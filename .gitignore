@@ -57,6 +57,4 @@ build/
 coverage.txt
 coverage.html
 
-# SQLBoiler generated files (we want to keep these in version control)
-# internal/database/models/*.go
-# !internal/database/models/boil*.go
+internal/database/models/*.go
