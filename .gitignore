@@ -24,9 +24,6 @@ go.sum
 *.swo
 *~
 
-# Environment files
-.env
-
 # Database files
 *.db
 *.sqlite
