@@ -31,10 +31,6 @@ generate: tools
 clean-models:
 	rm -rf internal/database/models
 
-
-SQLBOILER := sqlboiler
-MODELS_DIR := internal/database/models
-
 generate: tools
 	@echo "Generating sqlboiler models"
 	@mkdir -p $(MODELS_DIR)
