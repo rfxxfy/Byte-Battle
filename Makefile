@@ -33,15 +33,13 @@ generate: tools
 clean-models:
 	rm -rf internal/database/models
 
-
-
 APP_NAME := bytebattle
 CMD_DIR := ./cmd/$(APP_NAME)
 
 .PHONY: run build
 
 run:
-	@echo "→ Starting $(APP_NAME)"
+	@echo "Starting $(APP_NAME)"
 	@go run $(CMD_DIR)
 
 build:
