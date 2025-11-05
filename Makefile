@@ -22,23 +22,17 @@ tools:
 	@command -v $(SQLBOILER) >/dev/null || go install github.com/aarondl/sqlboiler/v4@latest
 	@command -v $(SQLBOILER_PSQL) >/dev/null || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@latest
 
+
 generate: tools
 	@echo "Generating sqlboiler models"
-	@mkdir -p internal/database
 	@rm -rf internal/database/models
-	@sqlboiler psql
+	@mkdir -p internal/database/models
+	@sqlboiler psql --output internal/database/models
+
 
 clean-models:
 	rm -rf internal/database/models
 
-generate: tools
-	@echo "Generating sqlboiler models"
-	@mkdir -p $(MODELS_DIR)
-	@rm -f $(MODELS_DIR)/*.go
-	@$(SQLBOILER) psql \
-		--config sqlboiler.toml \
-		--output $(MODELS_DIR) \
-		--pkgname models
 
 
 APP_NAME := bytebattle
