@@ -11,4 +11,3 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_token ON sessions(token);
