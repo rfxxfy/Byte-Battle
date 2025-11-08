@@ -103,3 +103,174 @@ func (s *HTTPServer) handleDeleteDuel(c echo.Context) error {
 
 	return c.NoContent(http.StatusNoContent)
 }
+
+func (s *HTTPServer) handleCreateSession(c echo.Context) error {
+	userID, err := strconv.Atoi(c.FormValue("user_id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"status": "error",
+			"error":  "invalid user_id",
+		})
+	}
+
+	session, err := s.sessionService.CreateSession(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusCreated, echo.Map{
+		"status":  "success",
+		"session": session,
+	})
+}
+
+func (s *HTTPServer) handleGetSession(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"status": "error",
+			"error":  "invalid session id",
+		})
+	}
+
+	session, err := s.sessionService.GetSession(c.Request().Context(), id)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"status":  "success",
+		"session": session,
+	})
+}
+
+func (s *HTTPServer) handleValidateSession(c echo.Context) error {
+	token := c.Request().Header.Get("Authorization")
+	if token == "" {
+		token = c.QueryParam("token")
+	}
+
+	session, err := s.sessionService.ValidateToken(c.Request().Context(), token)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"status":  "success",
+		"valid":   true,
+		"session": session,
+	})
+}
+
+func (s *HTTPServer) handleGetUserSessions(c echo.Context) error {
+	userID, err := strconv.Atoi(c.Param("user_id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"status": "error",
+			"error":  "invalid user_id",
+		})
+	}
+
+	sessions, err := s.sessionService.GetUserSessions(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"status":   "success",
+		"sessions": sessions,
+	})
+}
+
+func (s *HTTPServer) handleRefreshSession(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"status": "error",
+			"error":  "invalid session id",
+		})
+	}
+
+	session, err := s.sessionService.RefreshSession(c.Request().Context(), id)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"status":  "success",
+		"session": session,
+	})
+}
+
+func (s *HTTPServer) handleEndSession(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"status": "error",
+			"error":  "invalid session id",
+		})
+	}
+
+	err = s.sessionService.EndSession(c.Request().Context(), id)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *HTTPServer) handleEndAllUserSessions(c echo.Context) error {
+	userID, err := strconv.Atoi(c.Param("user_id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{
+			"status": "error",
+			"error":  "invalid user_id",
+		})
+	}
+
+	count, err := s.sessionService.EndAllUserSessions(c.Request().Context(), userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"status":  "success",
+		"deleted": count,
+	})
+}
+
+func (s *HTTPServer) handleCleanupExpiredSessions(c echo.Context) error {
+	count, err := s.sessionService.CleanupExpired(c.Request().Context())
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{
+			"status": "error",
+			"error":  err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"status":  "success",
+		"deleted": count,
+	})
+}
