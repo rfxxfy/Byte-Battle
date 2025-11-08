@@ -13,6 +13,15 @@ type CreateDuelRequest struct {
 	ProblemID int   `json:"problem_id"`
 }
 
+type SuccessResponse struct {
+	Status string `json:"status"`
+}
+
+type ErrorResponse struct {
+	Status string `json:"status"`
+	Error  string `json:"error"`
+}
+
 func (s *HTTPServer) handleRoot(c echo.Context) error {
 	return c.String(http.StatusOK, "Добро пожаловать в Byte-Battle!")
 }
@@ -101,7 +110,9 @@ func (s *HTTPServer) handleDeleteDuel(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.NoContent(http.StatusNoContent)
+	return c.JSON(http.StatusOK, SuccessResponse{
+		Status: "success",
+	})
 }
 
 func (s *HTTPServer) handleCreateSession(c echo.Context) error {
@@ -234,7 +245,9 @@ func (s *HTTPServer) handleEndSession(c echo.Context) error {
 		})
 	}
 
-	return c.NoContent(http.StatusNoContent)
+	return c.JSON(http.StatusOK, SuccessResponse{
+		Status: "success",
+	})
 }
 
 func (s *HTTPServer) handleEndAllUserSessions(c echo.Context) error {
