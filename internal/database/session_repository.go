@@ -13,7 +13,7 @@ import (
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 )
 
-type SessionRepository interface {
+type ISessionRepo interface {
 	Create(ctx context.Context, userID int, expiresAt time.Time) (*models.Session, error)
 	GetByID(ctx context.Context, id int) (*models.Session, error)
 	GetByToken(ctx context.Context, token string) (*models.Session, error)
@@ -25,12 +25,12 @@ type SessionRepository interface {
 	DeleteByUserID(ctx context.Context, userID int) (int64, error)
 }
 
-type sessionRepository struct {
+type sessionRepo struct {
 	db *sql.DB
 }
 
-func NewSessionRepository(db *sql.DB) SessionRepository {
-	return &sessionRepository{db: db}
+func NewSessionRepository(db *sql.DB) ISessionRepo {
+	return &sessionRepo{db: db}
 }
 
 func generateToken() (string, error) {
@@ -41,7 +41,7 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func (r *sessionRepository) Create(ctx context.Context, userID int, expiresAt time.Time) (*models.Session, error) {
+func (r *sessionRepo) Create(ctx context.Context, userID int, expiresAt time.Time) (*models.Session, error) {
 	token, err := generateToken()
 	if err != nil {
 		return nil, err
@@ -60,30 +60,30 @@ func (r *sessionRepository) Create(ctx context.Context, userID int, expiresAt ti
 	return session, nil
 }
 
-func (r *sessionRepository) GetByID(ctx context.Context, id int) (*models.Session, error) {
+func (r *sessionRepo) GetByID(ctx context.Context, id int) (*models.Session, error) {
 	return models.FindSession(ctx, r.db, id)
 }
 
-func (r *sessionRepository) GetByToken(ctx context.Context, token string) (*models.Session, error) {
+func (r *sessionRepo) GetByToken(ctx context.Context, token string) (*models.Session, error) {
 	return models.Sessions(
 		models.SessionWhere.Token.EQ(token),
 	).One(ctx, r.db)
 }
 
-func (r *sessionRepository) GetByUserID(ctx context.Context, userID int) (models.SessionSlice, error) {
+func (r *sessionRepo) GetByUserID(ctx context.Context, userID int) (models.SessionSlice, error) {
 	return models.Sessions(
 		models.SessionWhere.UserID.EQ(userID),
 		qm.OrderBy("created_at DESC"),
 	).All(ctx, r.db)
 }
 
-func (r *sessionRepository) Update(ctx context.Context, session *models.Session) error {
+func (r *sessionRepo) Update(ctx context.Context, session *models.Session) error {
 	session.UpdatedAt = time.Now()
 	_, err := session.Update(ctx, r.db, boil.Infer())
 	return err
 }
 
-func (r *sessionRepository) Delete(ctx context.Context, id int) error {
+func (r *sessionRepo) Delete(ctx context.Context, id int) error {
 	session, err := models.FindSession(ctx, r.db, id)
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func (r *sessionRepository) Delete(ctx context.Context, id int) error {
 	return err
 }
 
-func (r *sessionRepository) DeleteByToken(ctx context.Context, token string) error {
+func (r *sessionRepo) DeleteByToken(ctx context.Context, token string) error {
 	session, err := r.GetByToken(ctx, token)
 	if err != nil {
 		return err
@@ -103,13 +103,13 @@ func (r *sessionRepository) DeleteByToken(ctx context.Context, token string) err
 	return err
 }
 
-func (r *sessionRepository) DeleteExpired(ctx context.Context) (int64, error) {
+func (r *sessionRepo) DeleteExpired(ctx context.Context) (int64, error) {
 	return models.Sessions(
 		models.SessionWhere.ExpiresAt.LT(time.Now()),
 	).DeleteAll(ctx, r.db)
 }
 
-func (r *sessionRepository) DeleteByUserID(ctx context.Context, userID int) (int64, error) {
+func (r *sessionRepo) DeleteByUserID(ctx context.Context, userID int) (int64, error) {
 	return models.Sessions(
 		models.SessionWhere.UserID.EQ(userID),
 	).DeleteAll(ctx, r.db)

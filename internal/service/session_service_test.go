@@ -16,13 +16,13 @@ import (
 
 type SessionServiceTestSuite struct {
 	suite.Suite
-	mockRepo *mocks.MockSessionRepository
+	mockRepo *mocks.MockSessionRepo
 	service  *SessionService
 	ctx      context.Context
 }
 
 func (s *SessionServiceTestSuite) SetupTest() {
-	s.mockRepo = mocks.NewMockSessionRepository()
+	s.mockRepo = mocks.NewMockSessionRepo()
 	s.service = NewSessionService(s.mockRepo, WithSessionDuration(time.Hour))
 	s.ctx = context.Background()
 }
@@ -350,7 +350,7 @@ func (s *SessionServiceTestSuite) TestCleanupExpired_Success() {
 // WithSessionDuration option test
 
 func TestNewSessionService_WithCustomDuration(t *testing.T) {
-	mockRepo := mocks.NewMockSessionRepository()
+	mockRepo := mocks.NewMockSessionRepo()
 	customDuration := 48 * time.Hour
 
 	service := NewSessionService(mockRepo, WithSessionDuration(customDuration))
@@ -359,7 +359,7 @@ func TestNewSessionService_WithCustomDuration(t *testing.T) {
 }
 
 func TestNewSessionService_DefaultDuration(t *testing.T) {
-	mockRepo := mocks.NewMockSessionRepository()
+	mockRepo := mocks.NewMockSessionRepo()
 
 	service := NewSessionService(mockRepo)
 
