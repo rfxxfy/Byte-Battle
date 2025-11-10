@@ -1,0 +1,61 @@
+name: Build and Test Go App
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_USER: user_test
+          POSTGRES_PASSWORD: password_test
+          POSTGRES_DB: db_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.16'
+
+      #Сборка приложухи
+      - name: Build the application
+        run: go build -v ./...
+
+      #Запуск тестов
+      - name: Run tests
+        env:
+          PG_HOST: localhost
+          PG_PORT: 5432
+          PG_USER: user_test
+          PG_PASSWORD: password_test
+          PG_DBNAME: db_test
+        run: go test -v ./...
+
+      #Генерация отчета
+      - name: Generate test report
+        if: always()
+        run:
+          go install github.com/jstemmer/go-junit-report@latest
+          go test -v -json ./... | go-junit-report > report.xml
+
+      - name: Upload test report as Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-report
+          path: report.xml
