@@ -14,9 +14,9 @@ jobs:
       postgres:
         image: postgres:14-alpine
         env:
-          POSTGRES_USER: user_test
-          POSTGRES_PASSWORD: password_test
-          POSTGRES_DB: db_test
+          POSTGRES_USER: ${{ secrets.PG_USER_TEST }}
+          POSTGRES_PASSWORD: ${{ secrets.PG_PASSWORD_TEST }}
+          POSTGRES_DB: ${{ secrets.PG_DB_TEST }}
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -41,15 +41,15 @@ jobs:
         env:
           PG_HOST: localhost
           PG_PORT: 5432
-          PG_USER: user_test
-          PG_PASSWORD: password_test
-          PG_DBNAME: db_test
+          PG_USER: ${{ secrets.PG_USER_TEST }}
+          PG_PASSWORD: ${{ secrets.PG_PASSWORD_TEST }}
+          PG_DBNAME: ${{ secrets.PG_DB_TEST }}
         run: go test -v ./...
 
       #Генерация отчета
       - name: Generate test report
         if: always()
-        run:
+        run: |
           go install github.com/jstemmer/go-junit-report@latest
           go test -v -json ./... | go-junit-report > report.xml
 
