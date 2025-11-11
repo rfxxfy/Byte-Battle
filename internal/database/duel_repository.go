@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"sort"
 
 	"bytebattle/internal/database/models"
@@ -12,14 +11,13 @@ import (
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 )
 
-var ErrInvalidPlayerCount = errors.New("exactly 2 players required")
-
 type DuelStatus string
 
 const (
-	DuelStatusPending  DuelStatus = "pending"
-	DuelStatusActive   DuelStatus = "active"
-	DuelStatusFinished DuelStatus = "finished"
+	DuelStatusPending   DuelStatus = "pending"
+	DuelStatusActive    DuelStatus = "active"
+	DuelStatusFinished  DuelStatus = "finished"
+	DuelStatusCancelled DuelStatus = "cancelled"
 )
 
 type Player struct {
@@ -45,10 +43,6 @@ func NewDuelRepository(db *sql.DB) IDuelRepo {
 }
 
 func (r *duelRepo) Create(ctx context.Context, players []Player, problemID int) (*models.Duel, error) {
-	if len(players) != 2 {
-		return nil, ErrInvalidPlayerCount
-	}
-
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
