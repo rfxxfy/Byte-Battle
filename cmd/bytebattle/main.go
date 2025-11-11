@@ -25,7 +25,10 @@ func main() {
 	duelRepo := database.NewDuelRepository(db)
 	duelService := service.NewDuelService(duelRepo)
 
-	srv := server.NewHTTPServer(userService, duelService)
+	sessionRepo := database.NewSessionRepository(db)
+	sessionService := service.NewSessionService(sessionRepo)
+
+	srv := server.NewHTTPServer(userService, duelService, sessionService)
 
 	addr := httpCfg.Address()
 	log.Printf("Server started on %s", addr)
