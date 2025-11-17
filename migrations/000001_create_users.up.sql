@@ -1,6 +1,3 @@
--- +goose Up
--- SQL в разделе 'Up' выполняется при применении этой миграции
-
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
