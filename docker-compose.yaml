@@ -1,25 +1,22 @@
-version: "3.9"
-
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     container_name: bytebattle-postgres
     restart: unless-stopped
 
     environment:
-      POSTGRES_DB: bytebattle
-      POSTGRES_USER: bytebattle
-      POSTGRES_PASSWORD: bytebattle
+      POSTGRES_DB: ${DB_NAME:-bytebattle}
+      POSTGRES_USER: ${DB_USER:-bytebattle}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bytebattle}
 
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
 
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./schema:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bytebattle -d bytebattle"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bytebattle} -d ${DB_NAME:-bytebattle}"]
       interval: 5s
       timeout: 5s
       retries: 5
