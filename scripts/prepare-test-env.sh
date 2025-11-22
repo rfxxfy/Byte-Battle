@@ -12,14 +12,16 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== Preparing test environment ===${NC}"
+echo -e "${YELLOW}Checking environment variables...${NC}"
 
-# Default values (can be overridden by environment variables)
-export DB_HOST="${DB_HOST:-localhost}"
-export DB_PORT="${DB_PORT:-5432}"
-export DB_USER="${DB_USER:-bytebattle}"
-export DB_PASSWORD="${DB_PASSWORD:-bytebattle}"
-export DB_NAME="${DB_NAME:-bytebattle}"
+required_vars=(DB_HOST DB_PORT DB_USER DB_PASSWORD DB_NAME)
+
+for var in "${required_vars[@]}"; do
+    if [ -z "${!var}" ]; then
+        echo -e "${RED}Error: Environment variable $var is not set.${NC}"
+        exit 1
+    fi
+done
 
 DB_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
 
