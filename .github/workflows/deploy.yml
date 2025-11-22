@@ -1,0 +1,92 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  GO_VERSION: '1.25'
+
+jobs:
+  migrate-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install golang-migrate
+        run: |
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Step 1: Run migrations BEFORE deploying new code
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Run database migrations
+        env:
+          DB_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Running migrations..."
+          migrate -path ./migrations -database "$DB_URL" up
+          echo "Migrations completed successfully"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Step 2: Build application
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Build application
+        run: |
+          go build -o bin/bytebattle ./cmd/bytebattle
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Step 3: Deploy (example - adjust for your infrastructure)
+      # ─────────────────────────────────────────────────────────────────────
+      # Uncomment and configure based on your deployment target:
+
+      # Option A: Deploy to a VPS via SSH
+      # - name: Deploy to server
+      #   uses: appleboy/ssh-action@v1.0.0
+      #   with:
+      #     host: ${{ secrets.SSH_HOST }}
+      #     username: ${{ secrets.SSH_USER }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       cd /opt/bytebattle
+      #       docker compose pull
+      #       docker compose up -d
+
+      # Option B: Deploy to Docker Hub + trigger deployment
+      # - name: Login to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKER_USERNAME }}
+      #     password: ${{ secrets.DOCKER_TOKEN }}
+      #
+      # - name: Build and push Docker image
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: ${{ secrets.DOCKER_USERNAME }}/bytebattle:latest
+
+      # Option C: Deploy to Kubernetes
+      # - name: Deploy to Kubernetes
+      #   run: |
+      #     kubectl set image deployment/bytebattle app=bytebattle:${{ github.sha }}
+
+      - name: Deployment placeholder
+        run: |
+          echo "Migrations applied successfully"
+          echo "Application built: bin/bytebattle"
+          echo ""
+          echo "  Configure deployment step based on your infrastructure:"
+          echo "   - VPS via SSH"
+          echo "   - Docker Hub + container orchestration"
+          echo "   - Kubernetes"
+          echo "   - Cloud Run / App Engine / etc."
