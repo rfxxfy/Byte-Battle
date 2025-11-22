@@ -17,9 +17,9 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
+          POSTGRES_USER: ${{ secrets.PG_USER_TEST }}
+          POSTGRES_PASSWORD: ${{ secrets.PG_PASSWORD_TEST }}
+          POSTGRES_DB: ${{ secrets.PG_DB_TEST }}
         ports:
           - 5432:5432
         options: >-
