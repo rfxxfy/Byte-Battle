@@ -13,6 +13,10 @@ tidy:
 # SQLBoiler
 # ─────────────────────────────────────────────────────────────────────────────
 
+# CLI tool versions (single source of truth)
+MIGRATE_VERSION := v4.19.1
+SQLBOILER_VERSION := v4.19.7
+
 GOBIN := $(shell go env GOPATH)/bin
 SQLBOILER := $(GOBIN)/sqlboiler
 SQLBOILER_PSQL := $(GOBIN)/sqlboiler-psql
@@ -20,8 +24,8 @@ SQLBOILER_PSQL := $(GOBIN)/sqlboiler-psql
 .PHONY: tools generate clean-models
 
 tools:
-	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@latest
-	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@latest
+	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@$(SQLBOILER_VERSION)
+	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@$(SQLBOILER_VERSION)
 
 generate: tools
 	@echo "Generating sqlboiler models..."
@@ -50,7 +54,7 @@ DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?
 .PHONY: migrate-tools migrate-up migrate-down migrate-drop migrate-create migrate-version migrate-force
 
 migrate-tools:
-	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 
 migrate-up: migrate-tools
 	@echo "Applying all migrations..."

@@ -33,7 +33,7 @@ MIGRATE="${GOBIN}/migrate"
 
 if [ ! -f "$MIGRATE" ]; then
     echo -e "${YELLOW}Installing golang-migrate...${NC}"
-    go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+    go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
