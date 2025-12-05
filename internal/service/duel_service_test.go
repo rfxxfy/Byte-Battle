@@ -81,7 +81,7 @@ func TestCreateDuel_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duel, err := svc.CreateDuel(context.Background(), []int{1, 2}, 10)
 
 	if err != nil {
@@ -107,7 +107,7 @@ func TestCreateDuel_ThreePlayers(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.CreateDuel(context.Background(), []int{1, 2, 3}, 10)
 
 	if err != nil {
@@ -120,7 +120,7 @@ func TestCreateDuel_ThreePlayers(t *testing.T) {
 
 func TestCreateDuel_NotEnoughPlayers(t *testing.T) {
 	mock := &mockDuelRepo{}
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{1}, 10)
 
@@ -134,7 +134,7 @@ func TestCreateDuel_NotEnoughPlayers(t *testing.T) {
 
 func TestCreateDuel_EmptyPlayers(t *testing.T) {
 	mock := &mockDuelRepo{}
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{}, 10)
 
@@ -145,7 +145,7 @@ func TestCreateDuel_EmptyPlayers(t *testing.T) {
 
 func TestCreateDuel_DuplicatePlayers(t *testing.T) {
 	mock := &mockDuelRepo{}
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{1, 1}, 10)
 
@@ -159,7 +159,7 @@ func TestCreateDuel_DuplicatePlayers(t *testing.T) {
 
 func TestCreateDuel_DuplicateInThree(t *testing.T) {
 	mock := &mockDuelRepo{}
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{1, 2, 1}, 10)
 
@@ -175,7 +175,7 @@ func TestCreateDuel_RepoError(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.CreateDuel(context.Background(), []int{1, 2}, 10)
 
 	if err == nil {
@@ -190,7 +190,7 @@ func TestGetDuel_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duel, err := svc.GetDuel(context.Background(), 5)
 
 	if err != nil {
@@ -208,7 +208,7 @@ func TestGetDuel_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.GetDuel(context.Background(), 999)
 
 	if err == nil {
@@ -225,7 +225,7 @@ func TestListDuels_DefaultLimit(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), 0, 0)
 
 	if capturedLimit != 10 {
@@ -242,7 +242,7 @@ func TestListDuels_NegativeLimit(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), -5, 0)
 
 	if capturedLimit != 10 {
@@ -259,7 +259,7 @@ func TestListDuels_MaxLimit(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), 500, 0)
 
 	if capturedLimit != 100 {
@@ -276,7 +276,7 @@ func TestListDuels_ValidLimit(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), 50, 0)
 
 	if capturedLimit != 50 {
@@ -294,7 +294,7 @@ func TestStartDuel_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duel, err := svc.StartDuel(context.Background(), 1)
 
 	if err != nil {
@@ -312,7 +312,7 @@ func TestStartDuel_AlreadyActive(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
 	if err == nil {
@@ -327,7 +327,7 @@ func TestStartDuel_AlreadyFinished(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
 	if err == nil {
@@ -342,7 +342,7 @@ func TestStartDuel_NotFound(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
 	if err == nil {
@@ -360,7 +360,7 @@ func TestStartDuel_UpsertError(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
 	if err == nil {
@@ -383,7 +383,7 @@ func TestCompleteDuel_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duel, err := svc.CompleteDuel(context.Background(), 1, 1)
 
 	if err != nil {
@@ -412,7 +412,7 @@ func TestCompleteDuel_Player2Wins(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duel, err := svc.CompleteDuel(context.Background(), 1, 2)
 
 	if err != nil {
@@ -435,7 +435,7 @@ func TestCompleteDuel_InvalidWinner(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.CompleteDuel(context.Background(), 1, 999)
 
 	if err == nil {
@@ -453,7 +453,7 @@ func TestCompleteDuel_NotInProgress(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.CompleteDuel(context.Background(), 1, 1)
 
 	if err == nil {
@@ -471,7 +471,7 @@ func TestCancelDuel_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duel, err := svc.CancelDuel(context.Background(), 1)
 
 	if err != nil {
@@ -492,7 +492,7 @@ func TestCancelDuel_ActiveDuel(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duel, err := svc.CancelDuel(context.Background(), 1)
 
 	if err != nil {
@@ -510,7 +510,7 @@ func TestCancelDuel_AlreadyCompleted(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	_, err := svc.CancelDuel(context.Background(), 1)
 
 	if err == nil {
@@ -525,7 +525,7 @@ func TestDeleteDuel_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	err := svc.DeleteDuel(context.Background(), 1)
 
 	if err != nil {
@@ -540,7 +540,7 @@ func TestDeleteDuel_Error(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	err := svc.DeleteDuel(context.Background(), 1)
 
 	if err == nil {
@@ -555,7 +555,7 @@ func TestGetPlayerDuels_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duels, err := svc.GetPlayerDuels(context.Background(), 1)
 
 	if err != nil {
@@ -575,7 +575,7 @@ func TestGetActiveDuels_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewDuelServiceWithRepo(mock)
+	svc := NewDuelService(mock)
 	duels, err := svc.GetActiveDuels(context.Background())
 
 	if err != nil {
