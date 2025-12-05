@@ -13,6 +13,9 @@ tidy:
 # SQLBoiler
 # ─────────────────────────────────────────────────────────────────────────────
 
+MIGRATE_VERSION := v4.19.1
+SQLBOILER_VERSION := v4.19.7
+
 GOBIN := $(shell go env GOPATH)/bin
 SQLBOILER := $(GOBIN)/sqlboiler
 SQLBOILER_PSQL := $(GOBIN)/sqlboiler-psql
@@ -20,8 +23,8 @@ SQLBOILER_PSQL := $(GOBIN)/sqlboiler-psql
 .PHONY: tools generate clean-models
 
 tools:
-	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@latest
-	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@latest
+	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@$(SQLBOILER_VERSION)
+	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@$(SQLBOILER_VERSION)
 
 generate: tools
 	@echo "Generating sqlboiler models..."
@@ -39,39 +42,39 @@ clean-models:
 MIGRATE := $(GOBIN)/migrate
 MIGRATIONS_DIR := migrations
 
-# Database connection (can be overridden: make migrate-up DB_URL=...)
-DB_HOST ?= localhost
-DB_PORT ?= 5432
-DB_USER ?= bytebattle
-DB_PASSWORD ?= bytebattle
-DB_NAME ?= bytebattle
+# Database connection - requires .env file or env vars to be set
 DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
 
-.PHONY: migrate-tools migrate-up migrate-down migrate-drop migrate-create migrate-version migrate-force
+.PHONY: check-db-env migrate-tools migrate-up migrate-down migrate-drop migrate-create migrate-version migrate-force
+
+check-db-env:
+ifndef DB_HOST
+	$(error DB_HOST is not set. Create .env from .env.example or export env vars)
+endif
 
 migrate-tools:
-	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 
-migrate-up: migrate-tools
+migrate-up: check-db-env migrate-tools
 	@echo "Applying all migrations..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
 
-migrate-down: migrate-tools
+migrate-down: check-db-env migrate-tools
 	@echo "Rolling back last migration..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down 1
 
-migrate-down-all: migrate-tools
+migrate-down-all: check-db-env migrate-tools
 	@echo "Rolling back all migrations..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down
 
-migrate-drop: migrate-tools
+migrate-drop: check-db-env migrate-tools
 	@echo "Dropping all tables..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" drop -f
 
-migrate-version: migrate-tools
+migrate-version: check-db-env migrate-tools
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" version
 
-migrate-force: migrate-tools
+migrate-force: check-db-env migrate-tools
 ifndef VERSION
 	$(error VERSION is required. Usage: make migrate-force VERSION=N)
 endif
@@ -90,7 +93,7 @@ endif
 
 .PHONY: test test-prepare
 
-test-prepare:
+test-prepare: check-db-env
 	@./scripts/prepare-test-env.sh
 
 test: test-prepare

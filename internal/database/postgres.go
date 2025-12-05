@@ -6,7 +6,6 @@ import (
 
 	"bytebattle/internal/config"
 
-	"github.com/aarondl/sqlboiler/v4/boil"
 	_ "github.com/lib/pq"
 )
 
@@ -29,8 +28,6 @@ func NewPostgres(cfg *config.DatabaseConfig) (*sql.DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
-
-	boil.SetDB(db)
 
 	return db, nil
 }
