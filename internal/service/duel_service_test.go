@@ -7,6 +7,9 @@ import (
 
 	"bytebattle/internal/database"
 	"bytebattle/internal/database/models"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockDuelRepo struct {
@@ -84,18 +87,10 @@ func TestCreateDuel_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	duel, err := svc.CreateDuel(context.Background(), []int{1, 2}, 10)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if duel.ID != 1 {
-		t.Errorf("expected duel ID 1, got %d", duel.ID)
-	}
-	if duel.Player1ID != 1 {
-		t.Errorf("expected player1 ID 1, got %d", duel.Player1ID)
-	}
-	if duel.Player2ID != 2 {
-		t.Errorf("expected player2 ID 2, got %d", duel.Player2ID)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 1, duel.ID)
+	assert.Equal(t, 1, duel.Player1ID)
+	assert.Equal(t, 2, duel.Player2ID)
 }
 
 func TestCreateDuel_ThreePlayers(t *testing.T) {
@@ -110,12 +105,8 @@ func TestCreateDuel_ThreePlayers(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.CreateDuel(context.Background(), []int{1, 2, 3}, 10)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(capturedPlayers) != 3 {
-		t.Errorf("expected 3 players, got %d", len(capturedPlayers))
-	}
+	require.NoError(t, err)
+	assert.Len(t, capturedPlayers, 3)
 }
 
 func TestCreateDuel_NotEnoughPlayers(t *testing.T) {
@@ -124,12 +115,8 @@ func TestCreateDuel_NotEnoughPlayers(t *testing.T) {
 
 	_, err := svc.CreateDuel(context.Background(), []int{1}, 10)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if err.Error() != "at least two players are required" {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	require.Error(t, err)
+	assert.EqualError(t, err, "at least two players are required")
 }
 
 func TestCreateDuel_EmptyPlayers(t *testing.T) {
@@ -138,9 +125,7 @@ func TestCreateDuel_EmptyPlayers(t *testing.T) {
 
 	_, err := svc.CreateDuel(context.Background(), []int{}, 10)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestCreateDuel_DuplicatePlayers(t *testing.T) {
@@ -149,12 +134,8 @@ func TestCreateDuel_DuplicatePlayers(t *testing.T) {
 
 	_, err := svc.CreateDuel(context.Background(), []int{1, 1}, 10)
 
-	if err == nil {
-		t.Fatal("expected error for duplicate players, got nil")
-	}
-	if err.Error() != "players must be different" {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	require.Error(t, err)
+	assert.EqualError(t, err, "players must be different")
 }
 
 func TestCreateDuel_DuplicateInThree(t *testing.T) {
@@ -163,9 +144,7 @@ func TestCreateDuel_DuplicateInThree(t *testing.T) {
 
 	_, err := svc.CreateDuel(context.Background(), []int{1, 2, 1}, 10)
 
-	if err == nil {
-		t.Fatal("expected error for duplicate players, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestCreateDuel_RepoError(t *testing.T) {
@@ -178,9 +157,7 @@ func TestCreateDuel_RepoError(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.CreateDuel(context.Background(), []int{1, 2}, 10)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestGetDuel_Success(t *testing.T) {
@@ -193,12 +170,8 @@ func TestGetDuel_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	duel, err := svc.GetDuel(context.Background(), 5)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if duel.ID != 5 {
-		t.Errorf("expected ID 5, got %d", duel.ID)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 5, duel.ID)
 }
 
 func TestGetDuel_NotFound(t *testing.T) {
@@ -211,9 +184,7 @@ func TestGetDuel_NotFound(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.GetDuel(context.Background(), 999)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestListDuels_DefaultLimit(t *testing.T) {
@@ -228,9 +199,7 @@ func TestListDuels_DefaultLimit(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), 0, 0)
 
-	if capturedLimit != 10 {
-		t.Errorf("expected default limit 10, got %d", capturedLimit)
-	}
+	assert.Equal(t, 10, capturedLimit)
 }
 
 func TestListDuels_NegativeLimit(t *testing.T) {
@@ -245,9 +214,7 @@ func TestListDuels_NegativeLimit(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), -5, 0)
 
-	if capturedLimit != 10 {
-		t.Errorf("expected default limit 10, got %d", capturedLimit)
-	}
+	assert.Equal(t, 10, capturedLimit)
 }
 
 func TestListDuels_MaxLimit(t *testing.T) {
@@ -262,9 +229,7 @@ func TestListDuels_MaxLimit(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), 500, 0)
 
-	if capturedLimit != 100 {
-		t.Errorf("expected max limit 100, got %d", capturedLimit)
-	}
+	assert.Equal(t, 100, capturedLimit)
 }
 
 func TestListDuels_ValidLimit(t *testing.T) {
@@ -279,9 +244,7 @@ func TestListDuels_ValidLimit(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, _ = svc.ListDuels(context.Background(), 50, 0)
 
-	if capturedLimit != 50 {
-		t.Errorf("expected limit 50, got %d", capturedLimit)
-	}
+	assert.Equal(t, 50, capturedLimit)
 }
 
 func TestStartDuel_Success(t *testing.T) {
@@ -297,12 +260,8 @@ func TestStartDuel_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	duel, err := svc.StartDuel(context.Background(), 1)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if duel.Status != string(database.DuelStatusActive) {
-		t.Errorf("expected status active, got %s", duel.Status)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, string(database.DuelStatusActive), duel.Status)
 }
 
 func TestStartDuel_AlreadyActive(t *testing.T) {
@@ -315,9 +274,7 @@ func TestStartDuel_AlreadyActive(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestStartDuel_AlreadyFinished(t *testing.T) {
@@ -330,9 +287,7 @@ func TestStartDuel_AlreadyFinished(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestStartDuel_NotFound(t *testing.T) {
@@ -345,9 +300,7 @@ func TestStartDuel_NotFound(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestStartDuel_UpsertError(t *testing.T) {
@@ -363,9 +316,7 @@ func TestStartDuel_UpsertError(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.StartDuel(context.Background(), 1)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestCompleteDuel_Success(t *testing.T) {
@@ -386,15 +337,10 @@ func TestCompleteDuel_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	duel, err := svc.CompleteDuel(context.Background(), 1, 1)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if duel.Status != string(database.DuelStatusFinished) {
-		t.Errorf("expected status finished, got %s", duel.Status)
-	}
-	if !duel.WinnerID.Valid || duel.WinnerID.Int != 1 {
-		t.Errorf("expected winner ID 1, got %v", duel.WinnerID)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, string(database.DuelStatusFinished), duel.Status)
+	assert.True(t, duel.WinnerID.Valid)
+	assert.Equal(t, 1, duel.WinnerID.Int)
 }
 
 func TestCompleteDuel_Player2Wins(t *testing.T) {
@@ -415,12 +361,9 @@ func TestCompleteDuel_Player2Wins(t *testing.T) {
 	svc := NewDuelService(mock)
 	duel, err := svc.CompleteDuel(context.Background(), 1, 2)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !duel.WinnerID.Valid || duel.WinnerID.Int != 2 {
-		t.Errorf("expected winner ID 2, got %v", duel.WinnerID)
-	}
+	require.NoError(t, err)
+	assert.True(t, duel.WinnerID.Valid)
+	assert.Equal(t, 2, duel.WinnerID.Int)
 }
 
 func TestCompleteDuel_InvalidWinner(t *testing.T) {
@@ -438,12 +381,8 @@ func TestCompleteDuel_InvalidWinner(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.CompleteDuel(context.Background(), 1, 999)
 
-	if err == nil {
-		t.Fatal("expected error for invalid winner, got nil")
-	}
-	if err.Error() != "winner must be one of the players" {
-		t.Errorf("unexpected error message: %v", err)
-	}
+	require.Error(t, err)
+	assert.EqualError(t, err, "winner must be one of the players")
 }
 
 func TestCompleteDuel_NotInProgress(t *testing.T) {
@@ -456,9 +395,7 @@ func TestCompleteDuel_NotInProgress(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.CompleteDuel(context.Background(), 1, 1)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestCancelDuel_Success(t *testing.T) {
@@ -474,12 +411,8 @@ func TestCancelDuel_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	duel, err := svc.CancelDuel(context.Background(), 1)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if duel.Status != string(database.DuelStatusCancelled) {
-		t.Errorf("expected status cancelled, got %s", duel.Status)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, string(database.DuelStatusCancelled), duel.Status)
 }
 
 func TestCancelDuel_ActiveDuel(t *testing.T) {
@@ -495,12 +428,8 @@ func TestCancelDuel_ActiveDuel(t *testing.T) {
 	svc := NewDuelService(mock)
 	duel, err := svc.CancelDuel(context.Background(), 1)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if duel.Status != string(database.DuelStatusCancelled) {
-		t.Errorf("expected status cancelled, got %s", duel.Status)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, string(database.DuelStatusCancelled), duel.Status)
 }
 
 func TestCancelDuel_AlreadyCompleted(t *testing.T) {
@@ -513,9 +442,7 @@ func TestCancelDuel_AlreadyCompleted(t *testing.T) {
 	svc := NewDuelService(mock)
 	_, err := svc.CancelDuel(context.Background(), 1)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestDeleteDuel_Success(t *testing.T) {
@@ -528,9 +455,7 @@ func TestDeleteDuel_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	err := svc.DeleteDuel(context.Background(), 1)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestDeleteDuel_Error(t *testing.T) {
@@ -543,9 +468,7 @@ func TestDeleteDuel_Error(t *testing.T) {
 	svc := NewDuelService(mock)
 	err := svc.DeleteDuel(context.Background(), 1)
 
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
+	require.Error(t, err)
 }
 
 func TestGetPlayerDuels_Success(t *testing.T) {
@@ -558,12 +481,8 @@ func TestGetPlayerDuels_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	duels, err := svc.GetPlayerDuels(context.Background(), 1)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(duels) != 2 {
-		t.Errorf("expected 2 duels, got %d", len(duels))
-	}
+	require.NoError(t, err)
+	assert.Len(t, duels, 2)
 }
 
 func TestGetActiveDuels_Success(t *testing.T) {
@@ -578,13 +497,7 @@ func TestGetActiveDuels_Success(t *testing.T) {
 	svc := NewDuelService(mock)
 	duels, err := svc.GetActiveDuels(context.Background())
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(duels) != 1 {
-		t.Errorf("expected 1 duel, got %d", len(duels))
-	}
-	if capturedStatus != database.DuelStatusActive {
-		t.Errorf("expected status active, got %s", capturedStatus)
-	}
+	require.NoError(t, err)
+	assert.Len(t, duels, 1)
+	assert.Equal(t, database.DuelStatusActive, capturedStatus)
 }
