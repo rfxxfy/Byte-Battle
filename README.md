@@ -55,7 +55,7 @@ Byte-Battle — это не просто кодинг, а азартные и п
 
 5. Проверьте, что сервер работает:
    ```bash
-   curl http://localhost:8080/internal/hello_world
+   curl http://localhost:8080/
    ```
 
 ## Команды Makefile
