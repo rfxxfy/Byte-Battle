@@ -75,8 +75,21 @@ func (s *HTTPServer) handleGetDuel(c echo.Context) error {
 }
 
 func (s *HTTPServer) handleListDuels(c echo.Context) error {
-	limit, _ := strconv.Atoi(c.QueryParam("limit"))
-	offset, _ := strconv.Atoi(c.QueryParam("offset"))
+	var limit, offset int
+	if raw := c.QueryParam("limit"); raw != "" {
+		var err error
+		limit, err = strconv.Atoi(raw)
+		if err != nil {
+			return jsonErrorMsg(c, http.StatusBadRequest, "invalid limit")
+		}
+	}
+	if raw := c.QueryParam("offset"); raw != "" {
+		var err error
+		offset, err = strconv.Atoi(raw)
+		if err != nil {
+			return jsonErrorMsg(c, http.StatusBadRequest, "invalid offset")
+		}
+	}
 
 	duels, err := s.duelService.ListDuels(c.Request().Context(), limit, offset)
 	if err != nil {
@@ -244,8 +257,10 @@ func (s *HTTPServer) handleRefreshSession(c echo.Context) error {
 
 	session, err := s.sessionService.RefreshSession(c.Request().Context(), id)
 	if err != nil {
-		if errors.Is(err, service.ErrSessionNotFound) ||
-			errors.Is(err, service.ErrSessionExpired) {
+		if errors.Is(err, service.ErrSessionExpired) {
+			return jsonError(c, http.StatusUnauthorized, err)
+		}
+		if errors.Is(err, service.ErrSessionNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
 		}
 		return jsonError(c, http.StatusInternalServerError, err)
@@ -282,7 +297,7 @@ func (s *HTTPServer) handleEndAllUserSessions(c echo.Context) error {
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"ended": count})
+	return c.JSON(http.StatusOK, echo.Map{"count": count})
 }
 
 func (s *HTTPServer) handleCleanupExpiredSessions(c echo.Context) error {
@@ -291,5 +306,5 @@ func (s *HTTPServer) handleCleanupExpiredSessions(c echo.Context) error {
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"cleaned": count})
+	return c.JSON(http.StatusOK, echo.Map{"count": count})
 }

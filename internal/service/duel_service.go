@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -54,7 +53,7 @@ func (s *DuelService) CreateDuel(ctx context.Context, playerIDs []int, problemID
 func (s *DuelService) getDuel(ctx context.Context, id int) (*models.Duel, error) {
 	duel, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrDuelNotFound
 		}
 		return nil, err
