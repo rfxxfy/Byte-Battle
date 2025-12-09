@@ -43,7 +43,7 @@ Byte-Battle — это не просто кодинг, а азартные и п
 
 3. Поднимите базу данных и примените миграции:
    ```bash
-   docker compose up -d
+   docker compose up -d --wait
    make migrate-up
    ```
 
@@ -64,11 +64,15 @@ Byte-Battle — это не просто кодинг, а азартные и п
 make run                        # Запустить сервер
 make build                      # Собрать бинарник
 make generate                   # Сгенерировать модели SQLBoiler
+make clean-models               # Удалить сгенерированные модели
 make test                       # Запустить тесты
 make migrate-up                 # Применить все миграции
 make migrate-down               # Откатить последнюю миграцию
+make migrate-down-all           # Откатить все миграции
+make migrate-drop               # Удалить все таблицы
 make migrate-version            # Текущая версия миграции
 make migrate-create NAME=...    # Создать новую миграцию
+make migrate-force VERSION=...  # Принудительно задать версию миграции
 ```
 
 ## Структура проекта
