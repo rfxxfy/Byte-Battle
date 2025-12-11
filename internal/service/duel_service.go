@@ -144,11 +144,11 @@ func (s *DuelService) CancelDuel(ctx context.Context, id int) (*models.Duel, err
 }
 
 func (s *DuelService) DeleteDuel(ctx context.Context, id int) error {
-	_, err := s.getDuel(ctx, id)
-	if err != nil {
-		return err
+	err := s.repo.Delete(ctx, id)
+	if errors.Is(err, database.ErrNotFound) {
+		return ErrDuelNotFound
 	}
-	return s.repo.Delete(ctx, id)
+	return err
 }
 
 func (s *DuelService) GetPlayerDuels(ctx context.Context, playerID int) (models.DuelSlice, error) {
