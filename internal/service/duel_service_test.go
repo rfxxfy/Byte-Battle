@@ -187,6 +187,45 @@ func TestGetDuel_NotFound(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestGetDuel_SqlNoRows_ReturnsErrDuelNotFound(t *testing.T) {
+	mock := &mockDuelRepo{
+		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
+			return nil, database.ErrNotFound
+		},
+	}
+
+	svc := NewDuelService(mock)
+	_, err := svc.GetDuel(context.Background(), 999)
+
+	require.ErrorIs(t, err, ErrDuelNotFound)
+}
+
+func TestStartDuel_SqlNoRows_ReturnsErrDuelNotFound(t *testing.T) {
+	mock := &mockDuelRepo{
+		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
+			return nil, database.ErrNotFound
+		},
+	}
+
+	svc := NewDuelService(mock)
+	_, err := svc.StartDuel(context.Background(), 999)
+
+	require.ErrorIs(t, err, ErrDuelNotFound)
+}
+
+func TestDeleteDuel_SqlNoRows_ReturnsErrDuelNotFound(t *testing.T) {
+	mock := &mockDuelRepo{
+		deleteFunc: func(ctx context.Context, id int) error {
+			return database.ErrNotFound
+		},
+	}
+
+	svc := NewDuelService(mock)
+	err := svc.DeleteDuel(context.Background(), 999)
+
+	require.ErrorIs(t, err, ErrDuelNotFound)
+}
+
 func TestListDuels_DefaultLimit(t *testing.T) {
 	var capturedLimit int
 	mock := &mockDuelRepo{

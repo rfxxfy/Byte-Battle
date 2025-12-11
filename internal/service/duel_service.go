@@ -14,6 +14,7 @@ import (
 var (
 	ErrNotEnoughPlayers      = errors.New("at least two players are required")
 	ErrDuplicatePlayers      = errors.New("players must be different")
+	ErrDuelNotFound          = errors.New("duel not found")
 	ErrDuelAlreadyStarted    = errors.New("duel already started or completed")
 	ErrDuelNotInProgress     = errors.New("duel is not in progress")
 	ErrInvalidWinner         = errors.New("winner must be one of the players")
@@ -49,8 +50,19 @@ func (s *DuelService) CreateDuel(ctx context.Context, playerIDs []int, problemID
 	return s.repo.Create(ctx, players, problemID)
 }
 
+func (s *DuelService) getDuel(ctx context.Context, id int) (*models.Duel, error) {
+	duel, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrDuelNotFound
+		}
+		return nil, err
+	}
+	return duel, nil
+}
+
 func (s *DuelService) GetDuel(ctx context.Context, id int) (*models.Duel, error) {
-	return s.repo.GetByID(ctx, id)
+	return s.getDuel(ctx, id)
 }
 
 func (s *DuelService) ListDuels(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
@@ -65,7 +77,7 @@ func (s *DuelService) ListDuels(ctx context.Context, limit, offset int) (models.
 }
 
 func (s *DuelService) StartDuel(ctx context.Context, id int) (*models.Duel, error) {
-	duel, err := s.repo.GetByID(ctx, id)
+	duel, err := s.getDuel(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +98,7 @@ func (s *DuelService) StartDuel(ctx context.Context, id int) (*models.Duel, erro
 }
 
 func (s *DuelService) CompleteDuel(ctx context.Context, id int, winnerID int) (*models.Duel, error) {
-	duel, err := s.repo.GetByID(ctx, id)
+	duel, err := s.getDuel(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +124,7 @@ func (s *DuelService) CompleteDuel(ctx context.Context, id int, winnerID int) (*
 }
 
 func (s *DuelService) CancelDuel(ctx context.Context, id int) (*models.Duel, error) {
-	duel, err := s.repo.GetByID(ctx, id)
+	duel, err := s.getDuel(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +144,11 @@ func (s *DuelService) CancelDuel(ctx context.Context, id int) (*models.Duel, err
 }
 
 func (s *DuelService) DeleteDuel(ctx context.Context, id int) error {
-	return s.repo.Delete(ctx, id)
+	err := s.repo.Delete(ctx, id)
+	if errors.Is(err, database.ErrNotFound) {
+		return ErrDuelNotFound
+	}
+	return err
 }
 
 func (s *DuelService) GetPlayerDuels(ctx context.Context, playerID int) (models.DuelSlice, error) {

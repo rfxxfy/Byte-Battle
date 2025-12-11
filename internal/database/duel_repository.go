@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"sort"
 
 	"bytebattle/internal/database/models"
@@ -65,7 +66,11 @@ func (r *duelRepo) Create(ctx context.Context, players []Player, problemID int) 
 }
 
 func (r *duelRepo) GetByID(ctx context.Context, id int) (*models.Duel, error) {
-	return models.FindDuel(ctx, r.db, id)
+	duel, err := models.FindDuel(ctx, r.db, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return duel, err
 }
 
 func (r *duelRepo) GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
@@ -92,13 +97,14 @@ func (r *duelRepo) Upsert(ctx context.Context, duel *models.Duel) error {
 }
 
 func (r *duelRepo) Delete(ctx context.Context, id int) error {
-	duel, err := models.FindDuel(ctx, r.db, id)
+	rowsAff, err := models.Duels(qm.Where("id = ?", id)).DeleteAll(ctx, r.db)
 	if err != nil {
 		return err
 	}
-
-	_, err = duel.Delete(ctx, r.db)
-	return err
+	if rowsAff == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *duelRepo) GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error) {

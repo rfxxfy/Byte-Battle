@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"bytebattle/internal/database"
@@ -19,7 +18,7 @@ func NewUserService(repo database.IUserRepo) *UserService {
 
 func (s *UserService) GetOrCreateTestUser(ctx context.Context) (*models.User, error) {
 	user, err := s.repo.GetByUsername(ctx, "testuser")
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, database.ErrNotFound) {
 		return s.repo.Create(ctx, "testuser", "test@example.com", "hashedpassword")
 	}
 	return user, err
