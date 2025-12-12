@@ -17,7 +17,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("db error: %v", err)
 	}
-	defer db.Close()
 
 	userRepo := database.NewUserRepository(db)
 	userService := service.NewUserService(userRepo)
@@ -32,5 +31,7 @@ func main() {
 
 	addr := httpCfg.Address()
 	log.Printf("Server started on %s", addr)
-	log.Fatal(srv.Run(addr))
+	if err := srv.Run(addr); err != nil {
+		log.Fatalf("server error: %v", err)
+	}
 }
