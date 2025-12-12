@@ -1,0 +1,57 @@
+version: '2'
+
+run:
+  timeout: 5m
+  tests: true
+  concurrency: 8
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+
+    - gocritic
+    - misspell
+
+    - gosec
+    - bodyclose
+    - sqlclosecheck
+
+    - gocognit
+
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*database/sql.Tx).Rollback
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - commentFormatting
+
+    gocognit:
+      min-complexity: 20
+
+    misspell: {}
+
+issues:
+  exclude-dirs:
+    - internal/database/models
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocognit
+    # weak random is fine for non-security purposes
+    - linters: [gosec]
+      text: "G404"
+    # http server without timeout is acceptable in this context
+    - linters: [gosec]
+      text: "G114"
+    # directory/file permission checks
+    - linters: [gosec]
+      text: "G30[1246]"
