@@ -7,6 +7,22 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.9.0
+
   build-and-test:
     runs-on: ubuntu-latest
 
@@ -45,21 +61,6 @@ jobs:
         run: |
           go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
           migrate -path ./migrations -database "postgres://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=disable" up
-
-      - name: Create sqlboiler config
-        run: |
-          cat > sqlboiler.toml << EOF
-          [psql]
-            host = "${{ env.DB_HOST }}"
-            port = ${{ env.DB_PORT }}
-            user = "${{ secrets.PG_USER_TEST }}"
-            pass = "${{ secrets.PG_PASSWORD_TEST }}"
-            dbname = "${{ secrets.PG_DB_TEST }}"
-            sslmode = "disable"
-          EOF
-
-      - name: Generate SQLBoiler models
-        run: make generate
 
       - name: Build
         run: go build -v ./...
