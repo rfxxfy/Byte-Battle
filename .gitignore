@@ -56,3 +56,4 @@ build/
 coverage.txt
 coverage.html
 
+internal/database/models/*.go
