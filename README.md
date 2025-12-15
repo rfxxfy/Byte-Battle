@@ -47,9 +47,8 @@ Byte-Battle — это не просто кодинг, а азартные и п
    make migrate-up
    ```
 
-4. Сгенерируйте модели и запустите сервер:
+4. Запустите сервер:
    ```bash
-   make generate
    make run
    ```
 
@@ -63,9 +62,10 @@ Byte-Battle — это не просто кодинг, а азартные и п
 ```bash
 make run                        # Запустить сервер
 make build                      # Собрать бинарник
-make generate                   # Сгенерировать модели SQLBoiler
-make clean-models               # Удалить сгенерированные модели
+make lint                       # Запустить линтер
 make test                       # Запустить тесты
+make generate                   # Перегенерировать модели SQLBoiler (после изменения схемы БД)
+make clean-models               # Удалить сгенерированные модели
 make migrate-up                 # Применить все миграции
 make migrate-down               # Откатить последнюю миграцию
 make migrate-down-all           # Откатить все миграции
@@ -82,7 +82,7 @@ cmd/bytebattle/          # Точка входа приложения
 internal/
   config/                # Конфигурация (env-переменные)
   database/              # Репозитории и подключение к БД
-    models/              # Сгенерированные модели SQLBoiler (в .gitignore)
+    models/              # Сгенерированные модели SQLBoiler
   server/                # HTTP-сервер, роуты, хендлеры
   service/               # Бизнес-логика
 migrations/              # SQL-миграции (golang-migrate)
@@ -96,7 +96,7 @@ sqlboiler.toml.example   # Пример конфига SQLBoiler
 Приложение настраивается через переменные окружения.
 Все доступные переменные и их значения по умолчанию описаны в `.env.example`.
 
-`sqlboiler.toml` используется для генерации моделей — формат описан в `sqlboiler.toml.example`.
+`sqlboiler.toml` нужен только для перегенерации моделей при изменении схемы БД — формат описан в `sqlboiler.toml.example`.
 
 Оба файла (`.env`, `sqlboiler.toml`) содержат креды и **не должны коммититься** в репозиторий.
 
