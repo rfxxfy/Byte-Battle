@@ -97,7 +97,7 @@ func (s *DuelService) StartDuel(ctx context.Context, id int) (*models.Duel, erro
 	return duel, nil
 }
 
-func (s *DuelService) CompleteDuel(ctx context.Context, id int, winnerID int) (*models.Duel, error) {
+func (s *DuelService) CompleteDuel(ctx context.Context, id, winnerID int) (*models.Duel, error) {
 	duel, err := s.getDuel(ctx, id)
 	if err != nil {
 		return nil, err
