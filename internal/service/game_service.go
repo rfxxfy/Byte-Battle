@@ -12,26 +12,30 @@ import (
 )
 
 var (
-	ErrNotEnoughPlayers      = errors.New("at least two players are required")
-	ErrDuplicatePlayers      = errors.New("players must be different")
-	ErrDuelNotFound          = errors.New("duel not found")
-	ErrDuelAlreadyStarted    = errors.New("duel already started or completed")
-	ErrDuelNotInProgress     = errors.New("duel is not in progress")
-	ErrInvalidWinner         = errors.New("winner must be one of the players")
-	ErrCannotCancelCompleted = errors.New("cannot cancel completed duel")
+	ErrNotEnoughPlayers     = errors.New("at least two players are required")
+	ErrTooManyPlayers       = errors.New("too many players: maximum is 50")
+	ErrDuplicatePlayers     = errors.New("players must be different")
+	ErrGameNotFound         = errors.New("game not found")
+	ErrGameAlreadyStarted   = errors.New("game already started or completed")
+	ErrGameNotInProgress    = errors.New("game is not in progress")
+	ErrInvalidWinner        = errors.New("winner must be one of the players")
+	ErrCannotCancelFinished = errors.New("cannot cancel finished game")
 )
 
-type DuelService struct {
-	repo database.IDuelRepo
+type GameService struct {
+	repo database.IGameRepo
 }
 
-func NewDuelService(repo database.IDuelRepo) *DuelService {
-	return &DuelService{repo: repo}
+func NewGameService(repo database.IGameRepo) *GameService {
+	return &GameService{repo: repo}
 }
 
-func (s *DuelService) CreateDuel(ctx context.Context, playerIDs []int, problemID int) (*models.Duel, error) {
+func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID int) (*models.Game, error) {
 	if len(playerIDs) < 2 {
 		return nil, ErrNotEnoughPlayers
+	}
+	if len(playerIDs) > 50 {
+		return nil, ErrTooManyPlayers
 	}
 
 	seen := make(map[int]struct{})
@@ -50,22 +54,22 @@ func (s *DuelService) CreateDuel(ctx context.Context, playerIDs []int, problemID
 	return s.repo.Create(ctx, players, problemID)
 }
 
-func (s *DuelService) getDuel(ctx context.Context, id int) (*models.Duel, error) {
-	duel, err := s.repo.GetByID(ctx, id)
+func (s *GameService) getGame(ctx context.Context, id int) (*models.Game, error) {
+	game, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrDuelNotFound
+			return nil, ErrGameNotFound
 		}
 		return nil, err
 	}
-	return duel, nil
+	return game, nil
 }
 
-func (s *DuelService) GetDuel(ctx context.Context, id int) (*models.Duel, error) {
-	return s.getDuel(ctx, id)
+func (s *GameService) GetGame(ctx context.Context, id int) (*models.Game, error) {
+	return s.getGame(ctx, id)
 }
 
-func (s *DuelService) ListDuels(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
+func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.GameSlice, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -76,85 +80,82 @@ func (s *DuelService) ListDuels(ctx context.Context, limit, offset int) (models.
 	return s.repo.GetAll(ctx, limit, offset)
 }
 
-func (s *DuelService) StartDuel(ctx context.Context, id int) (*models.Duel, error) {
-	duel, err := s.getDuel(ctx, id)
+func (s *GameService) StartGame(ctx context.Context, id int) (*models.Game, error) {
+	game, err := s.getGame(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if duel.Status != string(database.DuelStatusPending) {
-		return nil, ErrDuelAlreadyStarted
+	if game.Status != string(database.GameStatusPending) {
+		return nil, ErrGameAlreadyStarted
 	}
 
-	duel.Status = string(database.DuelStatusActive)
-	duel.StartedAt = null.TimeFrom(time.Now())
+	game.Status = string(database.GameStatusActive)
+	game.StartedAt = null.TimeFrom(time.Now())
 
-	err = s.repo.Upsert(ctx, duel)
+	err = s.repo.Upsert(ctx, game)
 	if err != nil {
 		return nil, err
 	}
 
-	return duel, nil
+	return game, nil
 }
 
-func (s *DuelService) CompleteDuel(ctx context.Context, id, winnerID int) (*models.Duel, error) {
-	duel, err := s.getDuel(ctx, id)
+func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (*models.Game, error) {
+	game, err := s.getGame(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if duel.Status != string(database.DuelStatusActive) {
-		return nil, ErrDuelNotInProgress
+	if game.Status != string(database.GameStatusActive) {
+		return nil, ErrGameNotInProgress
 	}
 
-	if winnerID != duel.Player1ID && winnerID != duel.Player2ID {
+	ok, err := s.repo.IsParticipant(ctx, id, winnerID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, ErrInvalidWinner
 	}
 
-	duel.Status = string(database.DuelStatusFinished)
-	duel.WinnerID = null.IntFrom(winnerID)
-	duel.CompletedAt = null.TimeFrom(time.Now())
+	game.Status = string(database.GameStatusFinished)
+	game.WinnerID = null.IntFrom(winnerID)
+	game.CompletedAt = null.TimeFrom(time.Now())
 
-	err = s.repo.Upsert(ctx, duel)
+	err = s.repo.Upsert(ctx, game)
 	if err != nil {
 		return nil, err
 	}
 
-	return duel, nil
+	return game, nil
 }
 
-func (s *DuelService) CancelDuel(ctx context.Context, id int) (*models.Duel, error) {
-	duel, err := s.getDuel(ctx, id)
+func (s *GameService) CancelGame(ctx context.Context, id int) (*models.Game, error) {
+	game, err := s.getGame(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if duel.Status == string(database.DuelStatusFinished) {
-		return nil, ErrCannotCancelCompleted
+	if game.Status == string(database.GameStatusFinished) ||
+		game.Status == string(database.GameStatusCancelled) {
+		return nil, ErrCannotCancelFinished
 	}
 
-	duel.Status = string(database.DuelStatusCancelled)
+	game.Status = string(database.GameStatusCancelled)
 
-	err = s.repo.Upsert(ctx, duel)
+	err = s.repo.Upsert(ctx, game)
 	if err != nil {
 		return nil, err
 	}
 
-	return duel, nil
+	return game, nil
 }
 
-func (s *DuelService) DeleteDuel(ctx context.Context, id int) error {
+func (s *GameService) DeleteGame(ctx context.Context, id int) error {
 	err := s.repo.Delete(ctx, id)
 	if errors.Is(err, database.ErrNotFound) {
-		return ErrDuelNotFound
+		return ErrGameNotFound
 	}
 	return err
-}
-
-func (s *DuelService) GetPlayerDuels(ctx context.Context, playerID int) (models.DuelSlice, error) {
-	return s.repo.GetByPlayerID(ctx, playerID)
-}
-
-func (s *DuelService) GetActiveDuels(ctx context.Context) (models.DuelSlice, error) {
-	return s.repo.GetByStatus(ctx, database.DuelStatusActive)
 }

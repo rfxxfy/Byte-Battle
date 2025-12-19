@@ -11,11 +11,11 @@ import (
 type HTTPServer struct {
 	echo           *echo.Echo
 	users          *service.UserService
-	duelService    *service.DuelService
+	gameService    *service.GameService
 	sessionService *service.SessionService
 }
 
-func NewHTTPServer(users *service.UserService, duelService *service.DuelService, sessionService *service.SessionService) *HTTPServer {
+func NewHTTPServer(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService) *HTTPServer {
 	e := echo.New()
 
 	e.Use(middleware.RequestLogger())
@@ -24,7 +24,7 @@ func NewHTTPServer(users *service.UserService, duelService *service.DuelService,
 	s := &HTTPServer{
 		echo:           e,
 		users:          users,
-		duelService:    duelService,
+		gameService:    gameService,
 		sessionService: sessionService,
 	}
 

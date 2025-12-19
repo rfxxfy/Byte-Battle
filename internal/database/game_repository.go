@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"sort"
 
 	"bytebattle/internal/database/models"
 
@@ -12,92 +11,89 @@ import (
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 )
 
-type DuelStatus string
+type GameStatus string
 
 const (
-	DuelStatusPending   DuelStatus = "pending"
-	DuelStatusActive    DuelStatus = "active"
-	DuelStatusFinished  DuelStatus = "finished"
-	DuelStatusCancelled DuelStatus = "cancelled"
+	GameStatusPending   GameStatus = "pending"
+	GameStatusActive    GameStatus = "active"
+	GameStatusFinished  GameStatus = "finished"
+	GameStatusCancelled GameStatus = "cancelled"
 )
 
 type Player struct {
 	ID int
 }
 
-type IDuelRepo interface {
-	Create(ctx context.Context, players []Player, problemID int) (*models.Duel, error)
-	GetByID(ctx context.Context, id int) (*models.Duel, error)
-	GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error)
-	Upsert(ctx context.Context, duel *models.Duel) error
+type IGameRepo interface {
+	Create(ctx context.Context, players []Player, problemID int) (*models.Game, error)
+	GetByID(ctx context.Context, id int) (*models.Game, error)
+	GetAll(ctx context.Context, limit, offset int) (models.GameSlice, error)
+	Upsert(ctx context.Context, game *models.Game) error
 	Delete(ctx context.Context, id int) error
-	GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error)
-	GetByStatus(ctx context.Context, status DuelStatus) (models.DuelSlice, error)
+	IsParticipant(ctx context.Context, gameID, userID int) (bool, error)
 }
 
-type duelRepo struct {
+type gameRepo struct {
 	db *sql.DB
 }
 
-func NewDuelRepository(db *sql.DB) IDuelRepo {
-	return &duelRepo{db: db}
+func NewGameRepository(db *sql.DB) IGameRepo {
+	return &gameRepo{db: db}
 }
 
-func (r *duelRepo) Create(ctx context.Context, players []Player, problemID int) (*models.Duel, error) {
+func (r *gameRepo) Create(ctx context.Context, players []Player, problemID int) (*models.Game, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	duel := &models.Duel{
-		Player1ID: players[0].ID,
-		Player2ID: players[1].ID,
+	game := &models.Game{
 		ProblemID: problemID,
-		Status:    string(DuelStatusPending),
+		Status:    string(GameStatusPending),
 	}
 
-	err = duel.Insert(ctx, tx, boil.Infer())
+	err = game.Insert(ctx, tx, boil.Infer())
 	if err != nil {
 		return nil, err
 	}
 
-	return duel, tx.Commit()
+	for _, p := range players {
+		participant := &models.GameParticipant{
+			GameID: game.ID,
+			UserID: p.ID,
+		}
+		err = participant.Insert(ctx, tx, boil.Infer())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return game, tx.Commit()
 }
 
-func (r *duelRepo) GetByID(ctx context.Context, id int) (*models.Duel, error) {
-	duel, err := models.FindDuel(ctx, r.db, id)
+func (r *gameRepo) GetByID(ctx context.Context, id int) (*models.Game, error) {
+	game, err := models.FindGame(ctx, r.db, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
-	return duel, err
+	return game, err
 }
 
-func (r *duelRepo) GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
-	return models.Duels(
+func (r *gameRepo) GetAll(ctx context.Context, limit, offset int) (models.GameSlice, error) {
+	return models.Games(
 		qm.Limit(limit),
 		qm.Offset(offset),
 		qm.OrderBy("created_at DESC"),
 	).All(ctx, r.db)
 }
 
-func (r *duelRepo) Upsert(ctx context.Context, duel *models.Duel) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	err = duel.Upsert(ctx, tx, true, []string{"id"}, boil.Infer(), boil.Infer())
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+func (r *gameRepo) Upsert(ctx context.Context, game *models.Game) error {
+	return game.Upsert(ctx, r.db, true, []string{"id"}, boil.Infer(), boil.Infer())
 }
 
-func (r *duelRepo) Delete(ctx context.Context, id int) error {
-	rowsAff, err := models.Duels(qm.Where("id = ?", id)).DeleteAll(ctx, r.db)
+func (r *gameRepo) Delete(ctx context.Context, id int) error {
+	rowsAff, err := models.Games(qm.Where("id = ?", id)).DeleteAll(ctx, r.db)
 	if err != nil {
 		return err
 	}
@@ -107,45 +103,8 @@ func (r *duelRepo) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
-func (r *duelRepo) GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error) {
-	asPlayer1, err := models.Duels(
-		qm.Where("player1_id = ?", playerID),
-	).All(ctx, r.db)
-	if err != nil {
-		return nil, err
-	}
-
-	asPlayer2, err := models.Duels(
-		qm.Where("player2_id = ?", playerID),
-	).All(ctx, r.db)
-	if err != nil {
-		return nil, err
-	}
-
-	seen := make(map[int]struct{})
-	result := make(models.DuelSlice, 0, len(asPlayer1)+len(asPlayer2))
-
-	for _, d := range asPlayer1 {
-		seen[d.ID] = struct{}{}
-		result = append(result, d)
-	}
-
-	for _, d := range asPlayer2 {
-		if _, exists := seen[d.ID]; !exists {
-			result = append(result, d)
-		}
-	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].CreatedAt.Time.After(result[j].CreatedAt.Time)
-	})
-
-	return result, nil
-}
-
-func (r *duelRepo) GetByStatus(ctx context.Context, status DuelStatus) (models.DuelSlice, error) {
-	return models.Duels(
-		qm.Where("status = ?", string(status)),
-		qm.OrderBy("created_at DESC"),
-	).All(ctx, r.db)
+func (r *gameRepo) IsParticipant(ctx context.Context, gameID, userID int) (bool, error) {
+	return models.GameParticipants(
+		qm.Where("game_id = ? AND user_id = ?", gameID, userID),
+	).Exists(ctx, r.db)
 }

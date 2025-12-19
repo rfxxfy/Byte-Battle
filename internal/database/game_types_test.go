@@ -7,15 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDuelStatus_Constants(t *testing.T) {
+func TestGameStatus_Constants(t *testing.T) {
 	tests := []struct {
-		status   DuelStatus
+		status   GameStatus
 		expected string
 	}{
-		{DuelStatusPending, "pending"},
-		{DuelStatusActive, "active"},
-		{DuelStatusFinished, "finished"},
-		{DuelStatusCancelled, "cancelled"},
+		{GameStatusPending, "pending"},
+		{GameStatusActive, "active"},
+		{GameStatusFinished, "finished"},
+		{GameStatusCancelled, "cancelled"},
 	}
 
 	for _, tt := range tests {
@@ -37,8 +37,8 @@ func TestPlayer_ZeroValue(t *testing.T) {
 	assert.Equal(t, 0, player.ID)
 }
 
-func TestNewDuelRepository(t *testing.T) {
-	repo := NewDuelRepository(nil)
+func TestNewGameRepository(t *testing.T) {
+	repo := NewGameRepository(nil)
 
 	require.NotNil(t, repo)
 }

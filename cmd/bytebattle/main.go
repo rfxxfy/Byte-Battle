@@ -21,13 +21,13 @@ func main() {
 	userRepo := database.NewUserRepository(db)
 	userService := service.NewUserService(userRepo)
 
-	duelRepo := database.NewDuelRepository(db)
-	duelService := service.NewDuelService(duelRepo)
+	gameRepo := database.NewGameRepository(db)
+	gameService := service.NewGameService(gameRepo)
 
 	sessionRepo := database.NewSessionRepository(db)
 	sessionService := service.NewSessionService(sessionRepo)
 
-	srv := server.NewHTTPServer(userService, duelService, sessionService)
+	srv := server.NewHTTPServer(userService, gameService, sessionService)
 
 	addr := httpCfg.Address()
 	log.Printf("Server started on %s", addr)
