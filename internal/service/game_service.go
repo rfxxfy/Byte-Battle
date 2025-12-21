@@ -11,11 +11,8 @@ import (
 	"github.com/aarondl/null/v8"
 )
 
-const maxPlayers = 50
-
 var (
 	ErrNotEnoughPlayers     = errors.New("at least two players are required")
-	ErrTooManyPlayers       = errors.New("too many players: maximum is 50")
 	ErrDuplicatePlayers     = errors.New("players must be different")
 	ErrGameNotFound         = errors.New("game not found")
 	ErrGameAlreadyStarted   = errors.New("game already started or completed")
@@ -37,10 +34,6 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 	if len(playerIDs) < 2 {
 		return nil, ErrNotEnoughPlayers
 	}
-	if len(playerIDs) > maxPlayers {
-		return nil, ErrTooManyPlayers
-	}
-
 	seen := make(map[int]struct{})
 	for _, id := range playerIDs {
 		if _, exists := seen[id]; exists {

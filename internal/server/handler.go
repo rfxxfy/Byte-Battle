@@ -56,7 +56,6 @@ func (s *HTTPServer) handleCreateGame(c echo.Context) error {
 	game, err := s.gameService.CreateGame(c.Request().Context(), req.PlayerIDs, req.ProblemID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotEnoughPlayers) ||
-			errors.Is(err, service.ErrTooManyPlayers) ||
 			errors.Is(err, service.ErrDuplicatePlayers) {
 			return jsonError(c, http.StatusBadRequest, err)
 		}
