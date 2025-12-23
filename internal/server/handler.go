@@ -99,12 +99,12 @@ func (s *HTTPServer) handleListGames(c echo.Context) error {
 		}
 	}
 
-	games, err := s.gameService.ListGames(c.Request().Context(), limit, offset)
+	games, total, err := s.gameService.ListGames(c.Request().Context(), limit, offset)
 	if err != nil {
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"games": games})
+	return c.JSON(http.StatusOK, echo.Map{"games": games, "total": total})
 }
 
 func (s *HTTPServer) handleStartGame(c echo.Context) error {

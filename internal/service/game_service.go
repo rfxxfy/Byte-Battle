@@ -65,7 +65,7 @@ func (s *GameService) GetGame(ctx context.Context, id int) (*models.Game, error)
 	return s.getGame(ctx, id)
 }
 
-func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.GameSlice, error) {
+func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.GameSlice, int64, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -76,7 +76,17 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.
 		offset = 0
 	}
 
-	return s.repo.GetAll(ctx, limit, offset)
+	total, err := s.repo.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	games, err := s.repo.GetAll(ctx, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return games, total, nil
 }
 
 func (s *GameService) StartGame(ctx context.Context, id int) (*models.Game, error) {
