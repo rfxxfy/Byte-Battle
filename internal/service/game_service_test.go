@@ -8,18 +8,20 @@ import (
 	"bytebattle/internal/database"
 	"bytebattle/internal/database/models"
 
+	"github.com/aarondl/null/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type mockGameRepo struct {
-	createFunc        func(ctx context.Context, players []database.Player, problemID int) (*models.Game, error)
-	getByIDFunc       func(ctx context.Context, id int) (*models.Game, error)
-	getAllFunc         func(ctx context.Context, limit, offset int) (models.GameSlice, error)
-	countFunc         func(ctx context.Context) (int64, error)
-	upsertFunc        func(ctx context.Context, game *models.Game) error
-	deleteFunc        func(ctx context.Context, id int) error
-	isParticipantFunc func(ctx context.Context, gameID, userID int) (bool, error)
+	createFunc       func(ctx context.Context, players []database.Player, problemID int) (*models.Game, error)
+	getByIDFunc      func(ctx context.Context, id int) (*models.Game, error)
+	getAllFunc        func(ctx context.Context, limit, offset int) (models.GameSlice, error)
+	countFunc        func(ctx context.Context) (int64, error)
+	startGameFunc    func(ctx context.Context, id int) (*models.Game, error)
+	completeGameFunc func(ctx context.Context, id, winnerID int) (*models.Game, error)
+	cancelGameFunc   func(ctx context.Context, id int) (*models.Game, error)
+	deleteFunc       func(ctx context.Context, id int) error
 }
 
 func (m *mockGameRepo) Create(ctx context.Context, players []database.Player, problemID int) (*models.Game, error) {
@@ -50,11 +52,25 @@ func (m *mockGameRepo) Count(ctx context.Context) (int64, error) {
 	return 0, nil
 }
 
-func (m *mockGameRepo) Upsert(ctx context.Context, game *models.Game) error {
-	if m.upsertFunc != nil {
-		return m.upsertFunc(ctx, game)
+func (m *mockGameRepo) StartGame(ctx context.Context, id int) (*models.Game, error) {
+	if m.startGameFunc != nil {
+		return m.startGameFunc(ctx, id)
 	}
-	return nil
+	return &models.Game{ID: id, Status: database.GameStatusActive}, nil
+}
+
+func (m *mockGameRepo) CompleteGame(ctx context.Context, id, winnerID int) (*models.Game, error) {
+	if m.completeGameFunc != nil {
+		return m.completeGameFunc(ctx, id, winnerID)
+	}
+	return &models.Game{ID: id, Status: database.GameStatusFinished, WinnerID: null.IntFrom(winnerID)}, nil
+}
+
+func (m *mockGameRepo) CancelGame(ctx context.Context, id int) (*models.Game, error) {
+	if m.cancelGameFunc != nil {
+		return m.cancelGameFunc(ctx, id)
+	}
+	return &models.Game{ID: id, Status: database.GameStatusCancelled}, nil
 }
 
 func (m *mockGameRepo) Delete(ctx context.Context, id int) error {
@@ -62,13 +78,6 @@ func (m *mockGameRepo) Delete(ctx context.Context, id int) error {
 		return m.deleteFunc(ctx, id)
 	}
 	return nil
-}
-
-func (m *mockGameRepo) IsParticipant(ctx context.Context, gameID, userID int) (bool, error) {
-	if m.isParticipantFunc != nil {
-		return m.isParticipantFunc(ctx, gameID, userID)
-	}
-	return false, nil
 }
 
 func TestCreateGame_Success(t *testing.T) {
@@ -104,7 +113,6 @@ func TestCreateGame_ThreePlayers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, capturedPlayers, 3)
 }
-
 
 func TestCreateGame_NotEnoughPlayers(t *testing.T) {
 	mock := &mockGameRepo{}
@@ -197,9 +205,62 @@ func TestGetGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
 	require.ErrorIs(t, err, ErrGameNotFound)
 }
 
+func TestStartGame_Success(t *testing.T) {
+	mock := &mockGameRepo{
+		startGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
+		},
+	}
+
+	svc := NewGameService(mock)
+	game, err := svc.StartGame(context.Background(), 1)
+
+	require.NoError(t, err)
+	assert.Equal(t, database.GameStatusActive, game.Status)
+}
+
+func TestStartGame_AlreadyActive(t *testing.T) {
+	mock := &mockGameRepo{
+		startGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return nil, database.ErrGameNotPending
+		},
+	}
+
+	svc := NewGameService(mock)
+	_, err := svc.StartGame(context.Background(), 1)
+
+	require.ErrorIs(t, err, ErrGameAlreadyStarted)
+}
+
+func TestStartGame_AlreadyFinished(t *testing.T) {
+	mock := &mockGameRepo{
+		startGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return nil, database.ErrGameNotPending
+		},
+	}
+
+	svc := NewGameService(mock)
+	_, err := svc.StartGame(context.Background(), 1)
+
+	require.ErrorIs(t, err, ErrGameAlreadyStarted)
+}
+
+func TestStartGame_NotFound(t *testing.T) {
+	mock := &mockGameRepo{
+		startGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return nil, database.ErrNotFound
+		},
+	}
+
+	svc := NewGameService(mock)
+	_, err := svc.StartGame(context.Background(), 1)
+
+	require.ErrorIs(t, err, ErrGameNotFound)
+}
+
 func TestStartGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
+		startGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
 			return nil, database.ErrNotFound
 		},
 	}
@@ -208,6 +269,19 @@ func TestStartGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
 	_, err := svc.StartGame(context.Background(), 999)
 
 	require.ErrorIs(t, err, ErrGameNotFound)
+}
+
+func TestStartGame_RepoError(t *testing.T) {
+	mock := &mockGameRepo{
+		startGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return nil, errors.New("db error")
+		},
+	}
+
+	svc := NewGameService(mock)
+	_, err := svc.StartGame(context.Background(), 1)
+
+	require.Error(t, err)
 }
 
 func TestDeleteGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
@@ -283,88 +357,14 @@ func TestListGames_ValidLimit(t *testing.T) {
 	assert.Equal(t, 50, capturedLimit)
 }
 
-func TestStartGame_Success(t *testing.T) {
-	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
-		},
-		upsertFunc: func(ctx context.Context, game *models.Game) error {
-			return nil
-		},
-	}
-
-	svc := NewGameService(mock)
-	game, err := svc.StartGame(context.Background(), 1)
-
-	require.NoError(t, err)
-	assert.Equal(t, database.GameStatusActive, game.Status)
-}
-
-func TestStartGame_AlreadyActive(t *testing.T) {
-	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
-		},
-	}
-
-	svc := NewGameService(mock)
-	_, err := svc.StartGame(context.Background(), 1)
-
-	require.Error(t, err)
-}
-
-func TestStartGame_AlreadyFinished(t *testing.T) {
-	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusFinished}, nil
-		},
-	}
-
-	svc := NewGameService(mock)
-	_, err := svc.StartGame(context.Background(), 1)
-
-	require.Error(t, err)
-}
-
-func TestStartGame_NotFound(t *testing.T) {
-	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return nil, errors.New("not found")
-		},
-	}
-
-	svc := NewGameService(mock)
-	_, err := svc.StartGame(context.Background(), 1)
-
-	require.Error(t, err)
-}
-
-func TestStartGame_UpsertError(t *testing.T) {
-	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
-		},
-		upsertFunc: func(ctx context.Context, game *models.Game) error {
-			return errors.New("upsert error")
-		},
-	}
-
-	svc := NewGameService(mock)
-	_, err := svc.StartGame(context.Background(), 1)
-
-	require.Error(t, err)
-}
-
 func TestCompleteGame_Success(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
-		},
-		isParticipantFunc: func(ctx context.Context, gameID, userID int) (bool, error) {
-			return userID == 1 || userID == 2, nil
-		},
-		upsertFunc: func(ctx context.Context, game *models.Game) error {
-			return nil
+		completeGameFunc: func(ctx context.Context, id, winnerID int) (*models.Game, error) {
+			return &models.Game{
+				ID:       id,
+				Status:   database.GameStatusFinished,
+				WinnerID: null.IntFrom(winnerID),
+			}, nil
 		},
 	}
 
@@ -379,14 +379,12 @@ func TestCompleteGame_Success(t *testing.T) {
 
 func TestCompleteGame_SecondPlayerWins(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
-		},
-		isParticipantFunc: func(ctx context.Context, gameID, userID int) (bool, error) {
-			return userID == 1 || userID == 2, nil
-		},
-		upsertFunc: func(ctx context.Context, game *models.Game) error {
-			return nil
+		completeGameFunc: func(ctx context.Context, id, winnerID int) (*models.Game, error) {
+			return &models.Game{
+				ID:       id,
+				Status:   database.GameStatusFinished,
+				WinnerID: null.IntFrom(winnerID),
+			}, nil
 		},
 	}
 
@@ -400,41 +398,48 @@ func TestCompleteGame_SecondPlayerWins(t *testing.T) {
 
 func TestCompleteGame_InvalidWinner(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
-		},
-		isParticipantFunc: func(ctx context.Context, gameID, userID int) (bool, error) {
-			return false, nil
+		completeGameFunc: func(ctx context.Context, id, winnerID int) (*models.Game, error) {
+			return nil, database.ErrNotParticipant
 		},
 	}
 
 	svc := NewGameService(mock)
 	_, err := svc.CompleteGame(context.Background(), 1, 999)
 
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrInvalidWinner)
 	assert.EqualError(t, err, "winner must be one of the players")
 }
 
 func TestCompleteGame_NotInProgress(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
+		completeGameFunc: func(ctx context.Context, id, winnerID int) (*models.Game, error) {
+			return nil, database.ErrGameNotActive
 		},
 	}
 
 	svc := NewGameService(mock)
 	_, err := svc.CompleteGame(context.Background(), 1, 1)
 
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrGameNotInProgress)
+}
+
+func TestCompleteGame_NotFound(t *testing.T) {
+	mock := &mockGameRepo{
+		completeGameFunc: func(ctx context.Context, id, winnerID int) (*models.Game, error) {
+			return nil, database.ErrNotFound
+		},
+	}
+
+	svc := NewGameService(mock)
+	_, err := svc.CompleteGame(context.Background(), 999, 1)
+
+	require.ErrorIs(t, err, ErrGameNotFound)
 }
 
 func TestCancelGame_Success(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
-		},
-		upsertFunc: func(ctx context.Context, game *models.Game) error {
-			return nil
+		cancelGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return &models.Game{ID: id, Status: database.GameStatusCancelled}, nil
 		},
 	}
 
@@ -447,11 +452,8 @@ func TestCancelGame_Success(t *testing.T) {
 
 func TestCancelGame_ActiveGame(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
-		},
-		upsertFunc: func(ctx context.Context, game *models.Game) error {
-			return nil
+		cancelGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return &models.Game{ID: id, Status: database.GameStatusCancelled}, nil
 		},
 	}
 
@@ -464,21 +466,21 @@ func TestCancelGame_ActiveGame(t *testing.T) {
 
 func TestCancelGame_AlreadyFinished(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusFinished}, nil
+		cancelGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return nil, database.ErrGameFinished
 		},
 	}
 
 	svc := NewGameService(mock)
 	_, err := svc.CancelGame(context.Background(), 1)
 
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrCannotCancelFinished)
 }
 
 func TestCancelGame_AlreadyCancelled(t *testing.T) {
 	mock := &mockGameRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: database.GameStatusCancelled}, nil
+		cancelGameFunc: func(ctx context.Context, id int) (*models.Game, error) {
+			return nil, database.ErrGameAlreadyCancelled
 		},
 	}
 

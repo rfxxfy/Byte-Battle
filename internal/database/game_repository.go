@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"bytebattle/internal/database/models"
 
+	"github.com/aarondl/null/v8"
 	"github.com/aarondl/sqlboiler/v4/boil"
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 )
@@ -27,9 +29,10 @@ type IGameRepo interface {
 	GetByID(ctx context.Context, id int) (*models.Game, error)
 	GetAll(ctx context.Context, limit, offset int) (models.GameSlice, error)
 	Count(ctx context.Context) (int64, error)
-	Upsert(ctx context.Context, game *models.Game) error
+	StartGame(ctx context.Context, id int) (*models.Game, error)
+	CompleteGame(ctx context.Context, id, winnerID int) (*models.Game, error)
+	CancelGame(ctx context.Context, id int) (*models.Game, error)
 	Delete(ctx context.Context, id int) error
-	IsParticipant(ctx context.Context, gameID, userID int) (bool, error)
 }
 
 type gameRepo struct {
@@ -91,8 +94,107 @@ func (r *gameRepo) Count(ctx context.Context) (int64, error) {
 	return models.Games().Count(ctx, r.db)
 }
 
-func (r *gameRepo) Upsert(ctx context.Context, game *models.Game) error {
-	return game.Upsert(ctx, r.db, true, []string{"id"}, boil.Infer(), boil.Infer())
+func (r *gameRepo) StartGame(ctx context.Context, id int) (*models.Game, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	game, err := models.Games(qm.Where("id = ?", id), qm.For("UPDATE")).One(ctx, tx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if game.Status != GameStatusPending {
+		return nil, ErrGameNotPending
+	}
+
+	game.Status = GameStatusActive
+	game.StartedAt = null.TimeFrom(time.Now())
+	game.UpdatedAt = null.TimeFrom(time.Now())
+
+	if _, err = game.Update(ctx, tx, boil.Infer()); err != nil {
+		return nil, err
+	}
+
+	return game, tx.Commit()
+}
+
+func (r *gameRepo) CompleteGame(ctx context.Context, id, winnerID int) (*models.Game, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	game, err := models.Games(qm.Where("id = ?", id), qm.For("UPDATE")).One(ctx, tx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if game.Status != GameStatusActive {
+		return nil, ErrGameNotActive
+	}
+
+	ok, err := models.GameParticipants(
+		qm.Where("game_id = ? AND user_id = ?", id, winnerID),
+	).Exists(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, ErrNotParticipant
+	}
+
+	game.Status = GameStatusFinished
+	game.WinnerID = null.IntFrom(winnerID)
+	game.CompletedAt = null.TimeFrom(time.Now())
+	game.UpdatedAt = null.TimeFrom(time.Now())
+
+	if _, err = game.Update(ctx, tx, boil.Infer()); err != nil {
+		return nil, err
+	}
+
+	return game, tx.Commit()
+}
+
+func (r *gameRepo) CancelGame(ctx context.Context, id int) (*models.Game, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	game, err := models.Games(qm.Where("id = ?", id), qm.For("UPDATE")).One(ctx, tx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if game.Status == GameStatusFinished {
+		return nil, ErrGameFinished
+	}
+	if game.Status == GameStatusCancelled {
+		return nil, ErrGameAlreadyCancelled
+	}
+
+	game.Status = GameStatusCancelled
+	game.UpdatedAt = null.TimeFrom(time.Now())
+
+	if _, err = game.Update(ctx, tx, boil.Infer()); err != nil {
+		return nil, err
+	}
+
+	return game, tx.Commit()
 }
 
 func (r *gameRepo) Delete(ctx context.Context, id int) error {
@@ -104,10 +206,4 @@ func (r *gameRepo) Delete(ctx context.Context, id int) error {
 		return ErrNotFound
 	}
 	return nil
-}
-
-func (r *gameRepo) IsParticipant(ctx context.Context, gameID, userID int) (bool, error) {
-	return models.GameParticipants(
-		qm.Where("game_id = ? AND user_id = ?", gameID, userID),
-	).Exists(ctx, r.db)
 }
