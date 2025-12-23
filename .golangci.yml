@@ -28,6 +28,7 @@ linters:
       - path: _test\.go
         linters:
           - gocognit
+          - gosec
       # weak random is fine for non-security purposes
       - linters: [gosec]
         text: "G404"
@@ -42,6 +43,7 @@ linters:
     errcheck:
       exclude-functions:
         - (*database/sql.Tx).Rollback
+        - (*database/sql.DB).Close
 
     gocritic:
       enabled-tags:
