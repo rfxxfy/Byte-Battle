@@ -13,3 +13,4 @@ CREATE TABLE games (
 CREATE INDEX idx_games_problem_id ON games(problem_id);
 CREATE INDEX idx_games_winner_id ON games(winner_id);
 CREATE INDEX idx_games_status ON games(status);
+CREATE INDEX idx_games_created_at ON games(created_at);
