@@ -74,4 +74,10 @@ func TestGameDeleteCascadesParticipants(t *testing.T) {
 	count, err = models.GameParticipants(qm.Where("game_id = ?", game.ID)).Count(ctx, db)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), count, "participants should be cascade-deleted with the game")
+
+	game2, err := repo.Create(ctx, []Player{{ID: user1}, {ID: user2}}, problemID)
+	require.NoError(t, err, "should be able to create a new game with the same players after deletion")
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM games WHERE id = $1", game2.ID)
+	})
 }
