@@ -52,6 +52,7 @@ linters:
         - style
       disabled-checks:
         - commentFormatting
+        - hugeParam
 
     gocognit:
       min-complexity: 20
