@@ -10,12 +10,12 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type CreateDuelRequest struct {
+type CreateGameRequest struct {
 	PlayerIDs []int `json:"player_ids"`
 	ProblemID int   `json:"problem_id"`
 }
 
-type CompleteDuelRequest struct {
+type CompleteGameRequest struct {
 	WinnerID int `json:"winner_id"`
 }
 
@@ -47,13 +47,13 @@ func (s *HTTPServer) handleHello(c echo.Context) error {
 	})
 }
 
-func (s *HTTPServer) handleCreateDuel(c echo.Context) error {
-	var req CreateDuelRequest
+func (s *HTTPServer) handleCreateGame(c echo.Context) error {
+	var req CreateGameRequest
 	if err := c.Bind(&req); err != nil {
 		return jsonErrorMsg(c, http.StatusBadRequest, "invalid request body")
 	}
 
-	duel, err := s.duelService.CreateDuel(c.Request().Context(), req.PlayerIDs, req.ProblemID)
+	game, err := s.gameService.CreateGame(c.Request().Context(), req.PlayerIDs, req.ProblemID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotEnoughPlayers) ||
 			errors.Is(err, service.ErrDuplicatePlayers) {
@@ -62,27 +62,27 @@ func (s *HTTPServer) handleCreateDuel(c echo.Context) error {
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusCreated, echo.Map{"duel": duel})
+	return c.JSON(http.StatusCreated, echo.Map{"game": game})
 }
 
-func (s *HTTPServer) handleGetDuel(c echo.Context) error {
+func (s *HTTPServer) handleGetGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid duel id")
+		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
 	}
 
-	duel, err := s.duelService.GetDuel(c.Request().Context(), id)
+	game, err := s.gameService.GetGame(c.Request().Context(), id)
 	if err != nil {
-		if errors.Is(err, service.ErrDuelNotFound) {
+		if errors.Is(err, service.ErrGameNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
 		}
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"duel": duel})
+	return c.JSON(http.StatusOK, echo.Map{"game": game})
 }
 
-func (s *HTTPServer) handleListDuels(c echo.Context) error {
+func (s *HTTPServer) handleListGames(c echo.Context) error {
 	var limit, offset int
 	if raw := c.QueryParam("limit"); raw != "" {
 		var err error
@@ -99,95 +99,93 @@ func (s *HTTPServer) handleListDuels(c echo.Context) error {
 		}
 	}
 
-	duels, err := s.duelService.ListDuels(c.Request().Context(), limit, offset)
+	games, total, err := s.gameService.ListGames(c.Request().Context(), limit, offset)
 	if err != nil {
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"duels": duels})
+	return c.JSON(http.StatusOK, echo.Map{"games": games, "total": total})
 }
 
-func (s *HTTPServer) handleStartDuel(c echo.Context) error {
+func (s *HTTPServer) handleStartGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid duel id")
+		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
 	}
 
-	duel, err := s.duelService.StartDuel(c.Request().Context(), id)
+	game, err := s.gameService.StartGame(c.Request().Context(), id)
 	if err != nil {
-		if errors.Is(err, service.ErrDuelNotFound) {
+		if errors.Is(err, service.ErrGameNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
 		}
-		if errors.Is(err, service.ErrDuelAlreadyStarted) {
+		if errors.Is(err, service.ErrGameAlreadyStarted) {
 			return jsonError(c, http.StatusBadRequest, err)
 		}
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"duel": duel})
+	return c.JSON(http.StatusOK, echo.Map{"game": game})
 }
 
-func (s *HTTPServer) handleCompleteDuel(c echo.Context) error {
+func (s *HTTPServer) handleCompleteGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid duel id")
+		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
 	}
 
-	var req CompleteDuelRequest
+	var req CompleteGameRequest
 	if err := c.Bind(&req); err != nil {
 		return jsonErrorMsg(c, http.StatusBadRequest, "invalid request body")
 	}
-	if req.WinnerID == 0 {
-		return jsonErrorMsg(c, http.StatusBadRequest, "winner_id is required")
-	}
-	if req.WinnerID < 0 {
+	if req.WinnerID < 1 {
 		return jsonErrorMsg(c, http.StatusBadRequest, "invalid winner_id")
 	}
 
-	duel, err := s.duelService.CompleteDuel(c.Request().Context(), id, req.WinnerID)
+	game, err := s.gameService.CompleteGame(c.Request().Context(), id, req.WinnerID)
 	if err != nil {
-		if errors.Is(err, service.ErrDuelNotFound) {
+		if errors.Is(err, service.ErrGameNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
 		}
-		if errors.Is(err, service.ErrDuelNotInProgress) ||
+		if errors.Is(err, service.ErrGameNotInProgress) ||
 			errors.Is(err, service.ErrInvalidWinner) {
 			return jsonError(c, http.StatusBadRequest, err)
 		}
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"duel": duel})
+	return c.JSON(http.StatusOK, echo.Map{"game": game})
 }
 
-func (s *HTTPServer) handleCancelDuel(c echo.Context) error {
+func (s *HTTPServer) handleCancelGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid duel id")
+		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
 	}
 
-	duel, err := s.duelService.CancelDuel(c.Request().Context(), id)
+	game, err := s.gameService.CancelGame(c.Request().Context(), id)
 	if err != nil {
-		if errors.Is(err, service.ErrDuelNotFound) {
+		if errors.Is(err, service.ErrGameNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
 		}
-		if errors.Is(err, service.ErrCannotCancelCompleted) {
+		if errors.Is(err, service.ErrCannotCancelFinished) ||
+			errors.Is(err, service.ErrGameAlreadyCancelled) {
 			return jsonError(c, http.StatusBadRequest, err)
 		}
 		return jsonError(c, http.StatusInternalServerError, err)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"duel": duel})
+	return c.JSON(http.StatusOK, echo.Map{"game": game})
 }
 
-func (s *HTTPServer) handleDeleteDuel(c echo.Context) error {
+func (s *HTTPServer) handleDeleteGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid duel id")
+		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
 	}
 
-	err = s.duelService.DeleteDuel(c.Request().Context(), id)
+	err = s.gameService.DeleteGame(c.Request().Context(), id)
 	if err != nil {
-		if errors.Is(err, service.ErrDuelNotFound) {
+		if errors.Is(err, service.ErrGameNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
 		}
 		return jsonError(c, http.StatusInternalServerError, err)

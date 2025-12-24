@@ -30,7 +30,7 @@ generate: tools
 	@echo "Generating sqlboiler models..."
 	@rm -rf internal/database/models
 	@mkdir -p internal/database/models
-	@PATH="$(GOBIN):$$PATH" $(SQLBOILER) psql --output internal/database/models
+	@PATH="$(GOBIN):$$PATH" $(SQLBOILER) psql --output internal/database/models --no-tests
 
 clean-models:
 	rm -rf internal/database/models
@@ -50,6 +50,18 @@ DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?
 check-db-env:
 ifndef DB_HOST
 	$(error DB_HOST is not set. Create .env from .env.example or export env vars)
+endif
+ifndef DB_PORT
+	$(error DB_PORT is not set)
+endif
+ifndef DB_USER
+	$(error DB_USER is not set)
+endif
+ifndef DB_PASSWORD
+	$(error DB_PASSWORD is not set)
+endif
+ifndef DB_NAME
+	$(error DB_NAME is not set)
 endif
 
 migrate-tools:
@@ -98,7 +110,7 @@ test-prepare: check-db-env
 
 test: test-prepare
 	@echo "Running tests..."
-	@go test -v ./cmd/... ./internal/config/... ./internal/server/... ./internal/service/...
+	@go test -v ./...
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Lint

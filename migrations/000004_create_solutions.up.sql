@@ -1,8 +1,8 @@
 CREATE TABLE solutions (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     problem_id INTEGER NOT NULL REFERENCES problems(id),
-    duel_id INTEGER REFERENCES duels(id),
+    game_id INTEGER REFERENCES games(id) ON DELETE SET NULL,
     code TEXT NOT NULL,
     language VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'running', 'passed', 'failed')),
@@ -14,5 +14,5 @@ CREATE TABLE solutions (
 
 CREATE INDEX idx_solutions_user_id ON solutions(user_id);
 CREATE INDEX idx_solutions_problem_id ON solutions(problem_id);
-CREATE INDEX idx_solutions_duel_id ON solutions(duel_id);
+CREATE INDEX idx_solutions_game_id ON solutions(game_id);
 CREATE INDEX idx_solutions_status ON solutions(status);
