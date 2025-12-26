@@ -38,6 +38,9 @@ linters:
       # directory/file permission checks
       - linters: [gosec]
         text: "G30[1246]"
+      # db.Close() error is unactionable in error paths
+      - linters: [gosec]
+        text: "G104"
 
   settings:
     errcheck:
