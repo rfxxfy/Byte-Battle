@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"bytebattle/internal/apierr"
 	"bytebattle/internal/database"
 	"bytebattle/internal/database/models"
 
@@ -16,7 +17,7 @@ import (
 type mockGameRepo struct {
 	createFunc       func(ctx context.Context, players []database.Player, problemID int) (*models.Game, error)
 	getByIDFunc      func(ctx context.Context, id int) (*models.Game, error)
-	getAllFunc        func(ctx context.Context, limit, offset int) (models.GameSlice, error)
+	getAllFunc       func(ctx context.Context, limit, offset int) (models.GameSlice, error)
 	countFunc        func(ctx context.Context) (int64, error)
 	startGameFunc    func(ctx context.Context, id int) (*models.Game, error)
 	completeGameFunc func(ctx context.Context, id, winnerID int) (*models.Game, error)
@@ -202,7 +203,9 @@ func TestGetGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.GetGame(context.Background(), 999)
 
-	require.ErrorIs(t, err, ErrGameNotFound)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameNotFound, ae.ErrorCode)
 }
 
 func TestStartGame_Success(t *testing.T) {
@@ -229,7 +232,9 @@ func TestStartGame_AlreadyActive(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.StartGame(context.Background(), 1)
 
-	require.ErrorIs(t, err, ErrGameAlreadyStarted)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameAlreadyStarted, ae.ErrorCode)
 }
 
 func TestStartGame_AlreadyFinished(t *testing.T) {
@@ -242,7 +247,9 @@ func TestStartGame_AlreadyFinished(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.StartGame(context.Background(), 1)
 
-	require.ErrorIs(t, err, ErrGameAlreadyStarted)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameAlreadyStarted, ae.ErrorCode)
 }
 
 func TestStartGame_NotFound(t *testing.T) {
@@ -255,7 +262,9 @@ func TestStartGame_NotFound(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.StartGame(context.Background(), 1)
 
-	require.ErrorIs(t, err, ErrGameNotFound)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameNotFound, ae.ErrorCode)
 }
 
 func TestStartGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
@@ -268,7 +277,9 @@ func TestStartGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.StartGame(context.Background(), 999)
 
-	require.ErrorIs(t, err, ErrGameNotFound)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameNotFound, ae.ErrorCode)
 }
 
 func TestStartGame_RepoError(t *testing.T) {
@@ -294,7 +305,9 @@ func TestDeleteGame_SqlNoRows_ReturnsErrGameNotFound(t *testing.T) {
 	svc := NewGameService(mock)
 	err := svc.DeleteGame(context.Background(), 999)
 
-	require.ErrorIs(t, err, ErrGameNotFound)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameNotFound, ae.ErrorCode)
 }
 
 func TestListGames_DefaultLimit(t *testing.T) {
@@ -406,7 +419,9 @@ func TestCompleteGame_InvalidWinner(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.CompleteGame(context.Background(), 1, 999)
 
-	require.ErrorIs(t, err, ErrInvalidWinner)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrInvalidWinner, ae.ErrorCode)
 	assert.EqualError(t, err, "winner must be one of the players")
 }
 
@@ -420,7 +435,9 @@ func TestCompleteGame_NotInProgress(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.CompleteGame(context.Background(), 1, 1)
 
-	require.ErrorIs(t, err, ErrGameNotInProgress)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameNotInProgress, ae.ErrorCode)
 }
 
 func TestCompleteGame_NotFound(t *testing.T) {
@@ -433,7 +450,9 @@ func TestCompleteGame_NotFound(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.CompleteGame(context.Background(), 999, 1)
 
-	require.ErrorIs(t, err, ErrGameNotFound)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameNotFound, ae.ErrorCode)
 }
 
 func TestCancelGame_Success(t *testing.T) {
@@ -474,7 +493,9 @@ func TestCancelGame_AlreadyFinished(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.CancelGame(context.Background(), 1)
 
-	require.ErrorIs(t, err, ErrCannotCancelFinished)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrCannotCancelFinished, ae.ErrorCode)
 }
 
 func TestCancelGame_AlreadyCancelled(t *testing.T) {
@@ -487,7 +508,9 @@ func TestCancelGame_AlreadyCancelled(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.CancelGame(context.Background(), 1)
 
-	require.ErrorIs(t, err, ErrGameAlreadyCancelled)
+	var ae *apierr.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apierr.ErrGameAlreadyCancelled, ae.ErrorCode)
 }
 
 func TestDeleteGame_Success(t *testing.T) {

@@ -4,19 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"bytebattle/internal/apierr"
 	"bytebattle/internal/database"
 	"bytebattle/internal/database/models"
-)
-
-var (
-	ErrNotEnoughPlayers     = errors.New("at least two players are required")
-	ErrDuplicatePlayers     = errors.New("players must be different")
-	ErrGameNotFound         = errors.New("game not found")
-	ErrGameAlreadyStarted   = errors.New("game already started or completed")
-	ErrGameNotInProgress    = errors.New("game is not in progress")
-	ErrInvalidWinner        = errors.New("winner must be one of the players")
-	ErrCannotCancelFinished = errors.New("cannot cancel finished game")
-	ErrGameAlreadyCancelled = errors.New("game is already cancelled")
 )
 
 type GameService struct {
@@ -29,12 +19,12 @@ func NewGameService(repo database.IGameRepo) *GameService {
 
 func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID int) (*models.Game, error) {
 	if len(playerIDs) < 2 {
-		return nil, ErrNotEnoughPlayers
+		return nil, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players are required")
 	}
 	seen := make(map[int]struct{})
 	for _, id := range playerIDs {
 		if _, exists := seen[id]; exists {
-			return nil, ErrDuplicatePlayers
+			return nil, apierr.New(apierr.ErrDuplicatePlayers, "players must be different")
 		}
 		seen[id] = struct{}{}
 	}
@@ -50,7 +40,7 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 func (s *GameService) GetGame(ctx context.Context, id int) (*models.Game, error) {
 	game, err := s.repo.GetByID(ctx, id)
 	if errors.Is(err, database.ErrNotFound) {
-		return nil, ErrGameNotFound
+		return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
 	}
 	return game, err
 }
@@ -84,9 +74,9 @@ func (s *GameService) StartGame(ctx context.Context, id int) (*models.Game, erro
 	if err != nil {
 		switch {
 		case errors.Is(err, database.ErrNotFound):
-			return nil, ErrGameNotFound
+			return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
 		case errors.Is(err, database.ErrGameNotPending):
-			return nil, ErrGameAlreadyStarted
+			return nil, apierr.New(apierr.ErrGameAlreadyStarted, "game already started or completed")
 		}
 		return nil, err
 	}
@@ -98,11 +88,11 @@ func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (*mode
 	if err != nil {
 		switch {
 		case errors.Is(err, database.ErrNotFound):
-			return nil, ErrGameNotFound
+			return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
 		case errors.Is(err, database.ErrGameNotActive):
-			return nil, ErrGameNotInProgress
+			return nil, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
 		case errors.Is(err, database.ErrNotParticipant):
-			return nil, ErrInvalidWinner
+			return nil, apierr.New(apierr.ErrInvalidWinner, "winner must be one of the players")
 		}
 		return nil, err
 	}
@@ -114,11 +104,11 @@ func (s *GameService) CancelGame(ctx context.Context, id int) (*models.Game, err
 	if err != nil {
 		switch {
 		case errors.Is(err, database.ErrNotFound):
-			return nil, ErrGameNotFound
+			return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
 		case errors.Is(err, database.ErrGameFinished):
-			return nil, ErrCannotCancelFinished
+			return nil, apierr.New(apierr.ErrCannotCancelFinished, "cannot cancel finished game")
 		case errors.Is(err, database.ErrGameAlreadyCancelled):
-			return nil, ErrGameAlreadyCancelled
+			return nil, apierr.New(apierr.ErrGameAlreadyCancelled, "game is already cancelled")
 		}
 		return nil, err
 	}
@@ -128,7 +118,7 @@ func (s *GameService) CancelGame(ctx context.Context, id int) (*models.Game, err
 func (s *GameService) DeleteGame(ctx context.Context, id int) error {
 	err := s.repo.Delete(ctx, id)
 	if errors.Is(err, database.ErrNotFound) {
-		return ErrGameNotFound
+		return apierr.New(apierr.ErrGameNotFound, "game not found")
 	}
 	return err
 }
