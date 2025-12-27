@@ -29,7 +29,7 @@ type AppError struct {
 
 func (e *AppError) Error() string { return e.Message }
 
-func HTTPStatusCode(code string) int {
+func httpStatusCode(code string) int {
 	switch code {
 	case ErrValidation, ErrNotEnoughPlayers, ErrDuplicatePlayers,
 		ErrGameAlreadyStarted, ErrGameNotInProgress, ErrInvalidWinner,
@@ -48,6 +48,6 @@ func New(code, message string) *AppError {
 	return &AppError{
 		ErrorCode:  code,
 		Message:    message,
-		HTTPStatus: HTTPStatusCode(code),
+		HTTPStatus: httpStatusCode(code),
 	}
 }

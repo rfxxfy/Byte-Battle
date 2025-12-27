@@ -33,8 +33,8 @@ func serviceError(c echo.Context, err error) error {
 	return c.JSON(http.StatusInternalServerError, apierr.New(apierr.ErrInternal, err.Error()))
 }
 
-func jsonErrorMsg(c echo.Context, code int, msg string) error {
-	return c.JSON(code, apierr.New(apierr.ErrValidation, msg))
+func jsonErrorMsg(c echo.Context, msg string) error {
+	return c.JSON(http.StatusBadRequest, apierr.New(apierr.ErrValidation, msg))
 }
 
 func (s *HTTPServer) handleRoot(c echo.Context) error {
@@ -56,7 +56,7 @@ func (s *HTTPServer) handleHello(c echo.Context) error {
 func (s *HTTPServer) handleCreateGame(c echo.Context) error {
 	var req CreateGameRequest
 	if err := c.Bind(&req); err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid request body")
+		return jsonErrorMsg(c,"invalid request body")
 	}
 
 	game, err := s.gameService.CreateGame(c.Request().Context(), req.PlayerIDs, req.ProblemID)
@@ -70,7 +70,7 @@ func (s *HTTPServer) handleCreateGame(c echo.Context) error {
 func (s *HTTPServer) handleGetGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
+		return jsonErrorMsg(c,"invalid game id")
 	}
 
 	game, err := s.gameService.GetGame(c.Request().Context(), id)
@@ -87,14 +87,14 @@ func (s *HTTPServer) handleListGames(c echo.Context) error {
 		var err error
 		limit, err = strconv.Atoi(raw)
 		if err != nil {
-			return jsonErrorMsg(c, http.StatusBadRequest, "invalid limit")
+			return jsonErrorMsg(c,"invalid limit")
 		}
 	}
 	if raw := c.QueryParam("offset"); raw != "" {
 		var err error
 		offset, err = strconv.Atoi(raw)
 		if err != nil {
-			return jsonErrorMsg(c, http.StatusBadRequest, "invalid offset")
+			return jsonErrorMsg(c,"invalid offset")
 		}
 	}
 
@@ -109,7 +109,7 @@ func (s *HTTPServer) handleListGames(c echo.Context) error {
 func (s *HTTPServer) handleStartGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
+		return jsonErrorMsg(c,"invalid game id")
 	}
 
 	game, err := s.gameService.StartGame(c.Request().Context(), id)
@@ -123,15 +123,15 @@ func (s *HTTPServer) handleStartGame(c echo.Context) error {
 func (s *HTTPServer) handleCompleteGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
+		return jsonErrorMsg(c,"invalid game id")
 	}
 
 	var req CompleteGameRequest
 	if err := c.Bind(&req); err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid request body")
+		return jsonErrorMsg(c,"invalid request body")
 	}
 	if req.WinnerID < 1 {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid winner_id")
+		return jsonErrorMsg(c,"invalid winner_id")
 	}
 
 	game, err := s.gameService.CompleteGame(c.Request().Context(), id, req.WinnerID)
@@ -145,7 +145,7 @@ func (s *HTTPServer) handleCompleteGame(c echo.Context) error {
 func (s *HTTPServer) handleCancelGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
+		return jsonErrorMsg(c,"invalid game id")
 	}
 
 	game, err := s.gameService.CancelGame(c.Request().Context(), id)
@@ -159,7 +159,7 @@ func (s *HTTPServer) handleCancelGame(c echo.Context) error {
 func (s *HTTPServer) handleDeleteGame(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid game id")
+		return jsonErrorMsg(c,"invalid game id")
 	}
 
 	if err = s.gameService.DeleteGame(c.Request().Context(), id); err != nil {
@@ -172,13 +172,13 @@ func (s *HTTPServer) handleDeleteGame(c echo.Context) error {
 func (s *HTTPServer) handleCreateSession(c echo.Context) error {
 	var req CreateSessionRequest
 	if err := c.Bind(&req); err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid request body")
+		return jsonErrorMsg(c,"invalid request body")
 	}
 	if req.UserID == 0 {
-		return jsonErrorMsg(c, http.StatusBadRequest, "user_id is required")
+		return jsonErrorMsg(c,"user_id is required")
 	}
 	if req.UserID < 0 {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid user_id")
+		return jsonErrorMsg(c,"invalid user_id")
 	}
 
 	session, err := s.sessionService.CreateSession(c.Request().Context(), req.UserID)
@@ -192,7 +192,7 @@ func (s *HTTPServer) handleCreateSession(c echo.Context) error {
 func (s *HTTPServer) handleGetSession(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid session id")
+		return jsonErrorMsg(c,"invalid session id")
 	}
 
 	session, err := s.sessionService.GetSession(c.Request().Context(), id)
@@ -223,7 +223,7 @@ func (s *HTTPServer) handleValidateSession(c echo.Context) error {
 func (s *HTTPServer) handleGetUserSessions(c echo.Context) error {
 	userID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid user_id")
+		return jsonErrorMsg(c,"invalid user_id")
 	}
 
 	sessions, err := s.sessionService.GetUserSessions(c.Request().Context(), userID)
@@ -237,7 +237,7 @@ func (s *HTTPServer) handleGetUserSessions(c echo.Context) error {
 func (s *HTTPServer) handleRefreshSession(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid session id")
+		return jsonErrorMsg(c,"invalid session id")
 	}
 
 	session, err := s.sessionService.RefreshSession(c.Request().Context(), id)
@@ -251,7 +251,7 @@ func (s *HTTPServer) handleRefreshSession(c echo.Context) error {
 func (s *HTTPServer) handleEndSession(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid session id")
+		return jsonErrorMsg(c,"invalid session id")
 	}
 
 	if err = s.sessionService.EndSession(c.Request().Context(), id); err != nil {
@@ -264,7 +264,7 @@ func (s *HTTPServer) handleEndSession(c echo.Context) error {
 func (s *HTTPServer) handleEndAllUserSessions(c echo.Context) error {
 	userID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
-		return jsonErrorMsg(c, http.StatusBadRequest, "invalid user_id")
+		return jsonErrorMsg(c,"invalid user_id")
 	}
 
 	count, err := s.sessionService.EndAllUserSessions(c.Request().Context(), userID)
