@@ -1,285 +1,221 @@
 package server
 
 import (
-	"errors"
+	"context"
+	"encoding/json"
 	"net/http"
-	"strconv"
 
+	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
-
-	"github.com/labstack/echo/v4"
+	"bytebattle/internal/database/models"
 )
 
-type CreateGameRequest struct {
-	PlayerIDs []int `json:"player_ids"`
-	ProblemID int   `json:"problem_id"`
+func (s *HTTPServer) handleRoot(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("Добро пожаловать в Byte-Battle!"))
 }
 
-type CompleteGameRequest struct {
-	WinnerID int `json:"winner_id"`
-}
-
-type CreateSessionRequest struct {
-	UserID int `json:"user_id"`
-}
-
-// serviceError writes an AppError JSON response with the correct HTTP status,
-// or falls back to 500 for unexpected errors.
-func serviceError(c echo.Context, err error) error {
-	var ae *apierr.AppError
-	if errors.As(err, &ae) {
-		return c.JSON(ae.HTTPStatus, ae)
-	}
-	return c.JSON(http.StatusInternalServerError, apierr.New(apierr.ErrInternal, err.Error()))
-}
-
-func jsonErrorMsg(c echo.Context, msg string) error {
-	return c.JSON(http.StatusBadRequest, apierr.New(apierr.ErrValidation, msg))
-}
-
-func (s *HTTPServer) handleRoot(c echo.Context) error {
-	return c.String(http.StatusOK, "Добро пожаловать в Byte-Battle!")
-}
-
-func (s *HTTPServer) handleHello(c echo.Context) error {
-	user, err := s.users.GetOrCreateTestUser(c.Request().Context())
+func (s *HTTPServer) handleHello(w http.ResponseWriter, r *http.Request) {
+	user, err := s.users.GetOrCreateTestUser(r.Context())
 	if err != nil {
-		return serviceError(c, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"message": "Привет, Byte-Battle!",
 		"user":    user,
 	})
 }
 
-func (s *HTTPServer) handleCreateGame(c echo.Context) error {
-	var req CreateGameRequest
-	if err := c.Bind(&req); err != nil {
-		return jsonErrorMsg(c,"invalid request body")
+func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObject) (api.ListGamesResponseObject, error) {
+	limit, offset := 10, 0
+	if req.Params.Limit != nil {
+		limit = *req.Params.Limit
+	}
+	if req.Params.Offset != nil {
+		offset = *req.Params.Offset
 	}
 
-	game, err := s.gameService.CreateGame(c.Request().Context(), req.PlayerIDs, req.ProblemID)
+	games, total, err := s.gameService.ListGames(ctx, limit, offset)
 	if err != nil {
-		return serviceError(c, err)
+		return nil, err
 	}
 
-	return c.JSON(http.StatusCreated, echo.Map{"game": game})
+	apiGames := make([]api.Game, len(games))
+	for i, g := range games {
+		apiGames[i] = toAPIGame(g)
+	}
+
+	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
 }
 
-func (s *HTTPServer) handleGetGame(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
+func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestObject) (api.CreateGameResponseObject, error) {
+	game, err := s.gameService.CreateGame(ctx, req.Body.PlayerIds, req.Body.ProblemId)
 	if err != nil {
-		return jsonErrorMsg(c,"invalid game id")
+		return nil, err
 	}
 
-	game, err := s.gameService.GetGame(c.Request().Context(), id)
-	if err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"game": game})
+	return api.CreateGame201JSONResponse{Game: toAPIGame(game)}, nil
 }
 
-func (s *HTTPServer) handleListGames(c echo.Context) error {
-	var limit, offset int
-	if raw := c.QueryParam("limit"); raw != "" {
-		var err error
-		limit, err = strconv.Atoi(raw)
-		if err != nil {
-			return jsonErrorMsg(c,"invalid limit")
-		}
-	}
-	if raw := c.QueryParam("offset"); raw != "" {
-		var err error
-		offset, err = strconv.Atoi(raw)
-		if err != nil {
-			return jsonErrorMsg(c,"invalid offset")
-		}
-	}
-
-	games, total, err := s.gameService.ListGames(c.Request().Context(), limit, offset)
+func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) (api.GetGameResponseObject, error) {
+	game, err := s.gameService.GetGame(ctx, req.Id)
 	if err != nil {
-		return serviceError(c, err)
+		return nil, err
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"games": games, "total": total})
+	return api.GetGame200JSONResponse{Game: toAPIGame(game)}, nil
 }
 
-func (s *HTTPServer) handleStartGame(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		return jsonErrorMsg(c,"invalid game id")
+func (s *HTTPServer) DeleteGame(ctx context.Context, req api.DeleteGameRequestObject) (api.DeleteGameResponseObject, error) {
+	if err := s.gameService.DeleteGame(ctx, req.Id); err != nil {
+		return nil, err
 	}
 
-	game, err := s.gameService.StartGame(c.Request().Context(), id)
-	if err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"game": game})
+	return api.DeleteGame200JSONResponse{Deleted: true}, nil
 }
 
-func (s *HTTPServer) handleCompleteGame(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
+func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObject) (api.StartGameResponseObject, error) {
+	game, err := s.gameService.StartGame(ctx, req.Id)
 	if err != nil {
-		return jsonErrorMsg(c,"invalid game id")
+		return nil, err
 	}
 
-	var req CompleteGameRequest
-	if err := c.Bind(&req); err != nil {
-		return jsonErrorMsg(c,"invalid request body")
-	}
-	if req.WinnerID < 1 {
-		return jsonErrorMsg(c,"invalid winner_id")
-	}
-
-	game, err := s.gameService.CompleteGame(c.Request().Context(), id, req.WinnerID)
-	if err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"game": game})
+	return api.StartGame200JSONResponse{Game: toAPIGame(game)}, nil
 }
 
-func (s *HTTPServer) handleCancelGame(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		return jsonErrorMsg(c,"invalid game id")
+func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameRequestObject) (api.CompleteGameResponseObject, error) {
+	if req.Body.WinnerId < 1 {
+		return nil, apierr.New(apierr.ErrValidation, "invalid winner_id")
 	}
 
-	game, err := s.gameService.CancelGame(c.Request().Context(), id)
+	game, err := s.gameService.CompleteGame(ctx, req.Id, req.Body.WinnerId)
 	if err != nil {
-		return serviceError(c, err)
+		return nil, err
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"game": game})
+	return api.CompleteGame200JSONResponse{Game: toAPIGame(game)}, nil
 }
 
-func (s *HTTPServer) handleDeleteGame(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
+func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestObject) (api.CancelGameResponseObject, error) {
+	game, err := s.gameService.CancelGame(ctx, req.Id)
 	if err != nil {
-		return jsonErrorMsg(c,"invalid game id")
+		return nil, err
 	}
 
-	if err = s.gameService.DeleteGame(c.Request().Context(), id); err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"deleted": true})
+	return api.CancelGame200JSONResponse{Game: toAPIGame(game)}, nil
 }
 
-func (s *HTTPServer) handleCreateSession(c echo.Context) error {
-	var req CreateSessionRequest
-	if err := c.Bind(&req); err != nil {
-		return jsonErrorMsg(c,"invalid request body")
-	}
-	if req.UserID == 0 {
-		return jsonErrorMsg(c,"user_id is required")
-	}
-	if req.UserID < 0 {
-		return jsonErrorMsg(c,"invalid user_id")
+func (s *HTTPServer) CreateSession(ctx context.Context, req api.CreateSessionRequestObject) (api.CreateSessionResponseObject, error) {
+	if req.Body.UserId < 1 {
+		return nil, apierr.New(apierr.ErrValidation, "user_id must be a positive integer")
 	}
 
-	session, err := s.sessionService.CreateSession(c.Request().Context(), req.UserID)
+	session, err := s.sessionService.CreateSession(ctx, req.Body.UserId)
 	if err != nil {
-		return serviceError(c, err)
+		return nil, err
 	}
 
-	return c.JSON(http.StatusCreated, echo.Map{"session": session})
+	return api.CreateSession201JSONResponse{Session: toAPISession(session)}, nil
 }
 
-func (s *HTTPServer) handleGetSession(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
+func (s *HTTPServer) GetSession(ctx context.Context, req api.GetSessionRequestObject) (api.GetSessionResponseObject, error) {
+	session, err := s.sessionService.GetSession(ctx, req.Id)
 	if err != nil {
-		return jsonErrorMsg(c,"invalid session id")
+		return nil, err
 	}
 
-	session, err := s.sessionService.GetSession(c.Request().Context(), id)
-	if err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"session": session})
+	return api.GetSession200JSONResponse{Session: toAPISession(session)}, nil
 }
 
-func (s *HTTPServer) handleValidateSession(c echo.Context) error {
-	token := c.Request().Header.Get("Authorization")
-	if token == "" {
-		token = c.QueryParam("token")
+func (s *HTTPServer) ValidateSession(ctx context.Context, req api.ValidateSessionRequestObject) (api.ValidateSessionResponseObject, error) {
+	token := ""
+	if req.Params.Token != nil {
+		token = *req.Params.Token
 	}
 
-	session, err := s.sessionService.ValidateToken(c.Request().Context(), token)
+	session, err := s.sessionService.ValidateToken(ctx, token)
 	if err != nil {
-		return serviceError(c, err)
+		return nil, err
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{
-		"valid":   true,
-		"session": session,
-	})
+	return api.ValidateSession200JSONResponse{Valid: true, Session: toAPISession(session)}, nil
 }
 
-func (s *HTTPServer) handleGetUserSessions(c echo.Context) error {
-	userID, err := strconv.Atoi(c.Param("user_id"))
+func (s *HTTPServer) RefreshSession(ctx context.Context, req api.RefreshSessionRequestObject) (api.RefreshSessionResponseObject, error) {
+	session, err := s.sessionService.RefreshSession(ctx, req.Id)
 	if err != nil {
-		return jsonErrorMsg(c,"invalid user_id")
+		return nil, err
 	}
 
-	sessions, err := s.sessionService.GetUserSessions(c.Request().Context(), userID)
-	if err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"sessions": sessions})
+	return api.RefreshSession200JSONResponse{Session: toAPISession(session)}, nil
 }
 
-func (s *HTTPServer) handleRefreshSession(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		return jsonErrorMsg(c,"invalid session id")
+func (s *HTTPServer) EndSession(ctx context.Context, req api.EndSessionRequestObject) (api.EndSessionResponseObject, error) {
+	if err := s.sessionService.EndSession(ctx, req.Id); err != nil {
+		return nil, err
 	}
 
-	session, err := s.sessionService.RefreshSession(c.Request().Context(), id)
-	if err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"session": session})
+	return api.EndSession200JSONResponse{Ended: true}, nil
 }
 
-func (s *HTTPServer) handleEndSession(c echo.Context) error {
-	id, err := strconv.Atoi(c.Param("id"))
+func (s *HTTPServer) GetUserSessions(ctx context.Context, req api.GetUserSessionsRequestObject) (api.GetUserSessionsResponseObject, error) {
+	sessions, err := s.sessionService.GetUserSessions(ctx, req.UserId)
 	if err != nil {
-		return jsonErrorMsg(c,"invalid session id")
+		return nil, err
 	}
 
-	if err = s.sessionService.EndSession(c.Request().Context(), id); err != nil {
-		return serviceError(c, err)
+	apiSessions := make([]api.Session, len(sessions))
+	for i, s := range sessions {
+		apiSessions[i] = toAPISession(s)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"ended": true})
+	return api.GetUserSessions200JSONResponse{Sessions: apiSessions}, nil
 }
 
-func (s *HTTPServer) handleEndAllUserSessions(c echo.Context) error {
-	userID, err := strconv.Atoi(c.Param("user_id"))
+func (s *HTTPServer) EndAllUserSessions(ctx context.Context, req api.EndAllUserSessionsRequestObject) (api.EndAllUserSessionsResponseObject, error) {
+	count, err := s.sessionService.EndAllUserSessions(ctx, req.UserId)
 	if err != nil {
-		return jsonErrorMsg(c,"invalid user_id")
+		return nil, err
 	}
 
-	count, err := s.sessionService.EndAllUserSessions(c.Request().Context(), userID)
-	if err != nil {
-		return serviceError(c, err)
-	}
-
-	return c.JSON(http.StatusOK, echo.Map{"count": count})
+	return api.EndAllUserSessions200JSONResponse{Count: count}, nil
 }
 
-func (s *HTTPServer) handleCleanupExpiredSessions(c echo.Context) error {
-	count, err := s.sessionService.CleanupExpired(c.Request().Context())
+func (s *HTTPServer) CleanupExpiredSessions(ctx context.Context, _ api.CleanupExpiredSessionsRequestObject) (api.CleanupExpiredSessionsResponseObject, error) {
+	count, err := s.sessionService.CleanupExpired(ctx)
 	if err != nil {
-		return serviceError(c, err)
+		return nil, err
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"count": count})
+	return api.CleanupExpiredSessions200JSONResponse{Count: count}, nil
+}
+
+func toAPIGame(g *models.Game) api.Game {
+	result := api.Game{
+		Id:        g.ID,
+		ProblemId: g.ProblemID,
+		Status:    api.GameStatus(g.Status),
+		CreatedAt: g.CreatedAt,
+		UpdatedAt: g.UpdatedAt,
+	}
+	if g.WinnerID.Valid {
+		id := g.WinnerID.Int
+		result.WinnerId = &id
+	}
+	return result
+}
+
+func toAPISession(s *models.Session) api.Session {
+	return api.Session{
+		Id:        s.ID,
+		UserId:    s.UserID,
+		Token:     s.Token,
+		ExpiresAt: s.ExpiresAt,
+		CreatedAt: s.CreatedAt,
+	}
 }

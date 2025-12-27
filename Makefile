@@ -4,15 +4,7 @@ MODULE_NAME := bytebattle
 -include .env
 export
 
-.PHONY: tidy
-
-tidy:
-	go mod tidy
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SQLBoiler
-# ─────────────────────────────────────────────────────────────────────────────
-
+OAPI_CODEGEN := $(shell go env GOPATH)/bin/oapi-codegen
 MIGRATE_VERSION := v4.19.1
 SQLBOILER_VERSION := v4.19.7
 
@@ -20,17 +12,38 @@ GOBIN := $(shell go env GOPATH)/bin
 SQLBOILER := $(GOBIN)/sqlboiler
 SQLBOILER_PSQL := $(GOBIN)/sqlboiler-psql
 
-.PHONY: tools generate clean-models
+.PHONY: tidy tools generate generate-api generate-models clean clean-models
 
+tidy:
+	go mod tidy
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Code generation
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Install codegen tools
 tools:
+	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@$(SQLBOILER_VERSION)
 	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@$(SQLBOILER_VERSION)
 
-generate: tools
-	@echo "Generating sqlboiler models..."
+# Generate API types and server interface from openapi.yaml (no DB required)
+generate-api:
+	mkdir -p internal/api
+	cd api && $(OAPI_CODEGEN) -config oapi-codegen.yaml openapi.yaml
+
+# Generate SQLBoiler models from live DB (requires DB connection via sqlboiler.toml)
+generate-models:
 	@rm -rf internal/database/models
 	@mkdir -p internal/database/models
 	@PATH="$(GOBIN):$$PATH" $(SQLBOILER) psql --output internal/database/models --no-tests
+
+# Generate everything (auto-installs tools if missing)
+generate: tools generate-api generate-models
+
+# Remove generated files and binaries
+clean: clean-models
+	rm -rf internal/api/ bin/
 
 clean-models:
 	rm -rf internal/database/models

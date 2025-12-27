@@ -1,0 +1,502 @@
+openapi: "3.0.3"
+info:
+  title: Byte Battle API
+  version: "0.1.0"
+
+paths:
+  /games:
+    post:
+      operationId: CreateGame
+      summary: Create a new game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGameRequest"
+      responses:
+        "201":
+          description: Game created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+    get:
+      operationId: ListGames
+      summary: List games with pagination
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of games
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListGamesResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /games/{id}:
+    get:
+      operationId: GetGame
+      summary: Get game by ID
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: Game found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+    delete:
+      operationId: DeleteGame
+      summary: Delete game by ID
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: Game deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /games/{id}/start:
+    post:
+      operationId: StartGame
+      summary: Start a pending game
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: Game started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /games/{id}/complete:
+    post:
+      operationId: CompleteGame
+      summary: Complete a game with a winner
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteGameRequest"
+      responses:
+        "200":
+          description: Game completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /games/{id}/cancel:
+    post:
+      operationId: CancelGame
+      summary: Cancel a game
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: Game cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /sessions:
+    post:
+      operationId: CreateSession
+      summary: Create a new session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /sessions/validate:
+    get:
+      operationId: ValidateSession
+      summary: Validate a session token
+      parameters:
+        - name: token
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session is valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateSessionResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /sessions/cleanup:
+    post:
+      operationId: CleanupExpiredSessions
+      summary: Remove all expired sessions
+      responses:
+        "200":
+          description: Cleanup result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountResponse"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /sessions/{id}:
+    get:
+      operationId: GetSession
+      summary: Get session by ID
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: Session found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+    delete:
+      operationId: EndSession
+      summary: End (delete) a session
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndedResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /sessions/{id}/refresh:
+    post:
+      operationId: RefreshSession
+      summary: Refresh session expiry
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: Session refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /users/{user_id}/sessions:
+    get:
+      operationId: GetUserSessions
+      summary: List all sessions for a user
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: User sessions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSessionsResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+    delete:
+      operationId: EndAllUserSessions
+      summary: End all sessions for a user
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: Sessions ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+components:
+  parameters:
+    GameID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+    SessionID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+    UserID:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+          example: GAME_NOT_FOUND
+        message:
+          type: string
+          example: game not found
+
+    DeletedResponse:
+      type: object
+      required:
+        - deleted
+      properties:
+        deleted:
+          type: boolean
+
+    EndedResponse:
+      type: object
+      required:
+        - ended
+      properties:
+        ended:
+          type: boolean
+
+    CountResponse:
+      type: object
+      required:
+        - count
+      properties:
+        count:
+          type: integer
+          format: int64
+
+    Game:
+      type: object
+      required:
+        - id
+        - problem_id
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        problem_id:
+          type: integer
+        winner_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [pending, active, finished, cancelled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    GameResponse:
+      type: object
+      required:
+        - game
+      properties:
+        game:
+          $ref: "#/components/schemas/Game"
+
+    ListGamesResponse:
+      type: object
+      required:
+        - games
+        - total
+      properties:
+        games:
+          type: array
+          items:
+            $ref: "#/components/schemas/Game"
+        total:
+          type: integer
+          format: int64
+
+    CreateGameRequest:
+      type: object
+      required:
+        - player_ids
+        - problem_id
+      properties:
+        player_ids:
+          type: array
+          items:
+            type: integer
+          minItems: 2
+        problem_id:
+          type: integer
+
+    CompleteGameRequest:
+      type: object
+      required:
+        - winner_id
+      properties:
+        winner_id:
+          type: integer
+          minimum: 1
+
+    Session:
+      type: object
+      required:
+        - id
+        - user_id
+        - token
+        - expires_at
+        - created_at
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    SessionResponse:
+      type: object
+      required:
+        - session
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+
+    ValidateSessionResponse:
+      type: object
+      required:
+        - valid
+        - session
+      properties:
+        valid:
+          type: boolean
+        session:
+          $ref: "#/components/schemas/Session"
+
+    UserSessionsResponse:
+      type: object
+      required:
+        - sessions
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+
+    CreateSessionRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+          minimum: 1

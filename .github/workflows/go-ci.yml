@@ -61,7 +61,7 @@ jobs:
             sslmode = "disable"
           EOF
 
-      - name: Generate SQLBoiler models
+      - name: Generate code
         run: make generate
 
       - name: Lint
