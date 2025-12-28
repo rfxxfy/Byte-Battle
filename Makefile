@@ -21,11 +21,12 @@ tidy:
 # Code generation
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Install codegen tools
+# Install all dev tools (codegen, golang-migrate)
 tools:
 	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@$(SQLBOILER_VERSION)
 	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@$(SQLBOILER_VERSION)
+	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 
 # Generate API types and server interface from openapi.yaml (no DB required)
 generate-api:
