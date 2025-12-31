@@ -6,12 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"bytebattle/internal/apierr"
 	"bytebattle/internal/database"
 	"bytebattle/internal/database/mocks"
 	"bytebattle/internal/database/models"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -120,7 +122,9 @@ func (s *SessionServiceTestSuite) TestGetSession_NotFound() {
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), session)
-	assert.Equal(s.T(), ErrSessionNotFound, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrSessionNotFound, ae.ErrorCode)
 }
 
 // ValidateToken tests
@@ -148,7 +152,9 @@ func (s *SessionServiceTestSuite) TestValidateToken_EmptyToken() {
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), session)
-	assert.Equal(s.T(), ErrInvalidToken, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrInvalidToken, ae.ErrorCode)
 }
 
 func (s *SessionServiceTestSuite) TestValidateToken_NotFound() {
@@ -160,7 +166,9 @@ func (s *SessionServiceTestSuite) TestValidateToken_NotFound() {
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), session)
-	assert.Equal(s.T(), ErrSessionNotFound, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrSessionNotFound, ae.ErrorCode)
 }
 
 func (s *SessionServiceTestSuite) TestValidateToken_Expired() {
@@ -178,7 +186,9 @@ func (s *SessionServiceTestSuite) TestValidateToken_Expired() {
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), session)
-	assert.Equal(s.T(), ErrSessionExpired, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrSessionExpired, ae.ErrorCode)
 }
 
 // GetUserSessions tests
@@ -240,7 +250,9 @@ func (s *SessionServiceTestSuite) TestRefreshSession_NotFound() {
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), session)
-	assert.Equal(s.T(), ErrSessionNotFound, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrSessionNotFound, ae.ErrorCode)
 }
 
 // RefreshSessionByToken tests
@@ -272,7 +284,9 @@ func (s *SessionServiceTestSuite) TestRefreshSessionByToken_NotFound() {
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), session)
-	assert.Equal(s.T(), ErrSessionNotFound, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrSessionNotFound, ae.ErrorCode)
 }
 
 // EndSession tests
@@ -295,7 +309,9 @@ func (s *SessionServiceTestSuite) TestEndSession_NotFound() {
 	err := s.service.EndSession(s.ctx, sessionID)
 
 	assert.Error(s.T(), err)
-	assert.Equal(s.T(), ErrSessionNotFound, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrSessionNotFound, ae.ErrorCode)
 }
 
 // EndSessionByToken tests
@@ -318,7 +334,9 @@ func (s *SessionServiceTestSuite) TestEndSessionByToken_NotFound() {
 	err := s.service.EndSessionByToken(s.ctx, token)
 
 	assert.Error(s.T(), err)
-	assert.Equal(s.T(), ErrSessionNotFound, err)
+	var ae *apierr.AppError
+	require.ErrorAs(s.T(), err, &ae)
+	assert.Equal(s.T(), apierr.ErrSessionNotFound, ae.ErrorCode)
 }
 
 // EndAllUserSessions tests

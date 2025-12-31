@@ -5,14 +5,9 @@ import (
 	"errors"
 	"time"
 
+	"bytebattle/internal/apierr"
 	"bytebattle/internal/database"
 	"bytebattle/internal/database/models"
-)
-
-var (
-	ErrSessionNotFound = errors.New("session not found")
-	ErrSessionExpired  = errors.New("session expired")
-	ErrInvalidToken    = errors.New("invalid token")
 )
 
 const DefaultSessionDuration = 24 * time.Hour
@@ -55,31 +50,27 @@ func (s *SessionService) CreateSessionWithDuration(ctx context.Context, userID i
 
 func (s *SessionService) GetSession(ctx context.Context, id int) (*models.Session, error) {
 	session, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrSessionNotFound
-		}
-		return nil, err
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, apierr.New(apierr.ErrSessionNotFound, "session not found")
 	}
-
-	return session, nil
+	return session, err
 }
 
 func (s *SessionService) ValidateToken(ctx context.Context, token string) (*models.Session, error) {
 	if token == "" {
-		return nil, ErrInvalidToken
+		return nil, apierr.New(apierr.ErrInvalidToken, "token is required")
 	}
 
 	session, err := s.repo.GetByToken(ctx, token)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, apierr.New(apierr.ErrSessionNotFound, "session not found")
+	}
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrSessionNotFound
-		}
 		return nil, err
 	}
 
 	if time.Now().After(session.ExpiresAt) {
-		return nil, ErrSessionExpired
+		return nil, apierr.New(apierr.ErrSessionExpired, "session expired")
 	}
 
 	return session, nil
@@ -91,10 +82,10 @@ func (s *SessionService) GetUserSessions(ctx context.Context, userID int) (model
 
 func (s *SessionService) RefreshSession(ctx context.Context, id int) (*models.Session, error) {
 	session, err := s.repo.GetByID(ctx, id)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, apierr.New(apierr.ErrSessionNotFound, "session not found")
+	}
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrSessionNotFound
-		}
 		return nil, err
 	}
 
@@ -109,10 +100,10 @@ func (s *SessionService) RefreshSession(ctx context.Context, id int) (*models.Se
 
 func (s *SessionService) RefreshSessionByToken(ctx context.Context, token string) (*models.Session, error) {
 	session, err := s.repo.GetByToken(ctx, token)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, apierr.New(apierr.ErrSessionNotFound, "session not found")
+	}
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrSessionNotFound
-		}
 		return nil, err
 	}
 
@@ -127,24 +118,18 @@ func (s *SessionService) RefreshSessionByToken(ctx context.Context, token string
 
 func (s *SessionService) EndSession(ctx context.Context, id int) error {
 	err := s.repo.Delete(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return ErrSessionNotFound
-		}
-		return err
+	if errors.Is(err, database.ErrNotFound) {
+		return apierr.New(apierr.ErrSessionNotFound, "session not found")
 	}
-	return nil
+	return err
 }
 
 func (s *SessionService) EndSessionByToken(ctx context.Context, token string) error {
 	err := s.repo.DeleteByToken(ctx, token)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return ErrSessionNotFound
-		}
-		return err
+	if errors.Is(err, database.ErrNotFound) {
+		return apierr.New(apierr.ErrSessionNotFound, "session not found")
 	}
-	return nil
+	return err
 }
 
 func (s *SessionService) EndAllUserSessions(ctx context.Context, userID int) (int64, error) {
