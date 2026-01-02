@@ -9,25 +9,23 @@ import (
 )
 
 type HTTPServer struct {
-	echo             *echo.Echo
-	users            *service.UserService
-	gameService      *service.GameService
-	sessionService   *service.SessionService
-	executionService *service.ExecutionService
+	echo           *echo.Echo
+	users          *service.UserService
+	gameService    *service.GameService
+	sessionService *service.SessionService
 }
 
-func NewHTTPServer(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService, executionService *service.ExecutionService) *HTTPServer {
+func NewHTTPServer(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService) *HTTPServer {
 	e := echo.New()
 
 	e.Use(middleware.RequestLogger())
 	e.Use(middleware.Recover())
 
 	s := &HTTPServer{
-		echo:             e,
-		users:            users,
-		gameService:      gameService,
-		sessionService:   sessionService,
-		executionService: executionService,
+		echo:           e,
+		users:          users,
+		gameService:    gameService,
+		sessionService: sessionService,
 	}
 
 	s.registerRoutes()

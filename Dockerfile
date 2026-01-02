@@ -5,10 +5,11 @@ WORKDIR /src
 
 # Cache dependencies
 COPY go.mod go.sum ./
+COPY vendor/ vendor/
 
 # Copy source and build
 COPY . .
-RUN go build -o /app/bytebattle ./cmd/bytebattle
+RUN go build -mod=vendor -o /app/bytebattle ./cmd/bytebattle
 
 # Install migrate CLI
 ARG MIGRATE_VERSION=v4.19.1
