@@ -115,7 +115,7 @@ func (r *gameRepo) StartGame(ctx context.Context, id int) (*models.Game, error) 
 
 	game.Status = GameStatusActive
 	game.StartedAt = null.TimeFrom(time.Now())
-	game.UpdatedAt = null.TimeFrom(time.Now())
+	game.UpdatedAt = time.Now()
 
 	if _, err = game.Update(ctx, tx, boil.Infer()); err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (r *gameRepo) CompleteGame(ctx context.Context, id, winnerID int) (*models.
 	game.Status = GameStatusFinished
 	game.WinnerID = null.IntFrom(winnerID)
 	game.CompletedAt = null.TimeFrom(time.Now())
-	game.UpdatedAt = null.TimeFrom(time.Now())
+	game.UpdatedAt = time.Now()
 
 	if _, err = game.Update(ctx, tx, boil.Infer()); err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (r *gameRepo) CancelGame(ctx context.Context, id int) (*models.Game, error)
 	}
 
 	game.Status = GameStatusCancelled
-	game.UpdatedAt = null.TimeFrom(time.Now())
+	game.UpdatedAt = time.Now()
 
 	if _, err = game.Update(ctx, tx, boil.Infer()); err != nil {
 		return nil, err
