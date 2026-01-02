@@ -14,16 +14,18 @@ import (
 )
 
 type HTTPServer struct {
-	users          *service.UserService
-	gameService    *service.GameService
-	sessionService *service.SessionService
+	users            *service.UserService
+	gameService      *service.GameService
+	sessionService   *service.SessionService
+	executionService *service.ExecutionService
 }
 
-func New(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService) http.Handler {
+func New(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService, executionService *service.ExecutionService) http.Handler {
 	s := &HTTPServer{
-		users:          users,
-		gameService:    gameService,
-		sessionService: sessionService,
+		users:            users,
+		gameService:      gameService,
+		sessionService:   sessionService,
+		executionService: executionService,
 	}
 
 	r := chi.NewRouter()
@@ -32,6 +34,7 @@ func New(users *service.UserService, gameService *service.GameService, sessionSe
 
 	r.Get("/", s.handleRoot)
 	r.Get("/internal/hello_world", s.handleHello)
+	r.Post("/execute", s.handleExecute)
 
 	strictOpts := api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestErrorHandler,

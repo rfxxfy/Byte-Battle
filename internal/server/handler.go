@@ -8,6 +8,7 @@ import (
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
 	"bytebattle/internal/database/models"
+	"bytebattle/internal/executor"
 )
 
 func (s *HTTPServer) handleRoot(w http.ResponseWriter, _ *http.Request) {
@@ -191,6 +192,35 @@ func (s *HTTPServer) CleanupExpiredSessions(ctx context.Context, _ api.CleanupEx
 	}
 
 	return api.CleanupExpiredSessions200JSONResponse{Count: count}, nil
+}
+
+func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Code     string `json:"code"`
+		Language string `json:"language"`
+		Input    string `json:"input"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	result, err := s.executionService.Execute(r.Context(), executor.ExecutionRequest{
+		Code:     req.Code,
+		Language: executor.Language(req.Language),
+		Stdin:    req.Input,
+	})
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 func toAPIGame(g *models.Game) api.Game {
