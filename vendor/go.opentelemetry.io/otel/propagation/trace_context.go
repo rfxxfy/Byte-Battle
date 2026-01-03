@@ -46,8 +46,13 @@ func (TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
 		carrier.Set(tracestateHeader, ts)
 	}
 
+<<<<<<< HEAD
 	// Preserve only the spec-defined flags: sampled (0x01) and random (0x02).
 	flags := sc.TraceFlags() & (trace.FlagsSampled | trace.FlagsRandom)
+=======
+	// Clear all flags other than the trace-context supported sampling bit.
+	flags := sc.TraceFlags() & trace.FlagsSampled
+>>>>>>> f0895f0 (fix issues)
 
 	var sb strings.Builder
 	sb.Grow(2 + 32 + 16 + 2 + 3)
@@ -104,6 +109,7 @@ func (TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	if !extractPart(opts[:], &h, 2) {
 		return trace.SpanContext{}
 	}
+<<<<<<< HEAD
 	if version == 0 && (h != "" || opts[0] > 3) {
 		// version 0 does not allow extra fields or reserved flag bits.
 		return trace.SpanContext{}
@@ -111,6 +117,16 @@ func (TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 
 	scc.TraceFlags = trace.TraceFlags(opts[0]) & //nolint:gosec // slice size already checked.
 		(trace.FlagsSampled | trace.FlagsRandom)
+=======
+	if version == 0 && (h != "" || opts[0] > 2) {
+		// version 0 not allow extra
+		// version 0 not allow other flag
+		return trace.SpanContext{}
+	}
+
+	// Clear all flags other than the trace-context supported sampling bit.
+	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled // nolint:gosec // slice size already checked.
+>>>>>>> f0895f0 (fix issues)
 
 	// Ignore the error returned here. Failure to parse tracestate MUST NOT
 	// affect the parsing of traceparent according to the W3C tracecontext

@@ -5,6 +5,10 @@ package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http
 
 import (
 	"context"
+<<<<<<< HEAD
+=======
+	"fmt"
+>>>>>>> f0895f0 (fix issues)
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -15,7 +19,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
+<<<<<<< HEAD
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+=======
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+>>>>>>> f0895f0 (fix issues)
 	"go.opentelemetry.io/otel/trace"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
@@ -84,6 +92,11 @@ func defaultTransportFormatter(_ string, r *http.Request) string {
 // RoundTrip creates a Span and propagates its context via the provided request's headers
 // before handing the request to the configured base RoundTripper. The created span will
 // end when the response body is closed or when a read from the body returns io.EOF.
+<<<<<<< HEAD
+=======
+// If GetBody returns an error, the error is reported via otel.Handle and the request
+// continues with the original Body.
+>>>>>>> f0895f0 (fix issues)
 func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	requestStartTime := time.Now()
 	for _, f := range t.filters {
@@ -103,7 +116,13 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 	}
 
+<<<<<<< HEAD
 	ctx, span := tracer.Start(r.Context(), t.spanNameFormatter("", r), t.spanStartOptions...)
+=======
+	opts := append([]trace.SpanStartOption{}, t.spanStartOptions...) // start with the configured options
+
+	ctx, span := tracer.Start(r.Context(), t.spanNameFormatter("", r), opts...)
+>>>>>>> f0895f0 (fix issues)
 
 	if t.clientTrace != nil {
 		ctx = httptrace.WithClientTrace(ctx, t.clientTrace(ctx))
@@ -116,6 +135,7 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	r = r.Clone(ctx) // According to RoundTripper spec, we shouldn't modify the origin request.
 
+<<<<<<< HEAD
 	var lastBW *request.BodyWrapper // Records the last body wrapper. Can be nil.
 	maybeWrapBody := func(body io.ReadCloser) io.ReadCloser {
 		if body == nil || body == http.NoBody {
@@ -138,11 +158,33 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 	}
 
+=======
+	// GetBody is preferred over direct access to Body if the function is set.
+	// If the resulting body is nil or is NoBody, we don't want to mutate the body as it
+	// will affect the identity of it in an unforeseeable way because we assert
+	// ReadCloser fulfills a certain interface and it is indeed nil or NoBody.
+	body := r.Body
+	if r.GetBody != nil {
+		b, err := r.GetBody()
+		if err != nil {
+			otel.Handle(fmt.Errorf("http.Request GetBody returned an error: %w", err))
+		} else {
+			body = b
+		}
+	}
+
+	bw := request.NewBodyWrapper(body, func(int64) {})
+	if body != nil && body != http.NoBody {
+		r.Body = bw
+	}
+
+>>>>>>> f0895f0 (fix issues)
 	span.SetAttributes(t.semconv.RequestTraceAttrs(r)...)
 	t.propagators.Inject(ctx, propagation.HeaderCarrier(r.Header))
 
 	res, err := t.rt.RoundTrip(r)
 
+<<<<<<< HEAD
 	// Record the metrics on error or no error.
 	statusCode := 0
 	if err == nil {
@@ -164,6 +206,37 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 			AdditionalAttributes: append(labeler.Get(), t.metricAttributesFromRequest(r)...),
 		}),
 	)
+=======
+	// Defer metrics recording function to record the metrics on error or no error.
+	defer func() {
+		metricAttributes := semconv.MetricAttributes{
+			Req:                  r,
+			AdditionalAttributes: append(labeler.Get(), t.metricAttributesFromRequest(r)...),
+		}
+
+		if err == nil {
+			metricAttributes.StatusCode = res.StatusCode
+		}
+
+		metricOpts := t.semconv.MetricOptions(metricAttributes)
+
+		metricData := semconv.MetricData{
+			RequestSize: bw.BytesRead(),
+		}
+
+		if err == nil {
+			readRecordFunc := func(int64) {}
+			res.Body = newWrappedBody(span, readRecordFunc, res.Body)
+		}
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedTime := float64(time.Since(requestStartTime)) / float64(time.Millisecond)
+
+		metricData.ElapsedTime = elapsedTime
+
+		t.semconv.RecordMetrics(ctx, metricData, metricOpts)
+	}()
+>>>>>>> f0895f0 (fix issues)
 
 	if err != nil {
 		span.SetAttributes(otelsemconv.ErrorType(err))
@@ -173,8 +246,11 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		return res, err
 	}
 
+<<<<<<< HEAD
 	readRecordFunc := func(int64) {}
 	res.Body = newWrappedBody(span, readRecordFunc, res.Body)
+=======
+>>>>>>> f0895f0 (fix issues)
 	// traces
 	span.SetAttributes(t.semconv.ResponseTraceAttrs(res)...)
 	span.SetStatus(t.semconv.Status(res.StatusCode))

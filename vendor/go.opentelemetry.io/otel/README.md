@@ -53,6 +53,7 @@ Currently, this project supports the following environments.
 
 | OS       | Go Version | Architecture |
 |----------|------------|--------------|
+<<<<<<< HEAD
 | Ubuntu   | 1.26       | amd64        |
 | Ubuntu   | 1.25       | amd64        |
 | Ubuntu   | 1.26       | 386          |
@@ -67,6 +68,22 @@ Currently, this project supports the following environments.
 | Windows  | 1.25       | amd64        |
 | Windows  | 1.26       | 386          |
 | Windows  | 1.25       | 386          |
+=======
+| Ubuntu   | 1.25       | amd64        |
+| Ubuntu   | 1.24       | amd64        |
+| Ubuntu   | 1.25       | 386          |
+| Ubuntu   | 1.24       | 386          |
+| Ubuntu   | 1.25       | arm64        |
+| Ubuntu   | 1.24       | arm64        |
+| macOS    | 1.25       | amd64        |
+| macOS    | 1.24       | amd64        |
+| macOS    | 1.25       | arm64        |
+| macOS    | 1.24       | arm64        |
+| Windows  | 1.25       | amd64        |
+| Windows  | 1.24       | amd64        |
+| Windows  | 1.25       | 386          |
+| Windows  | 1.24       | 386          |
+>>>>>>> f0895f0 (fix issues)
 
 While this project should work for other systems, no compatibility guarantees
 are made for those systems currently.

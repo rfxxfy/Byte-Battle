@@ -15,13 +15,21 @@ import (
 	"slices"
 	"strings"
 	"sync"
+<<<<<<< HEAD
 	"time"
+=======
+>>>>>>> f0895f0 (fix issues)
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+<<<<<<< HEAD
 	"go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/semconv/v1.40.0/httpconv"
+=======
+	"go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel/semconv/v1.39.0/httpconv"
+>>>>>>> f0895f0 (fix issues)
 )
 
 type RequestTraceAttrsOpts struct {
@@ -37,7 +45,11 @@ type ResponseTelemetry struct {
 	WriteError error
 }
 
+<<<<<<< HEAD
 type HTTPServer struct {
+=======
+type HTTPServer struct{
+>>>>>>> f0895f0 (fix issues)
 	requestBodySizeHistogram  httpconv.ServerRequestBodySize
 	responseBodySizeHistogram httpconv.ServerResponseBodySize
 	requestDurationHistogram  httpconv.ServerRequestDuration
@@ -246,11 +258,27 @@ type MetricAttributes struct {
 }
 
 type MetricData struct {
+<<<<<<< HEAD
 	RequestSize     int64
 	RequestDuration time.Duration
 }
 
 var (
+=======
+	RequestSize int64
+
+	// The request duration, in milliseconds
+	ElapsedTime float64
+}
+
+var (
+	metricAddOptionPool = &sync.Pool{
+		New: func() any {
+			return &[]metric.AddOption{}
+		},
+	}
+
+>>>>>>> f0895f0 (fix issues)
 	metricRecordOptionPool = &sync.Pool{
 		New: func() any {
 			return &[]metric.RecordOption{}
@@ -265,7 +293,11 @@ func (n HTTPServer) RecordMetrics(ctx context.Context, md ServerMetricData) {
 	*recordOpts = append(*recordOpts, o)
 	n.requestBodySizeHistogram.Inst().Record(ctx, md.RequestSize, *recordOpts...)
 	n.responseBodySizeHistogram.Inst().Record(ctx, md.ResponseSize, *recordOpts...)
+<<<<<<< HEAD
 	n.requestDurationHistogram.Inst().Record(ctx, durationToSeconds(md.RequestDuration), o)
+=======
+	n.requestDurationHistogram.Inst().Record(ctx, md.ElapsedTime/1000.0, o)
+>>>>>>> f0895f0 (fix issues)
 	*recordOpts = (*recordOpts)[:0]
 	metricRecordOptionPool.Put(recordOpts)
 }
@@ -366,8 +398,13 @@ func (n HTTPServer) MetricAttributes(server string, req *http.Request, statusCod
 	}
 
 	if route != "" {
+<<<<<<< HEAD
 		num++
 	}
+=======
+        num++
+    }
+>>>>>>> f0895f0 (fix issues)
 
 	attributes := slices.Grow(additionalAttributes, num)
 	attributes = append(attributes,
@@ -390,7 +427,12 @@ func (n HTTPServer) MetricAttributes(server string, req *http.Request, statusCod
 	}
 
 	if route != "" {
+<<<<<<< HEAD
 		attributes = append(attributes, semconv.HTTPRoute(route))
 	}
+=======
+        attributes = append(attributes, semconv.HTTPRoute(route))
+    }
+>>>>>>> f0895f0 (fix issues)
 	return attributes
 }

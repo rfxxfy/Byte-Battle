@@ -61,10 +61,14 @@ func checkValue(val string) bool {
 func checkKeyRemain(key string) bool {
 	// ( lcalpha / DIGIT / "_" / "-"/ "*" / "/" )
 	for _, v := range key {
+<<<<<<< HEAD
 		if v > 127 {
 			return false
 		}
 		if isAlphaNumASCII(v) {
+=======
+		if isAlphaNum(byte(v)) {
+>>>>>>> f0895f0 (fix issues)
 			continue
 		}
 		switch v {
@@ -92,7 +96,11 @@ func checkKeyPart(key string, n int) bool {
 	return ret && checkKeyRemain(key[1:])
 }
 
+<<<<<<< HEAD
 func isAlphaNumASCII[T rune | byte](c T) bool {
+=======
+func isAlphaNum(c byte) bool {
+>>>>>>> f0895f0 (fix issues)
 	if c >= 'a' && c <= 'z' {
 		return true
 	}
@@ -108,7 +116,11 @@ func checkKeyTenant(key string, n int) bool {
 	if key == "" {
 		return false
 	}
+<<<<<<< HEAD
 	return isAlphaNumASCII(key[0]) && len(key[1:]) <= n && checkKeyRemain(key[1:])
+=======
+	return isAlphaNum(key[0]) && len(key[1:]) <= n && checkKeyRemain(key[1:])
+>>>>>>> f0895f0 (fix issues)
 }
 
 // based on the W3C Trace Context specification

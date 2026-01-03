@@ -8,13 +8,23 @@ import (
 	"sync"
 	"sync/atomic"
 
+<<<<<<< HEAD
 	"go.opentelemetry.io/otel/internal/errorhandler"
+=======
+>>>>>>> f0895f0 (fix issues)
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
 type (
+<<<<<<< HEAD
+=======
+	errorHandlerHolder struct {
+		eh ErrorHandler
+	}
+
+>>>>>>> f0895f0 (fix issues)
 	tracerProviderHolder struct {
 		tp trace.TracerProvider
 	}
@@ -29,10 +39,18 @@ type (
 )
 
 var (
+<<<<<<< HEAD
+=======
+	globalErrorHandler  = defaultErrorHandler()
+>>>>>>> f0895f0 (fix issues)
 	globalTracer        = defaultTracerValue()
 	globalPropagators   = defaultPropagatorsValue()
 	globalMeterProvider = defaultMeterProvider()
 
+<<<<<<< HEAD
+=======
+	delegateErrorHandlerOnce      sync.Once
+>>>>>>> f0895f0 (fix issues)
 	delegateTraceOnce             sync.Once
 	delegateTextMapPropagatorOnce sync.Once
 	delegateMeterOnce             sync.Once
@@ -48,7 +66,11 @@ var (
 // Subsequent calls to SetErrorHandler after the first will not forward errors
 // to the new ErrorHandler for prior returned instances.
 func GetErrorHandler() ErrorHandler {
+<<<<<<< HEAD
 	return errorhandler.GetErrorHandler()
+=======
+	return globalErrorHandler.Load().(errorHandlerHolder).eh
+>>>>>>> f0895f0 (fix issues)
 }
 
 // SetErrorHandler sets the global ErrorHandler to h.
@@ -58,7 +80,30 @@ func GetErrorHandler() ErrorHandler {
 // ErrorHandler. Subsequent calls will set the global ErrorHandler, but not
 // delegate errors to h.
 func SetErrorHandler(h ErrorHandler) {
+<<<<<<< HEAD
 	errorhandler.SetErrorHandler(h)
+=======
+	current := GetErrorHandler()
+
+	if _, cOk := current.(*ErrDelegator); cOk {
+		if _, ehOk := h.(*ErrDelegator); ehOk && current == h {
+			// Do not assign to the delegate of the default ErrDelegator to be
+			// itself.
+			Error(
+				errors.New("no ErrorHandler delegate configured"),
+				"ErrorHandler remains its current value.",
+			)
+			return
+		}
+	}
+
+	delegateErrorHandlerOnce.Do(func() {
+		if def, ok := current.(*ErrDelegator); ok {
+			def.setDelegate(h)
+		}
+	})
+	globalErrorHandler.Store(errorHandlerHolder{eh: h})
+>>>>>>> f0895f0 (fix issues)
 }
 
 // TracerProvider is the internal implementation for global.TracerProvider.
@@ -150,6 +195,15 @@ func SetMeterProvider(mp metric.MeterProvider) {
 	globalMeterProvider.Store(meterProviderHolder{mp: mp})
 }
 
+<<<<<<< HEAD
+=======
+func defaultErrorHandler() *atomic.Value {
+	v := &atomic.Value{}
+	v.Store(errorHandlerHolder{eh: &ErrDelegator{}})
+	return v
+}
+
+>>>>>>> f0895f0 (fix issues)
 func defaultTracerValue() *atomic.Value {
 	v := &atomic.Value{}
 	v.Store(tracerProviderHolder{tp: &tracerProvider{}})

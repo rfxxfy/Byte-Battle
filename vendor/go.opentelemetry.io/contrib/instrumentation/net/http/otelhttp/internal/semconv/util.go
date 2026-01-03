@@ -11,11 +11,18 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+<<<<<<< HEAD
 	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	semconvNew "go.opentelemetry.io/otel/semconv/v1.40.0"
+=======
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	semconvNew "go.opentelemetry.io/otel/semconv/v1.39.0"
+>>>>>>> f0895f0 (fix issues)
 )
 
 // SplitHostPort splits a network address hostport of the form "host",
@@ -126,8 +133,11 @@ func standardizeHTTPMethod(method string) string {
 	}
 	return method
 }
+<<<<<<< HEAD
 
 func durationToSeconds(d time.Duration) float64 {
 	// Use floating point division here for higher precision (instead of Seconds method).
 	return float64(d) / float64(time.Second)
 }
+=======
+>>>>>>> f0895f0 (fix issues)

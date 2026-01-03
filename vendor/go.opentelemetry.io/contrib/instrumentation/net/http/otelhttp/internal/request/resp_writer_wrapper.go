@@ -61,7 +61,11 @@ func (w *RespWriterWrapper) Write(p []byte) (int, error) {
 
 // WriteHeader persists initial statusCode for span attribution.
 // All calls to WriteHeader will be propagated to the underlying ResponseWriter
+<<<<<<< HEAD
 // and will persist the statusCode from the first call (except for informational response status codes).
+=======
+// and will persist the statusCode from the first call.
+>>>>>>> f0895f0 (fix issues)
 // Blocking consecutive calls to WriteHeader alters expected behavior and will
 // remove warning logs from net/http where developers will notice incorrect handler implementations.
 func (w *RespWriterWrapper) WriteHeader(statusCode int) {
@@ -77,6 +81,7 @@ func (w *RespWriterWrapper) WriteHeader(statusCode int) {
 // parent method.
 func (w *RespWriterWrapper) writeHeader(statusCode int) {
 	if !w.wroteHeader {
+<<<<<<< HEAD
 		// Ignore informational response status codes.
 		// Based on https://github.com/golang/go/blob/go1.24.1/src/net/http/server.go#L1216
 		if statusCode >= 100 && statusCode <= 199 && statusCode != http.StatusSwitchingProtocols {
@@ -84,6 +89,8 @@ func (w *RespWriterWrapper) writeHeader(statusCode int) {
 			return
 		}
 
+=======
+>>>>>>> f0895f0 (fix issues)
 		w.wroteHeader = true
 		w.statusCode = statusCode
 	}

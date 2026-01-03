@@ -24,18 +24,24 @@ type Float64Counter interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Add(ctx context.Context, incr float64, options ...AddOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Enabled(context.Context) bool
 }
 
@@ -89,18 +95,24 @@ type Float64UpDownCounter interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Add(ctx context.Context, incr float64, options ...AddOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Enabled(context.Context) bool
 }
 
@@ -154,18 +166,24 @@ type Float64Histogram interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Record(ctx context.Context, incr float64, options ...RecordOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Enabled(context.Context) bool
 }
 
@@ -224,18 +242,24 @@ type Float64Gauge interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Record(ctx context.Context, value float64, options ...RecordOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Enabled(context.Context) bool
 }
 

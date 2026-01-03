@@ -211,9 +211,12 @@ type Float64Observer interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+<<<<<<< HEAD
 	//
 	// Implementations of this method need to be safe for a user to call
 	// concurrently.
+=======
+>>>>>>> f0895f0 (fix issues)
 	Observe(value float64, options ...ObserveOption)
 }
 

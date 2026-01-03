@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 <!-- Released section -->
 <!-- Don't change this section unless doing release -->
 
+<<<<<<< HEAD
 ## [1.42.0/0.64.0/0.18.0/0.0.16] 2026-03-06
 
 ### Added
@@ -52,6 +53,8 @@ The next release will require at least [Go 1.25].
 - Return an error when the endpoint is configured as insecure and with TLS configuration in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp`. (#7914)
 - Return an error when the endpoint is configured as insecure and with TLS configuration in `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp`. (#7914)
 
+=======
+>>>>>>> f0895f0 (fix issues)
 ## [1.40.0/0.62.0/0.16.0] 2026-02-02
 
 ### Added
@@ -3576,9 +3579,13 @@ It contains api and sdk for trace and meter.
 - CircleCI build CI manifest files.
 - CODEOWNERS file to track owners of this project.
 
+<<<<<<< HEAD
 [Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.42.0...HEAD
 [1.42.0/0.64.0/0.18.0/0.0.16]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.42.0
 [1.41.0/0.63.0/0.17.0/0.0.15]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.41.0
+=======
+[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.40.0...HEAD
+>>>>>>> f0895f0 (fix issues)
 [1.40.0/0.62.0/0.16.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.40.0
 [1.39.0/0.61.0/0.15.0/0.0.14]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.39.0
 [1.38.0/0.60.0/0.14.0/0.0.13]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.38.0
@@ -3678,7 +3685,10 @@ It contains api and sdk for trace and meter.
 
 <!-- Released section ended -->
 
+<<<<<<< HEAD
 [Go 1.26]: https://go.dev/doc/go1.26
+=======
+>>>>>>> f0895f0 (fix issues)
 [Go 1.25]: https://go.dev/doc/go1.25
 [Go 1.24]: https://go.dev/doc/go1.24
 [Go 1.23]: https://go.dev/doc/go1.23

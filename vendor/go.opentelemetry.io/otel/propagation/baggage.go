@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"go.opentelemetry.io/otel/baggage"
+<<<<<<< HEAD
 	"go.opentelemetry.io/otel/internal/errorhandler"
 )
 
@@ -17,6 +18,11 @@ const (
 	// https://www.w3.org/TR/baggage/#limits
 	maxMembers = 64
 )
+=======
+)
+
+const baggageHeader = "baggage"
+>>>>>>> f0895f0 (fix issues)
 
 // Baggage is a propagator that supports the W3C Baggage format.
 //
@@ -57,9 +63,12 @@ func extractSingleBaggage(parent context.Context, carrier TextMapCarrier) contex
 
 	bag, err := baggage.Parse(bStr)
 	if err != nil {
+<<<<<<< HEAD
 		errorhandler.GetErrorHandler().Handle(err)
 	}
 	if bag.Len() == 0 {
+=======
+>>>>>>> f0895f0 (fix issues)
 		return parent
 	}
 	return baggage.ContextWithBaggage(parent, bag)
@@ -70,11 +79,15 @@ func extractMultiBaggage(parent context.Context, carrier ValuesGetter) context.C
 	if len(bVals) == 0 {
 		return parent
 	}
+<<<<<<< HEAD
 
+=======
+>>>>>>> f0895f0 (fix issues)
 	var members []baggage.Member
 	for _, bStr := range bVals {
 		currBag, err := baggage.Parse(bStr)
 		if err != nil {
+<<<<<<< HEAD
 			errorhandler.GetErrorHandler().Handle(err)
 		}
 		if currBag.Len() == 0 {
@@ -91,6 +104,15 @@ func extractMultiBaggage(parent context.Context, carrier ValuesGetter) context.C
 		errorhandler.GetErrorHandler().Handle(err)
 	}
 	if b.Len() == 0 {
+=======
+			continue
+		}
+		members = append(members, currBag.Members()...)
+	}
+
+	b, err := baggage.New(members...)
+	if err != nil || b.Len() == 0 {
+>>>>>>> f0895f0 (fix issues)
 		return parent
 	}
 	return baggage.ContextWithBaggage(parent, b)

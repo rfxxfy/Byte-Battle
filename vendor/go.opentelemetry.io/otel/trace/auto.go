@@ -20,7 +20,11 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+<<<<<<< HEAD
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+=======
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+>>>>>>> f0895f0 (fix issues)
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/internal/telemetry"
 )

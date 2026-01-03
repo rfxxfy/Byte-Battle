@@ -746,8 +746,13 @@ Encapsulate setup in constructor functions, ensuring clear ownership and scope:
 import (
 	"errors"
 
+<<<<<<< HEAD
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/semconv/v1.40.0/otelconv"
+=======
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+	"go.opentelemetry.io/otel/semconv/v1.39.0/otelconv"
+>>>>>>> f0895f0 (fix issues)
 )
 
 type SDKComponent struct {
@@ -1039,7 +1044,11 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []trace.ReadOnlySpan) 
 
 All observability metrics should follow the [OpenTelemetry Semantic Conventions for SDK metrics](https://github.com/open-telemetry/semantic-conventions/blob/1cf2476ae5e518225a766990a28a6d5602bd5a30/docs/otel/sdk-metrics.md).
 
+<<<<<<< HEAD
 Use the metric semantic conventions convenience package [otelconv](./semconv/v1.40.0/otelconv/metric.go).
+=======
+Use the metric semantic conventions convenience package [otelconv](./semconv/v1.39.0/otelconv/metric.go).
+>>>>>>> f0895f0 (fix issues)
 
 ##### Component Identification
 
