@@ -32,7 +32,7 @@ cd /opt/bytebattle
 
 # Создать .env с продовыми значениями
 cat > .env << 'EOF'
-# Database
+# Database (используются postgres-контейнером и для сборки DB_DSN)
 DB_USER=bytebattle
 DB_PASSWORD=СГЕНЕРИРОВАТЬ_НАДЁЖНЫЙ_ПАРОЛЬ
 DB_NAME=bytebattle

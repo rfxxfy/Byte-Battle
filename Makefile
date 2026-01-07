@@ -56,56 +56,39 @@ clean-models:
 MIGRATE := $(GOBIN)/migrate
 MIGRATIONS_DIR := migrations
 
-# Database connection - requires .env file or env vars to be set
-DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
+# Database DSN — defaults work for local dev with docker-compose
+DB_DSN ?= postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable
 
-.PHONY: check-db-env migrate-tools migrate-up migrate-down migrate-drop migrate-create migrate-version migrate-force
-
-check-db-env:
-ifndef DB_HOST
-	$(error DB_HOST is not set. Create .env from .env.example or export env vars)
-endif
-ifndef DB_PORT
-	$(error DB_PORT is not set)
-endif
-ifndef DB_USER
-	$(error DB_USER is not set)
-endif
-ifndef DB_PASSWORD
-	$(error DB_PASSWORD is not set)
-endif
-ifndef DB_NAME
-	$(error DB_NAME is not set)
-endif
+.PHONY: migrate-tools migrate-up migrate-down migrate-down-all migrate-drop migrate-create migrate-version migrate-force
 
 migrate-tools:
 	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 
-migrate-up: check-db-env migrate-tools
+migrate-up: migrate-tools
 	@echo "Applying all migrations..."
-	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
+	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" up
 
-migrate-down: check-db-env migrate-tools
+migrate-down: migrate-tools
 	@echo "Rolling back last migration..."
-	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down 1
+	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" down 1
 
-migrate-down-all: check-db-env migrate-tools
+migrate-down-all: migrate-tools
 	@echo "Rolling back all migrations..."
-	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down
+	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" down
 
-migrate-drop: check-db-env migrate-tools
+migrate-drop: migrate-tools
 	@echo "Dropping all tables..."
-	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" drop -f
+	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" drop -f
 
-migrate-version: check-db-env migrate-tools
-	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" version
+migrate-version: migrate-tools
+	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" version
 
-migrate-force: check-db-env migrate-tools
+migrate-force: migrate-tools
 ifndef VERSION
 	$(error VERSION is required. Usage: make migrate-force VERSION=N)
 endif
 	@echo "Force setting version to $(VERSION)..."
-	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_URL)" force $(VERSION)
+	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" force $(VERSION)
 
 migrate-create: migrate-tools
 ifndef NAME
@@ -119,7 +102,7 @@ endif
 
 .PHONY: test test-prepare
 
-test-prepare: check-db-env
+test-prepare:
 	@./scripts/prepare-test-env.sh
 
 test: test-prepare

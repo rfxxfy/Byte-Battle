@@ -14,10 +14,9 @@ import (
 )
 
 func main() {
-	dbCfg := config.LoadDatabaseConfig()
-	httpCfg := config.LoadHTTPConfig()
+	cfg := config.Load()
 
-	db, err := database.NewPostgres(dbCfg)
+	db, err := database.NewPostgres(cfg.DBDSN)
 	if err != nil {
 		log.Fatalf("db error: %v", err)
 	}
@@ -27,7 +26,7 @@ func main() {
 	defer cancel()
 
 	srv := &http.Server{
-		Addr:              httpCfg.Address(),
+		Addr:              cfg.HTTPAddr,
 		Handler:           app.NewRouter(db),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

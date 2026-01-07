@@ -58,7 +58,7 @@ jobs:
 
             # Run migrations
             docker compose -f docker-compose.prod.yaml run --rm app \
-              sh -c 'migrate -path ./migrations -database "postgres://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=$DB_SSLMODE" up'
+              sh -c 'migrate -path ./migrations -database "$DB_DSN" up'
 
             # Restart app
             docker compose -f docker-compose.prod.yaml up -d --no-deps app
