@@ -82,8 +82,8 @@ make build                      # Собрать бинарник
 make test                       # Запустить все тесты (unit + интеграционные)
 make generate                   # Сгенерировать модели SQLBoiler
 make clean-models               # Удалить сгенерированные модели
+make fmt                        # Отформатировать код
 make lint                       # Запустить линтер
-make fmt                        # Автоматически исправить форматирование (goimports)
 make migrate-up                 # Применить все миграции
 make migrate-down               # Откатить последнюю миграцию
 make migrate-down-all           # Откатить все миграции
