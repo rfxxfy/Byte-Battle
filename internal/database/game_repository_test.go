@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"os"
 	"testing"
 
@@ -17,11 +16,11 @@ import (
 
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"),
-	)
-	db, err := sql.Open("postgres", connStr)
+	dsn := os.Getenv("DB_DSN")
+	if dsn == "" {
+		dsn = "postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable"
+	}
+	db, err := sql.Open("postgres", dsn)
 	require.NoError(t, err)
 	require.NoError(t, db.Ping())
 	t.Cleanup(func() { db.Close() })

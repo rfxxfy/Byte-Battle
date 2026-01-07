@@ -4,23 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 
-	"bytebattle/internal/config"
-
 	_ "github.com/lib/pq"
 )
 
-func NewPostgres(cfg *config.DatabaseConfig) (*sql.DB, error) {
-	connStr := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Host,
-		cfg.Port,
-		cfg.User,
-		cfg.Password,
-		cfg.Name,
-		cfg.SSLMode,
-	)
-
-	db, err := sql.Open("postgres", connStr)
+func NewPostgres(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}

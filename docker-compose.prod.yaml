@@ -15,14 +15,8 @@ services:
     ports:
       - "${HTTP_PORT}:8080"
     environment:
-      HTTP_HOST: "0.0.0.0"
+      DB_DSN: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable
       HTTP_PORT: "8080"
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      DB_SSLMODE: disable
 
   postgres:
     image: postgres:18
