@@ -83,7 +83,7 @@ func (e *DockerExecutor) maintainPool(lang Language, settings *LangSettings) {
 		cancel()
 	}()
 
-	for i := 0; i < poolMaintainerMaxRounds; i++ {
+	for range poolMaintainerMaxRounds {
 		if e.maintainPoolIteration(ctx, lang, settings) {
 			return
 		}

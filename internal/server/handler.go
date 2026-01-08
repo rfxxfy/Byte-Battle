@@ -7,7 +7,7 @@ import (
 
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
-	"bytebattle/internal/database/models"
+	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 )
 
@@ -45,8 +45,8 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	}
 
 	apiGames := make([]api.Game, len(games))
-	for i, g := range games {
-		apiGames[i] = toAPIGame(g)
+	for i := range games {
+		apiGames[i] = toAPIGame(games[i])
 	}
 
 	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
@@ -223,27 +223,27 @@ func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
-func toAPIGame(g *models.Game) api.Game {
+func toAPIGame(g sqlcdb.Game) api.Game {
 	result := api.Game{
-		Id:        g.ID,
-		ProblemId: g.ProblemID,
+		Id:        int(g.ID),
+		ProblemId: int(g.ProblemID),
 		Status:    api.GameStatus(g.Status),
-		CreatedAt: g.CreatedAt,
-		UpdatedAt: g.UpdatedAt,
+		CreatedAt: g.CreatedAt.Time,
+		UpdatedAt: g.UpdatedAt.Time,
 	}
 	if g.WinnerID.Valid {
-		id := g.WinnerID.Int
+		id := int(g.WinnerID.Int32)
 		result.WinnerId = &id
 	}
 	return result
 }
 
-func toAPISession(s *models.Session) api.Session {
+func toAPISession(s sqlcdb.Session) api.Session {
 	return api.Session{
-		Id:        s.ID,
-		UserId:    s.UserID,
+		Id:        int(s.ID),
+		UserId:    int(s.UserID),
 		Token:     s.Token,
-		ExpiresAt: s.ExpiresAt,
-		CreatedAt: s.CreatedAt,
+		ExpiresAt: s.ExpiresAt.Time,
+		CreatedAt: s.CreatedAt.Time,
 	}
 }

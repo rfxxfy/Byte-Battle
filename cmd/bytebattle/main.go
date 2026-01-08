@@ -10,24 +10,30 @@ import (
 
 	"bytebattle/internal/app"
 	"bytebattle/internal/config"
-	"bytebattle/internal/database"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
 	cfg := config.Load()
 
-	db, err := database.NewPostgres(cfg.DBDSN)
+	pool, err := pgxpool.New(context.Background(), cfg.DBDSN)
 	if err != nil {
-		log.Fatalf("db error: %v", err)
+		log.Fatalf("db pool error: %v", err)
 	}
-	defer db.Close()
+
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
+		log.Fatalf("db ping error: %v", err)
+	}
+	defer pool.Close()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           app.NewRouter(db),
+		Handler:           app.NewRouter(pool),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
