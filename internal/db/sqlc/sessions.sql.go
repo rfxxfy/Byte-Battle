@@ -18,9 +18,9 @@ RETURNING id, user_id, token, expires_at, created_at, updated_at
 `
 
 type CreateSessionParams struct {
-	UserID    int32            `json:"user_id"`
-	Token     string           `json:"token"`
-	ExpiresAt pgtype.Timestamp `json:"expires_at"`
+	UserID    int32              `json:"user_id"`
+	Token     string             `json:"token"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
@@ -149,8 +149,8 @@ RETURNING id, user_id, token, expires_at, created_at, updated_at
 `
 
 type UpdateSessionExpiryParams struct {
-	ID        int32            `json:"id"`
-	ExpiresAt pgtype.Timestamp `json:"expires_at"`
+	ID        int32              `json:"id"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error) {
