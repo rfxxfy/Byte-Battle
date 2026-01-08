@@ -23,7 +23,6 @@ go.work.sum
 .env
 .env.local
 .env.*.local
-sqlboiler.toml
 
 # Database files
 *.db
@@ -55,4 +54,3 @@ build/
 coverage.txt
 coverage.html
 
-internal/database/models/*.go

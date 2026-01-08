@@ -32,26 +32,17 @@ Byte-Battle — это не просто кодинг, а азартные и п
    cd Byte-Battle
    ```
 
-2. Создайте файлы конфигурации из примеров и заполните своими значениями:
-   ```bash
-   cp .env.example .env
-   cp sqlboiler.toml.example sqlboiler.toml
-   ```
-
-3. Поднимите базу данных:
+2. Поднимите базу данных:
    ```bash
    docker compose up -d --wait
    ```
 
-4. Примените миграции:
+3. Примените миграции:
    ```bash
    make migrate-up
    ```
 
-5. Сгенерируйте модели SQLBoiler:
-   ```bash
-   make generate
-   ```
+По умолчанию приложение подключается к `postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable` — это значение `docker-compose.yaml`. Для другого окружения задайте переменную `DB_DSN` (или создайте `.env` на основе `.env.example`).
 
 ## Запуск
 
@@ -72,7 +63,7 @@ make test
 ```
 
 `make test` автоматически ждёт готовности БД, применяет миграции и запускает все тесты, включая интеграционные.
-Требует запущенного Docker Compose и `.env`.
+Требует запущенного Docker Compose.
 
 ## Команды Makefile
 
@@ -80,8 +71,10 @@ make test
 make run                        # Запустить сервер
 make build                      # Собрать бинарник
 make test                       # Запустить все тесты (unit + интеграционные)
-make generate                   # Сгенерировать модели SQLBoiler
-make clean-models               # Удалить сгенерированные модели
+make generate                   # Сгенерировать API + sqlc код
+make generate-api               # Сгенерировать API из openapi.yaml
+make generate-sqlc              # Сгенерировать sqlc код из SQL-запросов
+make clean                      # Удалить сгенерированные файлы и бинарники
 make fmt                        # Отформатировать код
 make lint                       # Запустить линтер
 make migrate-up                 # Применить все миграции
@@ -98,30 +91,39 @@ make migrate-force VERSION=...  # Принудительно задать вер
 ```
 cmd/bytebattle/          # Точка входа приложения
 internal/
+  api/                   # Сгенерированные типы и интерфейсы из openapi.yaml
+  apierr/                # Типизированные ошибки API
   config/                # Конфигурация (env-переменные)
-  database/              # Репозитории и подключение к БД
-    models/              # Сгенерированные модели SQLBoiler (в .gitignore)
+  db/
+    queries/             # SQL-запросы для sqlc
+    sqlc/                # Сгенерированный sqlc-код
   server/                # HTTP-сервер, роуты, хендлеры
   service/               # Бизнес-логика
+api/                     # OpenAPI-спецификация
 migrations/              # SQL-миграции (golang-migrate)
 scripts/                 # Вспомогательные скрипты
 .env.example             # Пример переменных окружения
-sqlboiler.toml.example   # Пример конфига SQLBoiler
+sqlc.yaml                # Конфиг генератора sqlc
 ```
 
 ## Конфигурация
 
-Приложение настраивается через переменные окружения.
-Все доступные переменные и их значения по умолчанию описаны в `.env.example`.
+Приложение настраивается через переменные окружения:
 
-`sqlboiler.toml` используется для генерации моделей — формат описан в `sqlboiler.toml.example`.
+| Переменная | По умолчанию | Описание |
+|---|---|---|
+| `DB_DSN` | `postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable` | DSN подключения к PostgreSQL |
+| `HTTP_ADDR` | `:8080` | Адрес HTTP-сервера |
 
-Оба файла (`.env`, `sqlboiler.toml`) содержат креды и **не должны коммититься** в репозиторий.
+Для dev-окружения значения по умолчанию совпадают с `docker-compose.yaml` — никаких `.env` не нужно.
+Для задания кастомных значений создайте `.env` на основе `.env.example` — он загружается автоматически.
 
 ## Built With
 
 - [Go](https://golang.org/) - Programming language
-- [Echo](https://echo.labstack.com/) - Web framework
+- [chi](https://github.com/go-chi/chi) - HTTP router
+- [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) - OpenAPI code generation
 - [PostgreSQL](https://www.postgresql.org/) - Database
-- [SQLBoiler](https://github.com/aarondl/sqlboiler) - ORM
+- [pgx](https://github.com/jackc/pgx) - PostgreSQL driver
+- [sqlc](https://sqlc.dev/) - SQL-to-Go code generation
 - [golang-migrate](https://github.com/golang-migrate/migrate) - Database migrations

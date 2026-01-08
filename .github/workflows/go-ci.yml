@@ -45,26 +45,17 @@ jobs:
       - name: Run database migrations
         run: migrate -path ./migrations -database "$DB_DSN" up
 
-      - name: Create sqlboiler config
-        run: |
-          cat > sqlboiler.toml << EOF
-          [psql]
-            host = "localhost"
-            port = 5432
-            user = "${{ secrets.PG_USER_TEST }}"
-            pass = "${{ secrets.PG_PASSWORD_TEST }}"
-            dbname = "${{ secrets.PG_DB_TEST }}"
-            sslmode = "disable"
-          EOF
-
       - name: Generate API
         run: make generate-api
 
       - name: Check api.gen.go is up to date
         run: git diff --exit-code internal/api/api.gen.go
 
-      - name: Generate models
-        run: make generate-models
+      - name: Generate sqlc
+        run: make generate-sqlc
+
+      - name: Check sqlc files are up to date
+        run: git diff --exit-code internal/db/sqlc/
 
       - name: Lint
         uses: golangci/golangci-lint-action@v9

@@ -6,13 +6,10 @@ export
 
 OAPI_CODEGEN := $(shell go env GOPATH)/bin/oapi-codegen
 MIGRATE_VERSION := v4.19.1
-SQLBOILER_VERSION := v4.19.7
 
 GOBIN := $(shell go env GOPATH)/bin
-SQLBOILER := $(GOBIN)/sqlboiler
-SQLBOILER_PSQL := $(GOBIN)/sqlboiler-psql
 
-.PHONY: tidy tools generate generate-api generate-models clean clean-models
+.PHONY: tidy tools generate generate-api generate-sqlc clean
 
 tidy:
 	go mod tidy
@@ -21,11 +18,10 @@ tidy:
 # Code generation
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Install all dev tools (codegen, golang-migrate)
+# Install all dev tools (codegen, sqlc, golang-migrate)
 tools:
 	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
-	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@$(SQLBOILER_VERSION)
-	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@$(SQLBOILER_VERSION)
+	@command -v sqlc >/dev/null 2>&1 || go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
 	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 
 # Generate API types and server interface from openapi.yaml (no DB required)
@@ -33,21 +29,16 @@ generate-api:
 	mkdir -p internal/api
 	cd api && $(OAPI_CODEGEN) -config oapi-codegen.yaml openapi.yaml
 
-# Generate SQLBoiler models from live DB (requires DB connection via sqlboiler.toml)
-generate-models:
-	@rm -rf internal/database/models
-	@mkdir -p internal/database/models
-	@PATH="$(GOBIN):$$PATH" $(SQLBOILER) psql --output internal/database/models --no-tests
+# Generate sqlc query code from SQL files (no DB required)
+generate-sqlc:
+	sqlc generate
 
 # Generate everything (auto-installs tools if missing)
-generate: tools generate-api generate-models
+generate: tools generate-api generate-sqlc
 
 # Remove generated files and binaries
-clean: clean-models
-	rm -rf internal/api/ bin/
-
-clean-models:
-	rm -rf internal/database/models
+clean:
+	rm -rf internal/api/ internal/db/sqlc/ bin/
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Migrations (golang-migrate)
