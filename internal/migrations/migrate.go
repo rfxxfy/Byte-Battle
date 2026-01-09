@@ -26,6 +26,7 @@ func Run(pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
+	defer func() { _, _ = m.Close() }()
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return err
