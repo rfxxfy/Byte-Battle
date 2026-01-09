@@ -45,7 +45,7 @@ clean:
 # ─────────────────────────────────────────────────────────────────────────────
 
 MIGRATE := $(GOBIN)/migrate
-MIGRATIONS_DIR := migrations
+MIGRATIONS_DIR := internal/migrations
 
 # Database DSN — defaults work for local dev with docker-compose
 DB_DSN ?= postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable

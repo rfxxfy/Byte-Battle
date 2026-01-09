@@ -4,12 +4,14 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"bytebattle/internal/app"
 	"bytebattle/internal/config"
+	"bytebattle/internal/migrations"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,6 +28,15 @@ func main() {
 		pool.Close()
 		log.Fatalf("db ping error: %v", err)
 	}
+
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		if err := migrations.Run(pool); err != nil {
+			log.Fatalf("migration error: %v", err)
+		}
+		log.Println("Migrations applied successfully")
+		return
+	}
+
 	defer pool.Close()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
