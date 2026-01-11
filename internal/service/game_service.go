@@ -202,7 +202,7 @@ func (s *GameService) CancelGame(ctx context.Context, id int) (sqlcdb.Game, erro
 	}
 
 	if game.Status == gameStatusFinished {
-		return sqlcdb.Game{}, apierr.New(apierr.ErrCannotCancelFinished, "cannot cancel finished game")
+		return sqlcdb.Game{}, apierr.New(apierr.ErrCannotCancelFinishedGame, "cannot cancel finished game")
 	}
 	if game.Status == gameStatusCancelled {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyCancelled, "game is already cancelled")
