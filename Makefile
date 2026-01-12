@@ -91,14 +91,17 @@ endif
 # Testing
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: test test-prepare
+.PHONY: test test-unit test-e2e
 
-test-prepare:
-	@./scripts/prepare-test-env.sh
+test-unit:
+	@echo "Running unit tests..."
+	@go test -v -count=1 $(shell go list ./... | grep -v /e2e)
 
-test: test-prepare
-	@echo "Running tests..."
-	@go test -v ./...
+test-e2e:
+	@echo "Running e2e tests..."
+	@go test -v -count=1 -timeout 120s ./internal/e2e/...
+
+test: test-unit test-e2e
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Lint
