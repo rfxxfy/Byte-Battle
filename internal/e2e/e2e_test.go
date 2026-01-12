@@ -406,8 +406,8 @@ func TestSession_ValidateToken(t *testing.T) {
 	resp := do(t, http.MethodGet, fmt.Sprintf("/sessions/validate?token=%s", s.Session.Token), nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body struct {
-		Valid    bool        `json:"valid"`
-		Session  sessionResp `json:"session"`
+		Valid   bool        `json:"valid"`
+		Session sessionResp `json:"session"`
 	}
 	decodeJSON(t, resp, &body)
 	assert.True(t, body.Valid)

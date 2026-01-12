@@ -29,6 +29,7 @@ linters:
         linters:
           - gocognit
           - gosec
+          - bodyclose
       # weak random is fine for non-security purposes
       - linters: [gosec]
         text: "G404"
@@ -51,6 +52,7 @@ linters:
         - (*database/sql.Tx).Rollback
         - (*database/sql.DB).Close
         - (github.com/jackc/pgx/v5.Tx).Rollback
+        - (io.Closer).Close
 
     gocritic:
       enabled-tags:
