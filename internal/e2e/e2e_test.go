@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -21,6 +23,7 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 	"bytebattle/internal/migrations"
+	"bytebattle/internal/ws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -31,8 +34,15 @@ func (noOpExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executo
 	return executor.ExecutionResult{}, nil
 }
 
+type failingExecutor struct{}
+
+func (failingExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
+	return executor.ExecutionResult{ExitCode: 1, Stderr: "wrong answer"}, nil
+}
+
 var (
 	testSrv   *httptest.Server
+	testPool  *pgxpool.Pool
 	user1ID   int
 	user2ID   int
 	problemID int
@@ -120,6 +130,7 @@ func TestMain(m *testing.M) {
 	}
 	problemID = int(pid)
 
+	testPool = pool
 	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, noOpExecutor{}))
 
 	code := m.Run()
@@ -198,6 +209,16 @@ func createGame(t *testing.T) gameResp {
 	var g gameResp
 	decodeJSON(t, resp, &g)
 	return g
+}
+
+func createActiveGame(t *testing.T) gameResp {
+	t.Helper()
+	g := createGame(t)
+	resp := do(t, http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var started gameResp
+	decodeJSON(t, resp, &started)
+	return started
 }
 
 // --- game tests ---
@@ -465,4 +486,183 @@ func TestSession_GetUserSessions(t *testing.T) {
 	}
 	decodeJSON(t, resp, &body)
 	assert.GreaterOrEqual(t, len(body.Sessions), 2)
+}
+
+// --- websocket helpers ---
+
+func wsURL(path string) string {
+	return "ws" + strings.TrimPrefix(testSrv.URL, "http") + path
+}
+
+func wsDialer(token string) *websocket.Dialer {
+	d := *websocket.DefaultDialer
+	if token != "" {
+		d.Subprotocols = []string{token}
+	}
+	return &d
+}
+
+func wsConnect(t *testing.T, path, token string) *websocket.Conn {
+	t.Helper()
+	conn, _, err := wsDialer(token).Dial(wsURL(path), nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+	return conn
+}
+
+func wsDial(t *testing.T, path, token string) (*websocket.Conn, *http.Response) {
+	t.Helper()
+	conn, resp, _ := wsDialer(token).Dial(wsURL(path), nil)
+	if conn != nil {
+		t.Cleanup(func() { conn.Close() })
+	}
+	return conn, resp
+}
+
+func wsRead(t *testing.T, conn *websocket.Conn) ws.ServerMessage {
+	t.Helper()
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper
+	var msg ws.ServerMessage
+	require.NoError(t, conn.ReadJSON(&msg))
+	return msg
+}
+
+func sessionToken(t *testing.T, userID int) string {
+	t.Helper()
+	return createSession(t, userID).Session.Token
+}
+
+// --- websocket tests ---
+
+func TestGameWS_InvalidParams(t *testing.T) {
+	t.Run("missing token", func(t *testing.T) {
+		g := createActiveGame(t)
+		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), "")
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
+
+	t.Run("invalid token", func(t *testing.T) {
+		g := createActiveGame(t)
+		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), "badtoken")
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+
+	t.Run("nonexistent game", func(t *testing.T) {
+		_, resp := wsDial(t, "/games/999999/ws", sessionToken(t, user1ID))
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+}
+
+func TestGameWS_PendingGame(t *testing.T) {
+	g := createGame(t) // pending, not started
+	_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), sessionToken(t, user1ID))
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
+	g := createActiveGame(t)
+	wsPath := fmt.Sprintf("/games/%d/ws", g.Game.ID)
+
+	conn1 := wsConnect(t, wsPath, sessionToken(t, user1ID))
+	conn2 := wsConnect(t, wsPath, sessionToken(t, user2ID))
+
+	require.NoError(t, conn1.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "print('hello')",
+		Language: "python",
+	}))
+
+	// оба клиента должны получить submission_result
+	r1 := wsRead(t, conn1)
+	assert.Equal(t, ws.TypeSubmissionResult, r1.Type)
+	assert.Equal(t, int32(user1ID), r1.UserID)
+	assert.True(t, r1.Accepted)
+
+	r2 := wsRead(t, conn2)
+	assert.Equal(t, ws.TypeSubmissionResult, r2.Type)
+	assert.Equal(t, int32(user1ID), r2.UserID)
+	assert.True(t, r2.Accepted)
+}
+
+func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
+	// failingExecutor always returns ExitCode=1, so no game_finished should be sent
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}))
+	t.Cleanup(srv.Close)
+
+	wsURLFailing := func(path string) string {
+		return "ws" + strings.TrimPrefix(srv.URL, "http") + path
+	}
+	doFailing := func(method, path string, body any) *http.Response {
+		var buf bytes.Buffer
+		if body != nil {
+			require.NoError(t, json.NewEncoder(&buf).Encode(body))
+		}
+		req, err := http.NewRequest(method, srv.URL+path, &buf)
+		require.NoError(t, err)
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		resp, err := srv.Client().Do(req)
+		require.NoError(t, err)
+		return resp
+	}
+
+	// create and start a game via the failing server
+	r := doFailing(http.MethodPost, "/games", map[string]any{
+		"player_ids": []int{user1ID, user2ID},
+		"problem_id": problemID,
+	})
+	require.Equal(t, http.StatusCreated, r.StatusCode)
+	var g gameResp
+	decodeJSON(t, r, &g)
+
+	r = doFailing(http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil)
+	require.Equal(t, http.StatusOK, r.StatusCode)
+	r.Body.Close()
+
+	token := sessionToken(t, user1ID)
+	conn, _, err := wsDialer(token).Dial(wsURLFailing(fmt.Sprintf("/games/%d/ws", g.Game.ID)), nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "wrong solution",
+		Language: "go",
+	}))
+
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper, error not actionable
+	var result ws.ServerMessage
+	require.NoError(t, conn.ReadJSON(&result))
+	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
+	assert.False(t, result.Accepted)
+
+	// no game_finished should arrive
+	conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond)) //nolint:errcheck // test helper, error not actionable
+	var unexpected ws.ServerMessage
+	err = conn.ReadJSON(&unexpected)
+	assert.Error(t, err, "expected timeout, not a game_finished message")
+}
+
+func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
+	g := createActiveGame(t)
+	conn := wsConnect(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), sessionToken(t, user1ID))
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "solution",
+		Language: "go",
+	}))
+
+	result := wsRead(t, conn)
+	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
+	assert.True(t, result.Accepted)
+
+	finished := wsRead(t, conn)
+	assert.Equal(t, ws.TypeGameFinished, finished.Type)
+	assert.Equal(t, int32(user1ID), finished.WinnerID)
 }

@@ -3,12 +3,19 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
+	"bytebattle/internal/ws"
+
+	"github.com/go-chi/chi/v5"
+	gorillaws "github.com/gorilla/websocket"
 )
 
 func (s *HTTPServer) handleRoot(w http.ResponseWriter, _ *http.Request) {
@@ -246,4 +253,117 @@ func toAPISession(s sqlcdb.Session) api.Session {
 		ExpiresAt: s.ExpiresAt.Time,
 		CreatedAt: s.CreatedAt.Time,
 	}
+}
+
+func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
+	gameID, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid game id", http.StatusBadRequest)
+		return
+	}
+
+	// Token is passed as the first Sec-WebSocket-Protocol value.
+	// Browsers cannot set custom headers on WS connections, so this is
+	// the standard workaround: new WebSocket(url, [token])
+	token := ""
+	if protocols := gorillaws.Subprotocols(r); len(protocols) > 0 {
+		token = protocols[0]
+	}
+
+	session, err := s.sessionService.ValidateToken(r.Context(), token)
+	if err != nil {
+		writeHTTPError(w, err)
+		return
+	}
+
+	game, err := s.gameService.GetGame(r.Context(), gameID)
+	if err != nil {
+		http.Error(w, "game not found", http.StatusNotFound)
+		return
+	}
+	if game.Status != "active" {
+		http.Error(w, "game is not active", http.StatusBadRequest)
+		return
+	}
+
+	// Echo the subprotocol back — required by browser WS spec
+	conn, err := upgrader.Upgrade(w, r, http.Header{
+		"Sec-WebSocket-Protocol": {token},
+	})
+	if err != nil {
+		log.Printf("ws upgrade error: %v", err)
+		return
+	}
+
+	client := ws.NewClient(conn)
+	s.hub.Join(int32(gameID), client)
+	defer s.hub.Leave(int32(gameID), client)
+	defer client.Close() // signals WritePump to exit cleanly
+
+	go client.WritePump()
+
+	conn.SetReadLimit(32 * 1024)
+	conn.SetReadDeadline(time.Now().Add(ws.PongWait)) //nolint:errcheck // not actionable
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(ws.PongWait))
+	})
+
+	for {
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			if gorillaws.IsUnexpectedCloseError(err, gorillaws.CloseGoingAway, gorillaws.CloseNormalClosure) {
+				log.Printf("ws read error: %v", err)
+			}
+			return
+		}
+
+		var msg ws.ClientMessage
+		if err := json.Unmarshal(data, &msg); err != nil || msg.Type != ws.TypeSubmit {
+			continue
+		}
+
+		s.processSubmit(r.Context(), int32(gameID), session.UserID, msg)
+	}
+}
+
+func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, msg ws.ClientMessage) {
+	result, execErr := s.executionService.Execute(ctx, executor.ExecutionRequest{
+		Code:     msg.Code,
+		Language: executor.Language(msg.Language),
+		Stdin:    msg.Input,
+	})
+
+	if execErr != nil {
+		log.Printf("executor error game=%d user=%d: %v", gameID, userID, execErr)
+	}
+	accepted := execErr == nil && result.ExitCode == 0
+
+	resultMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:     ws.TypeSubmissionResult,
+		UserID:   userID,
+		Accepted: accepted,
+		Stdout:   result.Stdout,
+		Stderr:   result.Stderr,
+	})
+	s.hub.Broadcast(gameID, resultMsg)
+
+	if !accepted {
+		return
+	}
+
+	completed, err := s.gameService.CompleteGame(ctx, int(gameID), int(userID))
+	if err != nil {
+		// another player already won — ignore
+		return
+	}
+
+	winnerID := int32(0)
+	if completed.WinnerID.Valid {
+		winnerID = completed.WinnerID.Int32
+	}
+	finMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:     ws.TypeGameFinished,
+		WinnerID: winnerID,
+	})
+	s.hub.Broadcast(gameID, finMsg)
 }

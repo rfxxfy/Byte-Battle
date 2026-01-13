@@ -8,6 +8,7 @@ import (
 	"bytebattle/internal/executor"
 	"bytebattle/internal/server"
 	"bytebattle/internal/service"
+	"bytebattle/internal/ws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,5 +35,6 @@ func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor) http.Hand
 	sessionService := service.NewSessionService(q)
 	executionService := service.NewExecutionService(exec)
 
-	return server.New(userService, gameService, sessionService, executionService)
+	hub := ws.NewHub()
+	return server.New(userService, gameService, sessionService, executionService, hub)
 }

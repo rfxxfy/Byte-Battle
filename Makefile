@@ -94,7 +94,7 @@ endif
 
 test-unit:
 	@echo "Running unit tests..."
-	@go test -v -count=1 $(shell go list ./... | grep -v /e2e)
+	@go test -v -race -count=1 $(shell go list ./... | grep -v /e2e)
 
 test-e2e:
 	@echo "Running e2e tests..."

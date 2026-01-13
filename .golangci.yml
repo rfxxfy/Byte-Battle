@@ -42,6 +42,10 @@ linters:
       # integer overflow int->int32 for DB SERIAL IDs
       - linters: [gosec]
         text: "G115"
+      # integer overflow from strconv.Atoi to int32 for DB IDs is safe (IDs are small)
+      - linters: [gosec]
+        text: "G109"
+        path: "internal/server/handler\\.go"
       # db.Close() error is unactionable in error paths
       - linters: [gosec]
         text: "G104"
@@ -53,6 +57,9 @@ linters:
         - (*database/sql.DB).Close
         - (github.com/jackc/pgx/v5.Tx).Rollback
         - (io.Closer).Close
+        - (*github.com/gorilla/websocket.Conn).Close
+        - (*github.com/gorilla/websocket.Conn).SetReadDeadline
+        - (*github.com/gorilla/websocket.Conn).SetWriteDeadline
 
     gocritic:
       enabled-tags:
