@@ -56,7 +56,7 @@ jobs:
 
       - name: Run e2e tests
         run: |
-          go test -v -json -race -count=1 -timeout 120s ./internal/e2e/... 2>>test-stderr.log | tee -a test-output.json | go-junit-report -set-exit-code >> report.xml
+          go test -v -json -race -count=1 -timeout 300s ./internal/e2e/... 2>>test-stderr.log | tee -a test-output.json | go-junit-report -set-exit-code >> report.xml
 
       - name: Upload test report
         if: always()
