@@ -61,18 +61,21 @@ Swagger UI доступен на [http://localhost:8081](http://localhost:8081).
 ## Тесты
 
 ```bash
-make test
+make test        # unit + e2e
+make test-unit   # только unit
+make test-e2e    # только e2e (testcontainers, требует Docker)
 ```
 
-`make test` автоматически ждёт готовности БД, применяет миграции и запускает все тесты, включая интеграционные.
-Требует запущенного Docker Compose.
+E2e-тесты автоматически поднимают PostgreSQL через testcontainers — Docker Compose для тестов не нужен.
 
 ## Команды Makefile
 
 ```bash
 make run                        # Запустить сервер
 make build                      # Собрать бинарник
-make test                       # Запустить все тесты (unit + интеграционные)
+make test                       # Запустить все тесты (unit + e2e)
+make test-unit                  # Запустить unit-тесты
+make test-e2e                   # Запустить e2e-тесты (testcontainers)
 make generate                   # Сгенерировать API + sqlc код
 make generate-api               # Сгенерировать API из openapi.yaml
 make generate-sqlc              # Сгенерировать sqlc код из SQL-запросов
@@ -80,8 +83,8 @@ make clean                      # Удалить сгенерированные 
 make fmt                        # Отформатировать код
 make lint                       # Запустить линтер
 make migrate-up                 # Применить все миграции
-make migrate-down               # Откатить последнюю миграцию
-make migrate-down-all           # Откатить все миграции
+make migrate-rollback           # Откатить последнюю миграцию
+make migrate-down               # Откатить все миграции
 make migrate-drop               # Удалить все таблицы
 make migrate-version            # Текущая версия миграции
 make migrate-create NAME=...    # Создать новую миграцию
@@ -103,7 +106,6 @@ internal/
   server/                # HTTP-сервер, роуты, хендлеры
   service/               # Бизнес-логика
 api/                     # OpenAPI-спецификация
-scripts/                 # Вспомогательные скрипты
 .env.example             # Пример переменных окружения
 sqlc.yaml                # Конфиг генератора sqlc
 ```

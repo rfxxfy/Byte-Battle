@@ -49,7 +49,7 @@ MIGRATIONS_DIR := internal/migrations
 # Database DSN — defaults work for local dev with docker-compose
 DB_DSN ?= postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable
 
-.PHONY: migrate-tools migrate-up migrate-down migrate-down-all migrate-drop migrate-create migrate-version migrate-force
+.PHONY: migrate-tools migrate-up migrate-rollback migrate-down migrate-drop migrate-create migrate-version migrate-force
 
 migrate-tools:
 	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
@@ -58,11 +58,11 @@ migrate-up: migrate-tools
 	@echo "Applying all migrations..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" up
 
-migrate-down: migrate-tools
+migrate-rollback: migrate-tools
 	@echo "Rolling back last migration..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" down 1
 
-migrate-down-all: migrate-tools
+migrate-down: migrate-tools
 	@echo "Rolling back all migrations..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" down
 
