@@ -18,11 +18,10 @@ tidy:
 # Code generation
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Install all dev tools (codegen, sqlc, golang-migrate)
+# Install dev tools (oapi-codegen, sqlc)
 tools:
-	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.6.0
 	@command -v sqlc >/dev/null 2>&1 || go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
-	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 
 # Generate API types and server interface from openapi.yaml (no DB required)
 generate-api:
@@ -50,7 +49,7 @@ MIGRATIONS_DIR := internal/migrations
 # Database DSN — defaults work for local dev with docker-compose
 DB_DSN ?= postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable
 
-.PHONY: migrate-tools migrate-up migrate-down migrate-down-all migrate-drop migrate-create migrate-version migrate-force
+.PHONY: migrate-tools migrate-up migrate-rollback migrate-down migrate-drop migrate-create migrate-version migrate-force
 
 migrate-tools:
 	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
@@ -59,11 +58,11 @@ migrate-up: migrate-tools
 	@echo "Applying all migrations..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" up
 
-migrate-down: migrate-tools
+migrate-rollback: migrate-tools
 	@echo "Rolling back last migration..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" down 1
 
-migrate-down-all: migrate-tools
+migrate-down: migrate-tools
 	@echo "Rolling back all migrations..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DB_DSN)" down
 
@@ -91,14 +90,17 @@ endif
 # Testing
 # ─────────────────────────────────────────────────────────────────────────────
 
-.PHONY: test test-prepare
+.PHONY: test test-unit test-e2e
 
-test-prepare:
-	@./scripts/prepare-test-env.sh
+test-unit:
+	@echo "Running unit tests..."
+	@go test -v -count=1 $(shell go list ./... | grep -v /e2e)
 
-test: test-prepare
-	@echo "Running tests..."
-	@go test -v ./...
+test-e2e:
+	@echo "Running e2e tests..."
+	@go test -v -count=1 -timeout 120s ./internal/e2e/...
+
+test: test-unit test-e2e
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Lint

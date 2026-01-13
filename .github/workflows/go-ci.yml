@@ -10,24 +10,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    env:
-      DB_DSN: postgres://${{ secrets.PG_USER_TEST }}:${{ secrets.PG_PASSWORD_TEST }}@localhost:5432/${{ secrets.PG_DB_TEST }}?sslmode=disable
-
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: ${{ secrets.PG_USER_TEST }}
-          POSTGRES_PASSWORD: ${{ secrets.PG_PASSWORD_TEST }}
-          POSTGRES_DB: ${{ secrets.PG_DB_TEST }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,13 +19,16 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Cache Go tool binaries
+        uses: actions/cache@v5
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-go-tools-${{ hashFiles('Makefile', '.github/workflows/go-ci.yml') }}
+
       - name: Install tools
         run: |
           make tools
           go install github.com/jstemmer/go-junit-report/v2@v2.1.0
-
-      - name: Run database migrations
-        run: migrate -path ./internal/migrations -database "$DB_DSN" up
 
       - name: Generate API
         run: make generate-api
@@ -65,9 +50,13 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
-          go test -v -json ./... 2>test-stderr.log | tee test-output.json | go-junit-report -set-exit-code > report.xml
+          go test -v -json -count=1 $(go list ./... | grep -v /e2e) 2>test-stderr.log | tee test-output.json | go-junit-report -set-exit-code > report.xml
+
+      - name: Run e2e tests
+        run: |
+          go test -v -json -count=1 -timeout 120s ./internal/e2e/... 2>>test-stderr.log | tee -a test-output.json | go-junit-report -set-exit-code >> report.xml
 
       - name: Upload test report
         if: always()
