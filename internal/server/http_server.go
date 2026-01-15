@@ -22,15 +22,17 @@ var upgrader = gorillaws.Upgrader{
 type HTTPServer struct {
 	users            *service.UserService
 	gameService      *service.GameService
+	problemService   *service.ProblemService
 	sessionService   *service.SessionService
 	executionService *service.ExecutionService
 	hub              *ws.Hub
 }
 
-func New(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService, executionService *service.ExecutionService, hub *ws.Hub) http.Handler {
+func New(users *service.UserService, gameService *service.GameService, problemService *service.ProblemService, sessionService *service.SessionService, executionService *service.ExecutionService, hub *ws.Hub) http.Handler {
 	s := &HTTPServer{
 		users:            users,
 		gameService:      gameService,
+		problemService:   problemService,
 		sessionService:   sessionService,
 		executionService: executionService,
 		hub:              hub,

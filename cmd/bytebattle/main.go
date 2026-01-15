@@ -44,7 +44,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           app.NewRouter(pool),
+		Handler:           app.NewRouter(pool, cfg.ProblemsDir),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

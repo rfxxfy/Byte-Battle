@@ -25,6 +25,7 @@ WORKDIR /app
 COPY --from=builder /app/bytebattle .
 COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY migrations/ ./migrations/
+COPY --from=builder /src/problems/ ./problems/
 
 EXPOSE 8080
 

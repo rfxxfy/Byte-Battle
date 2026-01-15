@@ -1,0 +1,7 @@
+{
+  "title": "Two Sum",
+  "description": "Given N, then N integers, then target. Print two 0-based indices i j (i<j) where a[i]+a[j]=target.",
+  "difficulty": "easy",
+  "time_limit_ms": 2000,
+  "memory_limit_mb": 256
+}

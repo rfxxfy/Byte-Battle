@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS problems;
+-- No-op: problems table was never created.

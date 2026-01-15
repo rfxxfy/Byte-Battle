@@ -83,7 +83,7 @@ VALUES ($1, 'pending')
 RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at
 `
 
-func (q *Queries) CreateGame(ctx context.Context, problemID int32) (Game, error) {
+func (q *Queries) CreateGame(ctx context.Context, problemID string) (Game, error) {
 	row := q.db.QueryRow(ctx, createGame, problemID)
 	var i Game
 	err := row.Scan(

@@ -23,6 +23,7 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 	"bytebattle/internal/migrations"
+	"bytebattle/internal/problems"
 	"bytebattle/internal/ws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -41,11 +42,11 @@ func (failingExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (exec
 }
 
 var (
-	testSrv   *httptest.Server
-	testPool  *pgxpool.Pool
-	user1ID   int
-	user2ID   int
-	problemID int
+	testSrv    *httptest.Server
+	testPool   *pgxpool.Pool
+	testLoader *problems.Loader
+	user1ID    int
+	user2ID    int
 )
 
 func TestMain(m *testing.M) {
@@ -117,21 +118,17 @@ func TestMain(m *testing.M) {
 	}
 	user2ID = int(u2.ID)
 
-	var pid int32
-	err = pool.QueryRow(ctx,
-		"INSERT INTO problems (title, description, difficulty, time_limit, memory_limit) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-		"Test Problem", "A test problem", "easy", 5, 256,
-	).Scan(&pid)
+	loader, err := problems.NewLoader("testdata/problems")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "create problem: %v\n", err)
+		fmt.Fprintf(os.Stderr, "load test problems: %v\n", err)
 		pool.Close()
 		_ = pgCtr.Terminate(ctx)
 		os.Exit(1)
 	}
-	problemID = int(pid)
 
 	testPool = pool
-	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, noOpExecutor{}))
+	testLoader = loader
+	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, noOpExecutor{}, loader))
 
 	code := m.Run()
 
@@ -176,7 +173,7 @@ func errCode(t *testing.T, resp *http.Response) string {
 type gameResp struct {
 	Game struct {
 		ID        int    `json:"id"`
-		ProblemID int    `json:"problem_id"`
+		ProblemID string `json:"problem_id"`
 		Status    string `json:"status"`
 		WinnerID  *int   `json:"winner_id"`
 	} `json:"game"`
@@ -203,7 +200,7 @@ func createGame(t *testing.T) gameResp {
 	t.Helper()
 	resp := do(t, http.MethodPost, "/games", map[string]any{
 		"player_ids": []int{user1ID, user2ID},
-		"problem_id": problemID,
+		"problem_id": "test-problem",
 	})
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	var g gameResp
@@ -226,7 +223,7 @@ func createActiveGame(t *testing.T) gameResp {
 func TestGame_CreateAndGet(t *testing.T) {
 	g := createGame(t)
 	assert.Equal(t, "pending", g.Game.Status)
-	assert.Equal(t, problemID, g.Game.ProblemID)
+	assert.Equal(t, "test-problem", g.Game.ProblemID)
 
 	resp := do(t, http.MethodGet, fmt.Sprintf("/games/%d", g.Game.ID), nil)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -239,7 +236,7 @@ func TestGame_CreateValidation(t *testing.T) {
 	t.Run("too few players", func(t *testing.T) {
 		resp := do(t, http.MethodPost, "/games", map[string]any{
 			"player_ids": []int{user1ID},
-			"problem_id": problemID,
+			"problem_id": "test-problem",
 		})
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		assert.Equal(t, "NOT_ENOUGH_PLAYERS", errCode(t, resp))
@@ -248,7 +245,7 @@ func TestGame_CreateValidation(t *testing.T) {
 	t.Run("duplicate players", func(t *testing.T) {
 		resp := do(t, http.MethodPost, "/games", map[string]any{
 			"player_ids": []int{user1ID, user1ID},
-			"problem_id": problemID,
+			"problem_id": "test-problem",
 		})
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		assert.Equal(t, "DUPLICATE_PLAYERS", errCode(t, resp))
@@ -590,7 +587,7 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 
 func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	// failingExecutor always returns ExitCode=1, so no game_finished should be sent
-	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}))
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}, testLoader))
 	t.Cleanup(srv.Close)
 
 	wsURLFailing := func(path string) string {
@@ -614,7 +611,7 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	// create and start a game via the failing server
 	r := doFailing(http.MethodPost, "/games", map[string]any{
 		"player_ids": []int{user1ID, user2ID},
-		"problem_id": problemID,
+		"problem_id": "test-problem",
 	})
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp

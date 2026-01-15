@@ -1,0 +1,7 @@
+{
+  "title": "Test Add",
+  "description": "Read two ints, print sum.",
+  "difficulty": "easy",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256
+}
