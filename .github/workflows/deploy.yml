@@ -70,9 +70,5 @@ jobs:
             # Pull new image
             docker compose -f docker-compose.prod.yaml pull app
 
-            # Run migrations
-            docker compose -f docker-compose.prod.yaml run --rm app \
-              sh -c 'migrate -path ./migrations -database "$DB_DSN" up'
-
-            # Restart app
-            docker compose -f docker-compose.prod.yaml up -d --no-deps app
+            # Run migrations and restart app (migrate service runs first, then app)
+            docker compose -f docker-compose.prod.yaml up -d
