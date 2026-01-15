@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"bytebattle/internal/api"
@@ -18,6 +19,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	gorillaws "github.com/gorilla/websocket"
 )
+
+func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if err := s.pool.Ping(r.Context()); err != nil {
+		http.Error(w, "db unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
+}
 
 func (s *HTTPServer) handleRoot(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
@@ -223,6 +233,12 @@ func (s *HTTPServer) CleanupExpiredSessions(ctx context.Context, _ api.CleanupEx
 }
 
 func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if _, err := s.sessionService.ValidateToken(r.Context(), token); err != nil {
+		writeHTTPError(w, err)
+		return
+	}
+
 	var req struct {
 		Code     string `json:"code"`
 		Language string `json:"language"`

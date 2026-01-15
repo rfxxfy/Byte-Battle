@@ -1,5 +1,5 @@
 # Production compose — used on VPS
-# Requires .env with IMAGE and DB_* variables
+# Requires .env with IMAGE, DB_*, HTTP_PORT variables
 #
 # IMAGE is set by the deploy workflow, e.g.:
 #   IMAGE=ghcr.io/owner/byte-battle
@@ -9,6 +9,7 @@ services:
     image: ${IMAGE}:latest
     container_name: bytebattle-app
     restart: unless-stopped
+    user: root
     depends_on:
       postgres:
         condition: service_healthy
@@ -18,8 +19,25 @@ services:
       DB_DSN: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable
       HTTP_PORT: "8080"
       PROBLEMS_DIR: /app/problems
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
     volumes:
       - ./problems:/app/problems:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
 
   postgres:
     image: postgres:18
@@ -36,6 +54,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 volumes:
   postgres_data:
