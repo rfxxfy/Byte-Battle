@@ -440,8 +440,8 @@ func TestSession_InvalidToken(t *testing.T) {
 
 	t.Run("nonexistent token", func(t *testing.T) {
 		resp := do(t, http.MethodGet, "/sessions/validate?token=doesnotexist", nil)
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-		assert.Equal(t, "SESSION_NOT_FOUND", errCode(t, resp))
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.Equal(t, "INVALID_TOKEN", errCode(t, resp))
 	})
 }
 
@@ -584,8 +584,8 @@ func TestExecute_Auth(t *testing.T) {
 
 	t.Run("nonexistent bearer token", func(t *testing.T) {
 		resp := execute("Bearer doesnotexist")
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-		assert.Equal(t, "SESSION_NOT_FOUND", errCode(t, resp))
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.Equal(t, "INVALID_TOKEN", errCode(t, resp))
 	})
 
 	t.Run("valid token", func(t *testing.T) {
@@ -654,7 +654,7 @@ func TestGameWS_InvalidParams(t *testing.T) {
 		g := createActiveGame(t)
 		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), "badtoken")
 		require.NotNil(t, resp)
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("nonexistent game", func(t *testing.T) {
