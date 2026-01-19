@@ -116,8 +116,8 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 	// Atomically increment attempts and check the limit in one query.
 	// If no rows returned, the limit was already reached.
 	vc, err = s.db.IncrementAttemptsIfBelowLimit(ctx, sqlcdb.IncrementAttemptsIfBelowLimitParams{
-		ID:          vc.ID,
-		MaxAttempts: int32(s.cfg.MaxAttempts),
+		ID:       vc.ID,
+		Attempts: int32(s.cfg.MaxAttempts),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", ErrTooManyAttempts

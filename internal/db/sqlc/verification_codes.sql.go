@@ -46,12 +46,12 @@ RETURNING id, user_id, code_hash, expires_at, attempts, created_at
 `
 
 type IncrementAttemptsIfBelowLimitParams struct {
-	ID          int32 `json:"id"`
-	MaxAttempts int32 `json:"max_attempts"`
+	ID       int32 `json:"id"`
+	Attempts int32 `json:"attempts"`
 }
 
 func (q *Queries) IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (EmailVerificationCode, error) {
-	row := q.db.QueryRow(ctx, incrementAttemptsIfBelowLimit, arg.ID, arg.MaxAttempts)
+	row := q.db.QueryRow(ctx, incrementAttemptsIfBelowLimit, arg.ID, arg.Attempts)
 	var i EmailVerificationCode
 	err := row.Scan(
 		&i.ID,
