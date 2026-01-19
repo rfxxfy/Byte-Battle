@@ -63,7 +63,7 @@ type User struct {
 	Email         string             `json:"email"`
 	PasswordHash  pgtype.Text        `json:"password_hash"`
 	Rating        pgtype.Int4        `json:"rating"`
-	EmailVerified bool               `json:"email_verified"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	EmailVerified bool               `json:"email_verified"`
 }

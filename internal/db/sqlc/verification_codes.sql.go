@@ -11,34 +11,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const upsertVerificationCode = `-- name: UpsertVerificationCode :one
-INSERT INTO email_verification_codes (user_id, code_hash, expires_at)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id) DO UPDATE
-    SET code_hash  = EXCLUDED.code_hash,
-        expires_at = EXCLUDED.expires_at,
-        attempts   = 0
-RETURNING id, user_id, code_hash, expires_at, attempts, created_at
+const deleteVerificationCode = `-- name: DeleteVerificationCode :exec
+DELETE FROM email_verification_codes WHERE id = $1
 `
 
-type UpsertVerificationCodeParams struct {
-	UserID    int32              `json:"user_id"`
-	CodeHash  string             `json:"code_hash"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-}
-
-func (q *Queries) UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (EmailVerificationCode, error) {
-	row := q.db.QueryRow(ctx, upsertVerificationCode, arg.UserID, arg.CodeHash, arg.ExpiresAt)
-	var i EmailVerificationCode
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.CodeHash,
-		&i.ExpiresAt,
-		&i.Attempts,
-		&i.CreatedAt,
-	)
-	return i, err
+func (q *Queries) DeleteVerificationCode(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, deleteVerificationCode, id)
+	return err
 }
 
 const getVerificationCodeByUserID = `-- name: GetVerificationCodeByUserID :one
@@ -68,11 +47,32 @@ func (q *Queries) IncrementVerificationAttempts(ctx context.Context, id int32) e
 	return err
 }
 
-const deleteVerificationCode = `-- name: DeleteVerificationCode :exec
-DELETE FROM email_verification_codes WHERE id = $1
+const upsertVerificationCode = `-- name: UpsertVerificationCode :one
+INSERT INTO email_verification_codes (user_id, code_hash, expires_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id) DO UPDATE
+    SET code_hash  = EXCLUDED.code_hash,
+        expires_at = EXCLUDED.expires_at,
+        attempts   = 0
+RETURNING id, user_id, code_hash, expires_at, attempts, created_at
 `
 
-func (q *Queries) DeleteVerificationCode(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, deleteVerificationCode, id)
-	return err
+type UpsertVerificationCodeParams struct {
+	UserID    int32              `json:"user_id"`
+	CodeHash  string             `json:"code_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+func (q *Queries) UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (EmailVerificationCode, error) {
+	row := q.db.QueryRow(ctx, upsertVerificationCode, arg.UserID, arg.CodeHash, arg.ExpiresAt)
+	var i EmailVerificationCode
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CodeHash,
+		&i.ExpiresAt,
+		&i.Attempts,
+		&i.CreatedAt,
+	)
+	return i, err
 }

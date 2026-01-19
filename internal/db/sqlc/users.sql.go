@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at
+RETURNING id, username, email, password_hash, rating, created_at, updated_at, email_verified
 `
 
 type CreateUserParams struct {
@@ -31,10 +31,10 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Username,
 		&i.Email,
 		&i.PasswordHash,
-		&i.EmailVerified,
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerified,
 	)
 	return i, err
 }
@@ -42,7 +42,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 const createUserByEmail = `-- name: CreateUserByEmail :one
 INSERT INTO users (username, email)
 VALUES ($1, $2)
-RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at
+RETURNING id, username, email, password_hash, rating, created_at, updated_at, email_verified
 `
 
 type CreateUserByEmailParams struct {
@@ -58,16 +58,16 @@ func (q *Queries) CreateUserByEmail(ctx context.Context, arg CreateUserByEmailPa
 		&i.Username,
 		&i.Email,
 		&i.PasswordHash,
-		&i.EmailVerified,
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerified,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
+SELECT id, username, email, password_hash, rating, created_at, updated_at, email_verified FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -78,16 +78,16 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Username,
 		&i.Email,
 		&i.PasswordHash,
-		&i.EmailVerified,
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerified,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, password_hash, rating, created_at, updated_at, email_verified FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -98,10 +98,10 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Username,
 		&i.Email,
 		&i.PasswordHash,
-		&i.EmailVerified,
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailVerified,
 	)
 	return i, err
 }
