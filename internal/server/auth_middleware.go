@@ -11,7 +11,6 @@ type contextKey string
 
 const contextKeyUserID contextKey = "userID"
 
-// authMiddleware validates the session cookie and injects userID into the context.
 func (s *HTTPServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(s.cfg.Entrance.CookieName)

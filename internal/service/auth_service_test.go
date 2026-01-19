@@ -14,8 +14,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// --- test helpers ---
-
 func testEntranceConfig() config.EntranceConfig {
 	return config.EntranceConfig{
 		CodeTTL:     15 * time.Minute,
@@ -46,8 +44,6 @@ func validCode(t *testing.T, expiresAt time.Time, attempts int32) sqlcdb.EmailVe
 	}
 }
 
-// --- mock entranceDB ---
-
 type mockDB struct {
 	getUserByEmail          func(context.Context, string) (sqlcdb.User, error)
 	getUserByUsername       func(context.Context, string) (sqlcdb.User, error)
@@ -58,9 +54,9 @@ type mockDB struct {
 	deleteVerification      func(context.Context, int32) error
 	setEmailVerified        func(context.Context, int32) error
 
-	upsertCalled         bool
-	incrementCalled      bool
-	setVerifiedCalled    bool
+	upsertCalled      bool
+	incrementCalled   bool
+	setVerifiedCalled bool
 }
 
 func (m *mockDB) GetUserByEmail(ctx context.Context, email string) (sqlcdb.User, error) {
@@ -122,8 +118,6 @@ func (m *mockDB) SetEmailVerified(ctx context.Context, id int32) error {
 	return nil
 }
 
-// --- mock sessionCreator ---
-
 type mockSession struct {
 	token        string
 	createCalled bool
@@ -142,8 +136,6 @@ func (m *mockSession) CreateSession(_ context.Context, _ int) (sqlcdb.Session, e
 	return sqlcdb.Session{ID: 1, Token: tok}, nil
 }
 
-// --- mock Mailer ---
-
 type mockMailer struct {
 	sendCalled bool
 	lastTo     string
@@ -156,15 +148,9 @@ func (m *mockMailer) SendVerificationCode(to, _ string) error {
 	return m.err
 }
 
-// --- factory ---
-
 func newEntrance(db *mockDB, sess *mockSession, mailer *mockMailer) EntranceService {
 	return NewEntranceService(db, sess, mailer, testEntranceConfig())
 }
-
-// =============================================================================
-// Tests: pure functions
-// =============================================================================
 
 func TestIsValidEmail(t *testing.T) {
 	valid := []string{"user@example.com", "a+b@x.io", "foo.bar@baz.co.uk"}
@@ -198,10 +184,6 @@ func TestGenerateVerificationCode_Format(t *testing.T) {
 		}
 	}
 }
-
-// =============================================================================
-// Tests: SendCode
-// =============================================================================
 
 func TestSendCode_InvalidEmail_ReturnsError(t *testing.T) {
 	db := &mockDB{}
@@ -266,10 +248,6 @@ func TestSendCode_ExistingUser_SendsCodeWithoutCreating(t *testing.T) {
 		t.Error("expected mailer to be called")
 	}
 }
-
-// =============================================================================
-// Tests: VerifyCode
-// =============================================================================
 
 func TestVerifyCode_Success_ReturnsToken(t *testing.T) {
 	db := &mockDB{
