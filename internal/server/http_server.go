@@ -8,6 +8,7 @@ import (
 
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
+	"bytebattle/internal/config"
 	"bytebattle/internal/service"
 	"bytebattle/internal/ws"
 
@@ -39,9 +40,21 @@ type HTTPServer struct {
 	sessionService   *service.SessionService
 	executionService *service.ExecutionService
 	hub              *ws.Hub
+	entrance         service.EntranceService
+	cfg              config.Config
 }
 
-func New(pool *pgxpool.Pool, users *service.UserService, gameService *service.GameService, problemService *service.ProblemService, sessionService *service.SessionService, executionService *service.ExecutionService, hub *ws.Hub) http.Handler {
+func New(
+	pool *pgxpool.Pool,
+	users *service.UserService,
+	gameService *service.GameService,
+	problemService *service.ProblemService,
+	sessionService *service.SessionService,
+	executionService *service.ExecutionService,
+	hub *ws.Hub,
+	entrance service.EntranceService,
+	cfg config.Config,
+) http.Handler {
 	s := &HTTPServer{
 		pool:             pool,
 		users:            users,
@@ -50,6 +63,8 @@ func New(pool *pgxpool.Pool, users *service.UserService, gameService *service.Ga
 		sessionService:   sessionService,
 		executionService: executionService,
 		hub:              hub,
+		entrance:         entrance,
+		cfg:              cfg,
 	}
 
 	r := chi.NewRouter()
@@ -61,6 +76,11 @@ func New(pool *pgxpool.Pool, users *service.UserService, gameService *service.Ga
 	r.Get("/internal/hello_world", s.handleHello)
 	r.Post("/execute", s.handleExecute)
 	r.Get("/games/{id}/ws", s.handleGameWS)
+
+	r.Post("/auth/enter", s.handleSendCode)
+	r.Post("/auth/confirm", s.handleVerifyCode)
+	r.Post("/auth/logout", s.handleLogout)
+	r.Get("/auth/me", s.authMiddleware(s.handleAuthMe))
 
 	strictOpts := api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestErrorHandler,

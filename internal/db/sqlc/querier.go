@@ -16,20 +16,27 @@ type Querier interface {
 	CreateGame(ctx context.Context, problemID string) (Game, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (User, error)
 	DeleteExpiredSessions(ctx context.Context) (int64, error)
 	DeleteGame(ctx context.Context, id int32) (int64, error)
 	DeleteSession(ctx context.Context, id int32) (int64, error)
 	DeleteSessionsByUserID(ctx context.Context, userID int32) (int64, error)
+	DeleteVerificationCode(ctx context.Context, id int32) error
 	GetGameByID(ctx context.Context, id int32) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID int32) ([]Session, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetVerificationCodeByUserID(ctx context.Context, userID int32) (EmailVerificationCode, error)
+	IncrementVerificationAttempts(ctx context.Context, id int32) error
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error)
+	SetEmailVerified(ctx context.Context, id int32) error
 	StartGame(ctx context.Context, id int32) (Game, error)
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
+	UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (EmailVerificationCode, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -7,7 +7,9 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
 
 type UserService struct {
 	q *sqlcdb.Queries
@@ -23,7 +25,7 @@ func (s *UserService) GetOrCreateTestUser(ctx context.Context) (sqlcdb.User, err
 		return s.q.CreateUser(ctx, sqlcdb.CreateUserParams{
 			Username:     "testuser",
 			Email:        "test@example.com",
-			PasswordHash: "hashedpassword",
+			PasswordHash: pgtype.Text{String: "hashedpassword", Valid: true},
 		})
 	}
 	return user, err

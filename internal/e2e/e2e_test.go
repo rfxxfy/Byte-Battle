@@ -20,12 +20,14 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"bytebattle/internal/app"
+	"bytebattle/internal/config"
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 	"bytebattle/internal/migrations"
 	"bytebattle/internal/problems"
 	"bytebattle/internal/ws"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -95,7 +97,7 @@ func TestMain(m *testing.M) {
 	u1, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
 		Username:     "player1",
 		Email:        "player1@test.com",
-		PasswordHash: "hash",
+		PasswordHash: pgtype.Text{String: "hash", Valid: true},
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "create user1: %v\n", err)
@@ -108,7 +110,7 @@ func TestMain(m *testing.M) {
 	u2, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
 		Username:     "player2",
 		Email:        "player2@test.com",
-		PasswordHash: "hash",
+		PasswordHash: pgtype.Text{String: "hash", Valid: true},
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "create user2: %v\n", err)
@@ -128,7 +130,7 @@ func TestMain(m *testing.M) {
 
 	testPool = pool
 	testLoader = loader
-	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, noOpExecutor{}, loader))
+	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, noOpExecutor{}, loader, config.Load()))
 
 	code := m.Run()
 
@@ -698,7 +700,7 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 
 func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	// failingExecutor always returns ExitCode=1, so no game_finished should be sent
-	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}, testLoader))
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}, testLoader, config.Load()))
 	t.Cleanup(srv.Close)
 
 	wsURLFailing := func(path string) string {

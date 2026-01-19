@@ -7,18 +7,20 @@ package sqlcdb
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, username, email, password_hash, rating, created_at, updated_at
+RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Username     string `json:"username"`
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
+	Username     string      `json:"username"`
+	Email        string      `json:"email"`
+	PasswordHash pgtype.Text `json:"password_hash"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -29,6 +31,54 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Username,
 		&i.Email,
 		&i.PasswordHash,
+		&i.EmailVerified,
+		&i.Rating,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createUserByEmail = `-- name: CreateUserByEmail :one
+INSERT INTO users (username, email)
+VALUES ($1, $2)
+RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at
+`
+
+type CreateUserByEmailParams struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+func (q *Queries) CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUserByEmail, arg.Username, arg.Email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.EmailVerified,
+		&i.Rating,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.EmailVerified,
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -37,7 +87,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, password_hash, rating, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -48,9 +98,19 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Username,
 		&i.Email,
 		&i.PasswordHash,
+		&i.EmailVerified,
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const setEmailVerified = `-- name: SetEmailVerified :exec
+UPDATE users SET email_verified = true WHERE id = $1
+`
+
+func (q *Queries) SetEmailVerified(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, setEmailVerified, id)
+	return err
 }
