@@ -37,7 +37,7 @@ type entranceDB interface {
 	CreateUserByEmail(ctx context.Context, arg sqlcdb.CreateUserByEmailParams) (sqlcdb.User, error)
 	GetVerificationCodeByUserID(ctx context.Context, userID int32) (sqlcdb.EmailVerificationCode, error)
 	UpsertVerificationCode(ctx context.Context, arg sqlcdb.UpsertVerificationCodeParams) (sqlcdb.EmailVerificationCode, error)
-	IncrementVerificationAttempts(ctx context.Context, id int32) error
+	IncrementAttemptsIfBelowLimit(ctx context.Context, arg sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.EmailVerificationCode, error)
 	DeleteVerificationCode(ctx context.Context, id int32) error
 	SetEmailVerified(ctx context.Context, id int32) error
 }
@@ -109,16 +109,24 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 		return "", fmt.Errorf("get verification code: %w", err)
 	}
 
-	if vc.Attempts >= int32(s.cfg.MaxAttempts) {
-		return "", ErrTooManyAttempts
-	}
-
 	if time.Now().After(vc.ExpiresAt.Time) {
 		return "", ErrInvalidCode
 	}
 
+	// Atomically increment attempts and check the limit in one query.
+	// If no rows returned, the limit was already reached.
+	vc, err = s.db.IncrementAttemptsIfBelowLimit(ctx, sqlcdb.IncrementAttemptsIfBelowLimitParams{
+		ID:          vc.ID,
+		MaxAttempts: int32(s.cfg.MaxAttempts),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrTooManyAttempts
+	}
+	if err != nil {
+		return "", fmt.Errorf("increment attempts: %w", err)
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(vc.CodeHash), []byte(code)); err != nil {
-		_ = s.db.IncrementVerificationAttempts(ctx, vc.ID)
 		return "", ErrInvalidCode
 	}
 

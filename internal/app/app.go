@@ -47,5 +47,5 @@ func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, loader *p
 	entranceService := service.NewEntranceService(q, sessionService, mailer, cfg.Entrance)
 
 	hub := ws.NewHub()
-	return server.New(pool, userService, gameService, problemService, sessionService, executionService, hub, entranceService, cfg)
+	return server.New(pool, userService, gameService, problemService, sessionService, executionService, hub, entranceService, cfg.Entrance)
 }

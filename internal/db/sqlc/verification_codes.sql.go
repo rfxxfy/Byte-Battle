@@ -38,13 +38,30 @@ func (q *Queries) GetVerificationCodeByUserID(ctx context.Context, userID int32)
 	return i, err
 }
 
-const incrementVerificationAttempts = `-- name: IncrementVerificationAttempts :exec
-UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = $1
+const incrementAttemptsIfBelowLimit = `-- name: IncrementAttemptsIfBelowLimit :one
+UPDATE email_verification_codes
+SET attempts = attempts + 1
+WHERE id = $1 AND attempts < $2
+RETURNING id, user_id, code_hash, expires_at, attempts, created_at
 `
 
-func (q *Queries) IncrementVerificationAttempts(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, incrementVerificationAttempts, id)
-	return err
+type IncrementAttemptsIfBelowLimitParams struct {
+	ID          int32 `json:"id"`
+	MaxAttempts int32 `json:"max_attempts"`
+}
+
+func (q *Queries) IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (EmailVerificationCode, error) {
+	row := q.db.QueryRow(ctx, incrementAttemptsIfBelowLimit, arg.ID, arg.MaxAttempts)
+	var i EmailVerificationCode
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CodeHash,
+		&i.ExpiresAt,
+		&i.Attempts,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const upsertVerificationCode = `-- name: UpsertVerificationCode :one

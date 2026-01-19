@@ -13,7 +13,7 @@ const contextKeyUserID contextKey = "userID"
 
 func (s *HTTPServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(s.cfg.Entrance.CookieName)
+		cookie, err := r.Cookie(s.cfg.CookieName)
 		if err != nil || cookie.Value == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)

@@ -43,7 +43,7 @@ func (s *HTTPServer) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setSessionCookie(w, token, s.cfg.Entrance.CookieName, s.cfg.Entrance.CookieSecure, s.cfg.Entrance.SessionTTL)
+	setSessionCookie(w, token, s.cfg.CookieName, s.cfg.CookieSecure, s.cfg.SessionTTL)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -51,7 +51,7 @@ func (s *HTTPServer) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HTTPServer) handleLogout(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie(s.cfg.Entrance.CookieName)
+	cookie, err := r.Cookie(s.cfg.CookieName)
 	if err == nil && cookie.Value != "" {
 		session, err := s.sessionService.ValidateToken(r.Context(), cookie.Value)
 		if err == nil {
@@ -59,7 +59,7 @@ func (s *HTTPServer) handleLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	clearSessionCookie(w, s.cfg.Entrance.CookieName, s.cfg.Entrance.CookieSecure)
+	clearSessionCookie(w, s.cfg.CookieName, s.cfg.CookieSecure)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

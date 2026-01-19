@@ -50,7 +50,7 @@ type mockDB struct {
 	createUserByEmail       func(context.Context, sqlcdb.CreateUserByEmailParams) (sqlcdb.User, error)
 	getVerificationByUserID func(context.Context, int32) (sqlcdb.EmailVerificationCode, error)
 	upsertVerification      func(context.Context, sqlcdb.UpsertVerificationCodeParams) (sqlcdb.EmailVerificationCode, error)
-	incrementAttempts       func(context.Context, int32) error
+	incrementAttempts       func(context.Context, sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.EmailVerificationCode, error)
 	deleteVerification      func(context.Context, int32) error
 	setEmailVerified        func(context.Context, int32) error
 
@@ -95,12 +95,12 @@ func (m *mockDB) UpsertVerificationCode(ctx context.Context, arg sqlcdb.UpsertVe
 	return sqlcdb.EmailVerificationCode{ID: 1, UserID: arg.UserID}, nil
 }
 
-func (m *mockDB) IncrementVerificationAttempts(ctx context.Context, id int32) error {
+func (m *mockDB) IncrementAttemptsIfBelowLimit(ctx context.Context, arg sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.EmailVerificationCode, error) {
 	m.incrementCalled = true
 	if m.incrementAttempts != nil {
-		return m.incrementAttempts(ctx, id)
+		return m.incrementAttempts(ctx, arg)
 	}
-	return nil
+	return sqlcdb.EmailVerificationCode{ID: arg.ID}, nil
 }
 
 func (m *mockDB) DeleteVerificationCode(ctx context.Context, id int32) error {
@@ -250,12 +250,16 @@ func TestSendCode_ExistingUser_SendsCodeWithoutCreating(t *testing.T) {
 }
 
 func TestVerifyCode_Success_ReturnsToken(t *testing.T) {
+	code := validCode(t, time.Now().Add(10*time.Minute), 0)
 	db := &mockDB{
 		getUserByEmail: func(_ context.Context, _ string) (sqlcdb.User, error) {
 			return sqlcdb.User{ID: 1, Email: "user@example.com"}, nil
 		},
 		getVerificationByUserID: func(_ context.Context, _ int32) (sqlcdb.EmailVerificationCode, error) {
-			return validCode(t, time.Now().Add(10*time.Minute), 0), nil
+			return code, nil
+		},
+		incrementAttempts: func(_ context.Context, _ sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.EmailVerificationCode, error) {
+			return code, nil
 		},
 	}
 	sess := &mockSession{token: "my-session-token"}
@@ -294,7 +298,7 @@ func TestVerifyCode_WrongCode_IncrementsAttemptsAndErrors(t *testing.T) {
 		t.Errorf("expected ErrInvalidCode, got %v", err)
 	}
 	if !db.incrementCalled {
-		t.Error("expected IncrementVerificationAttempts to be called")
+		t.Error("expected IncrementAttemptsIfBelowLimit to be called")
 	}
 	if db.setVerifiedCalled {
 		t.Error("SetEmailVerified should NOT be called on wrong code")
@@ -302,13 +306,16 @@ func TestVerifyCode_WrongCode_IncrementsAttemptsAndErrors(t *testing.T) {
 }
 
 func TestVerifyCode_TooManyAttempts(t *testing.T) {
-	cfg := testEntranceConfig()
 	db := &mockDB{
 		getUserByEmail: func(_ context.Context, _ string) (sqlcdb.User, error) {
 			return sqlcdb.User{ID: 1}, nil
 		},
 		getVerificationByUserID: func(_ context.Context, _ int32) (sqlcdb.EmailVerificationCode, error) {
-			return validCode(t, time.Now().Add(10*time.Minute), int32(cfg.MaxAttempts)), nil
+			return validCode(t, time.Now().Add(10*time.Minute), 0), nil
+		},
+		// DB returns ErrNoRows because attempts >= limit — atomic check failed
+		incrementAttempts: func(_ context.Context, _ sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.EmailVerificationCode, error) {
+			return sqlcdb.EmailVerificationCode{}, pgx.ErrNoRows
 		},
 	}
 	svc := newEntrance(db, &mockSession{}, &mockMailer{})
@@ -317,9 +324,6 @@ func TestVerifyCode_TooManyAttempts(t *testing.T) {
 
 	if !errors.Is(err, ErrTooManyAttempts) {
 		t.Errorf("expected ErrTooManyAttempts, got %v", err)
-	}
-	if db.incrementCalled {
-		t.Error("IncrementVerificationAttempts should NOT be called at max attempts")
 	}
 }
 

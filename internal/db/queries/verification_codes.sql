@@ -10,8 +10,11 @@ RETURNING *;
 -- name: GetVerificationCodeByUserID :one
 SELECT * FROM email_verification_codes WHERE user_id = $1 LIMIT 1;
 
--- name: IncrementVerificationAttempts :exec
-UPDATE email_verification_codes SET attempts = attempts + 1 WHERE id = $1;
+-- name: IncrementAttemptsIfBelowLimit :one
+UPDATE email_verification_codes
+SET attempts = attempts + 1
+WHERE id = $1 AND attempts < $2
+RETURNING id, user_id, code_hash, expires_at, attempts, created_at;
 
 -- name: DeleteVerificationCode :exec
 DELETE FROM email_verification_codes WHERE id = $1;

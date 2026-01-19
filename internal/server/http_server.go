@@ -41,7 +41,7 @@ type HTTPServer struct {
 	executionService *service.ExecutionService
 	hub              *ws.Hub
 	entrance         service.EntranceService
-	cfg              config.Config
+	cfg              config.EntranceConfig
 }
 
 func New(
@@ -53,7 +53,7 @@ func New(
 	executionService *service.ExecutionService,
 	hub *ws.Hub,
 	entrance service.EntranceService,
-	cfg config.Config,
+	cfg config.EntranceConfig,
 ) http.Handler {
 	s := &HTTPServer{
 		pool:             pool,

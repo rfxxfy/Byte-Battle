@@ -30,7 +30,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetVerificationCodeByUserID(ctx context.Context, userID int32) (EmailVerificationCode, error)
-	IncrementVerificationAttempts(ctx context.Context, id int32) error
+	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (EmailVerificationCode, error)
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error)
 	SetEmailVerified(ctx context.Context, id int32) error

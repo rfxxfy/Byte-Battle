@@ -7,5 +7,4 @@ CREATE TABLE email_verification_codes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_verification_codes_user_id ON email_verification_codes(user_id);
 CREATE INDEX idx_verification_codes_expires_at ON email_verification_codes(expires_at);
