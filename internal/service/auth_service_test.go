@@ -20,7 +20,6 @@ func testEntranceConfig() config.EntranceConfig {
 		MaxAttempts: 5,
 		BcryptCost:  4, // low cost for fast tests
 		SessionTTL:  24 * time.Hour,
-		CookieName:  "bb_session",
 	}
 }
 
@@ -265,13 +264,13 @@ func TestVerifyCode_Success_ReturnsToken(t *testing.T) {
 	sess := &mockSession{token: "my-session-token"}
 	svc := newEntrance(db, sess, &mockMailer{})
 
-	token, err := svc.VerifyCode(context.Background(), "user@example.com", "111111")
+	session, err := svc.VerifyCode(context.Background(), "user@example.com", "111111")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if token != "my-session-token" {
-		t.Errorf("expected token 'my-session-token', got %q", token)
+	if session.Token != "my-session-token" {
+		t.Errorf("expected token 'my-session-token', got %q", session.Token)
 	}
 	if !db.setVerifiedCalled {
 		t.Error("expected SetEmailVerified to be called")

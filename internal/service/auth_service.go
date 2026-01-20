@@ -28,7 +28,7 @@ var (
 // The caller never needs to know which case occurred.
 type EntranceService interface {
 	SendCode(ctx context.Context, email string) error
-	VerifyCode(ctx context.Context, email, code string) (sessionToken string, err error)
+	VerifyCode(ctx context.Context, email, code string) (sqlcdb.Session, error)
 }
 
 type entranceDB interface {
@@ -92,25 +92,25 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 	return s.sendCode(ctx, user)
 }
 
-func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (string, error) {
+func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (sqlcdb.Session, error) {
 	user, err := s.db.GetUserByEmail(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrUserNotFound
+		return sqlcdb.Session{}, ErrUserNotFound
 	}
 	if err != nil {
-		return "", fmt.Errorf("get user: %w", err)
+		return sqlcdb.Session{}, fmt.Errorf("get user: %w", err)
 	}
 
 	vc, err := s.db.GetVerificationCodeByUserID(ctx, user.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrInvalidCode
+		return sqlcdb.Session{}, ErrInvalidCode
 	}
 	if err != nil {
-		return "", fmt.Errorf("get verification code: %w", err)
+		return sqlcdb.Session{}, fmt.Errorf("get verification code: %w", err)
 	}
 
 	if time.Now().After(vc.ExpiresAt.Time) {
-		return "", ErrInvalidCode
+		return sqlcdb.Session{}, ErrInvalidCode
 	}
 
 	// Atomically increment attempts and check the limit in one query.
@@ -120,28 +120,28 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 		Attempts: int32(s.cfg.MaxAttempts),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrTooManyAttempts
+		return sqlcdb.Session{}, ErrTooManyAttempts
 	}
 	if err != nil {
-		return "", fmt.Errorf("increment attempts: %w", err)
+		return sqlcdb.Session{}, fmt.Errorf("increment attempts: %w", err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(vc.CodeHash), []byte(code)); err != nil {
-		return "", ErrInvalidCode
+		return sqlcdb.Session{}, ErrInvalidCode
 	}
 
 	if err := s.db.SetEmailVerified(ctx, user.ID); err != nil {
-		return "", fmt.Errorf("set email verified: %w", err)
+		return sqlcdb.Session{}, fmt.Errorf("set email verified: %w", err)
 	}
 
 	_ = s.db.DeleteVerificationCode(ctx, vc.ID)
 
 	session, err := s.session.CreateSession(ctx, int(user.ID))
 	if err != nil {
-		return "", fmt.Errorf("create session: %w", err)
+		return sqlcdb.Session{}, fmt.Errorf("create session: %w", err)
 	}
 
-	return session.Token, nil
+	return session, nil
 }
 
 func (s *entranceService) sendCode(ctx context.Context, user sqlcdb.User) error {
