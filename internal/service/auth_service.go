@@ -95,7 +95,7 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (sqlcdb.Session, error) {
 	user, err := s.db.GetUserByEmail(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlcdb.Session{}, ErrUserNotFound
+		return sqlcdb.Session{}, ErrInvalidCode
 	}
 	if err != nil {
 		return sqlcdb.Session{}, fmt.Errorf("get user: %w", err)

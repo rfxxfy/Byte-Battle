@@ -344,13 +344,13 @@ func TestVerifyCode_ExpiredCode(t *testing.T) {
 	}
 }
 
-func TestVerifyCode_UserNotFound(t *testing.T) {
-	db := &mockDB{} // getUserByEmail returns pgx.ErrNoRows by default
+func TestVerifyCode_UnknownEmail_ReturnsInvalidCode(t *testing.T) {
+	db := &mockDB{}
 	svc := newEntrance(db, &mockSession{}, &mockMailer{})
 
 	_, err := svc.VerifyCode(context.Background(), "ghost@example.com", "111111")
 
-	if !errors.Is(err, ErrUserNotFound) {
-		t.Errorf("expected ErrUserNotFound, got %v", err)
+	if !errors.Is(err, ErrInvalidCode) {
+		t.Errorf("expected ErrInvalidCode, got %v", err)
 	}
 }
