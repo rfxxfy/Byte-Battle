@@ -11,8 +11,8 @@ type contextKey string
 
 const contextKeyUserID contextKey = "userID"
 
-func (s *HTTPServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (s *HTTPServer) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := bearerToken(r)
 		if token == "" {
 			w.Header().Set("Content-Type", "application/json")
@@ -31,7 +31,7 @@ func (s *HTTPServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		ctx := context.WithValue(r.Context(), contextKeyUserID, int(session.UserID))
 		next.ServeHTTP(w, r.WithContext(ctx))
-	}
+	})
 }
 
 func bearerToken(r *http.Request) string {

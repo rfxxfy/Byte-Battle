@@ -80,14 +80,17 @@ func New(
 	r.Post("/auth/enter", s.handleSendCode)
 	r.Post("/auth/confirm", s.handleVerifyCode)
 	r.Post("/auth/logout", s.handleLogout)
-	r.Get("/auth/me", s.authMiddleware(s.handleAuthMe))
+	r.With(s.authMiddleware).Get("/auth/me", s.handleAuthMe)
 
 	strictOpts := api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestErrorHandler,
 		ResponseErrorHandlerFunc: responseErrorHandler,
 	}
 	strictHandler := api.NewStrictHandlerWithOptions(s, nil, strictOpts)
-	api.HandlerFromMux(strictHandler, r)
+	r.Group(func(r chi.Router) {
+		r.Use(s.authMiddleware)
+		api.HandlerFromMux(strictHandler, r)
+	})
 
 	return r
 }
