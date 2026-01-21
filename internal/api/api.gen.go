@@ -22,6 +22,10 @@ import (
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 )
 
+const (
+	BearerAuthScopes = "BearerAuth.Scopes"
+)
+
 // Defines values for GameStatus.
 const (
 	Active    GameStatus = "active"
@@ -72,9 +76,10 @@ type CompleteGameRequest struct {
 	WinnerId int `json:"winner_id"`
 }
 
-// CountResponse defines model for CountResponse.
-type CountResponse struct {
-	Count int64 `json:"count"`
+// ConfirmRequest defines model for ConfirmRequest.
+type ConfirmRequest struct {
+	Code  string `json:"code"`
+	Email string `json:"email"`
 }
 
 // CreateGameRequest defines model for CreateGameRequest.
@@ -83,19 +88,14 @@ type CreateGameRequest struct {
 	ProblemId string `json:"problem_id"`
 }
 
-// CreateSessionRequest defines model for CreateSessionRequest.
-type CreateSessionRequest struct {
-	UserId int `json:"user_id"`
-}
-
 // DeletedResponse defines model for DeletedResponse.
 type DeletedResponse struct {
 	Deleted bool `json:"deleted"`
 }
 
-// EndedResponse defines model for EndedResponse.
-type EndedResponse struct {
-	Ended bool `json:"ended"`
+// EnterRequest defines model for EnterRequest.
+type EnterRequest struct {
+	Email string `json:"email"`
 }
 
 // ErrorResponse defines model for ErrorResponse.
@@ -133,6 +133,11 @@ type ListProblemsResponse struct {
 	Problems []Problem `json:"problems"`
 }
 
+// MeResponse defines model for MeResponse.
+type MeResponse struct {
+	UserId int `json:"user_id"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Description   string            `json:"description"`
@@ -154,39 +159,19 @@ type ProblemResponse struct {
 	Problem Problem `json:"problem"`
 }
 
-// Session defines model for Session.
-type Session struct {
-	CreatedAt time.Time `json:"created_at"`
+// StatusResponse defines model for StatusResponse.
+type StatusResponse struct {
+	Status string `json:"status"`
+}
+
+// TokenResponse defines model for TokenResponse.
+type TokenResponse struct {
 	ExpiresAt time.Time `json:"expires_at"`
-	Id        int       `json:"id"`
 	Token     string    `json:"token"`
-	UserId    int       `json:"user_id"`
-}
-
-// SessionResponse defines model for SessionResponse.
-type SessionResponse struct {
-	Session Session `json:"session"`
-}
-
-// UserSessionsResponse defines model for UserSessionsResponse.
-type UserSessionsResponse struct {
-	Sessions []Session `json:"sessions"`
-}
-
-// ValidateSessionResponse defines model for ValidateSessionResponse.
-type ValidateSessionResponse struct {
-	Session Session `json:"session"`
-	Valid   bool    `json:"valid"`
 }
 
 // GameID defines model for GameID.
 type GameID = int
-
-// SessionID defines model for SessionID.
-type SessionID = int
-
-// UserID defines model for UserID.
-type UserID = int
 
 // Error defines model for Error.
 type Error = ErrorResponse
@@ -197,10 +182,11 @@ type ListGamesParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
-// ValidateSessionParams defines parameters for ValidateSession.
-type ValidateSessionParams struct {
-	Token *string `form:"token,omitempty" json:"token,omitempty"`
-}
+// PostAuthConfirmJSONRequestBody defines body for PostAuthConfirm for application/json ContentType.
+type PostAuthConfirmJSONRequestBody = ConfirmRequest
+
+// PostAuthEnterJSONRequestBody defines body for PostAuthEnter for application/json ContentType.
+type PostAuthEnterJSONRequestBody = EnterRequest
 
 // CreateGameJSONRequestBody defines body for CreateGame for application/json ContentType.
 type CreateGameJSONRequestBody = CreateGameRequest
@@ -208,11 +194,20 @@ type CreateGameJSONRequestBody = CreateGameRequest
 // CompleteGameJSONRequestBody defines body for CompleteGame for application/json ContentType.
 type CompleteGameJSONRequestBody = CompleteGameRequest
 
-// CreateSessionJSONRequestBody defines body for CreateSession for application/json ContentType.
-type CreateSessionJSONRequestBody = CreateSessionRequest
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Verify magic code and get session token
+	// (POST /auth/confirm)
+	PostAuthConfirm(w http.ResponseWriter, r *http.Request)
+	// Request a magic code via email
+	// (POST /auth/enter)
+	PostAuthEnter(w http.ResponseWriter, r *http.Request)
+	// End current session
+	// (POST /auth/logout)
+	PostAuthLogout(w http.ResponseWriter, r *http.Request)
+	// Get current authenticated user
+	// (GET /auth/me)
+	GetAuthMe(w http.ResponseWriter, r *http.Request)
 	// List games with pagination
 	// (GET /games)
 	ListGames(w http.ResponseWriter, r *http.Request, params ListGamesParams)
@@ -240,35 +235,35 @@ type ServerInterface interface {
 	// Get problem by ID
 	// (GET /problems/{problem_id})
 	GetProblem(w http.ResponseWriter, r *http.Request, problemId string)
-	// Create a new session
-	// (POST /sessions)
-	CreateSession(w http.ResponseWriter, r *http.Request)
-	// Remove all expired sessions
-	// (POST /sessions/cleanup)
-	CleanupExpiredSessions(w http.ResponseWriter, r *http.Request)
-	// Validate a session token
-	// (GET /sessions/validate)
-	ValidateSession(w http.ResponseWriter, r *http.Request, params ValidateSessionParams)
-	// End (delete) a session
-	// (DELETE /sessions/{id})
-	EndSession(w http.ResponseWriter, r *http.Request, id SessionID)
-	// Get session by ID
-	// (GET /sessions/{id})
-	GetSession(w http.ResponseWriter, r *http.Request, id SessionID)
-	// Refresh session expiry
-	// (POST /sessions/{id}/refresh)
-	RefreshSession(w http.ResponseWriter, r *http.Request, id SessionID)
-	// End all sessions for a user
-	// (DELETE /users/{user_id}/sessions)
-	EndAllUserSessions(w http.ResponseWriter, r *http.Request, userId UserID)
-	// List all sessions for a user
-	// (GET /users/{user_id}/sessions)
-	GetUserSessions(w http.ResponseWriter, r *http.Request, userId UserID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Verify magic code and get session token
+// (POST /auth/confirm)
+func (_ Unimplemented) PostAuthConfirm(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Request a magic code via email
+// (POST /auth/enter)
+func (_ Unimplemented) PostAuthEnter(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// End current session
+// (POST /auth/logout)
+func (_ Unimplemented) PostAuthLogout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get current authenticated user
+// (GET /auth/me)
+func (_ Unimplemented) GetAuthMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // List games with pagination
 // (GET /games)
@@ -324,54 +319,6 @@ func (_ Unimplemented) GetProblem(w http.ResponseWriter, r *http.Request, proble
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Create a new session
-// (POST /sessions)
-func (_ Unimplemented) CreateSession(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Remove all expired sessions
-// (POST /sessions/cleanup)
-func (_ Unimplemented) CleanupExpiredSessions(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Validate a session token
-// (GET /sessions/validate)
-func (_ Unimplemented) ValidateSession(w http.ResponseWriter, r *http.Request, params ValidateSessionParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// End (delete) a session
-// (DELETE /sessions/{id})
-func (_ Unimplemented) EndSession(w http.ResponseWriter, r *http.Request, id SessionID) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Get session by ID
-// (GET /sessions/{id})
-func (_ Unimplemented) GetSession(w http.ResponseWriter, r *http.Request, id SessionID) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Refresh session expiry
-// (POST /sessions/{id}/refresh)
-func (_ Unimplemented) RefreshSession(w http.ResponseWriter, r *http.Request, id SessionID) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// End all sessions for a user
-// (DELETE /users/{user_id}/sessions)
-func (_ Unimplemented) EndAllUserSessions(w http.ResponseWriter, r *http.Request, userId UserID) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// List all sessions for a user
-// (GET /users/{user_id}/sessions)
-func (_ Unimplemented) GetUserSessions(w http.ResponseWriter, r *http.Request, userId UserID) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // ServerInterfaceWrapper converts contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler            ServerInterface
@@ -381,10 +328,84 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// PostAuthConfirm operation middleware
+func (siw *ServerInterfaceWrapper) PostAuthConfirm(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAuthConfirm(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAuthEnter operation middleware
+func (siw *ServerInterfaceWrapper) PostAuthEnter(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAuthEnter(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAuthLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostAuthLogout(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAuthLogout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthMe operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListGames operation middleware
 func (siw *ServerInterfaceWrapper) ListGames(w http.ResponseWriter, r *http.Request) {
 
 	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListGamesParams
@@ -419,6 +440,12 @@ func (siw *ServerInterfaceWrapper) ListGames(w http.ResponseWriter, r *http.Requ
 // CreateGame operation middleware
 func (siw *ServerInterfaceWrapper) CreateGame(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateGame(w, r)
 	}))
@@ -443,6 +470,12 @@ func (siw *ServerInterfaceWrapper) DeleteGame(w http.ResponseWriter, r *http.Req
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteGame(w, r, id)
@@ -469,6 +502,12 @@ func (siw *ServerInterfaceWrapper) GetGame(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGame(w, r, id)
 	}))
@@ -493,6 +532,12 @@ func (siw *ServerInterfaceWrapper) CancelGame(w http.ResponseWriter, r *http.Req
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelGame(w, r, id)
@@ -519,6 +564,12 @@ func (siw *ServerInterfaceWrapper) CompleteGame(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CompleteGame(w, r, id)
 	}))
@@ -543,6 +594,12 @@ func (siw *ServerInterfaceWrapper) StartGame(w http.ResponseWriter, r *http.Requ
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StartGame(w, r, id)
@@ -585,186 +642,6 @@ func (siw *ServerInterfaceWrapper) GetProblem(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetProblem(w, r, problemId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CreateSession operation middleware
-func (siw *ServerInterfaceWrapper) CreateSession(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateSession(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// CleanupExpiredSessions operation middleware
-func (siw *ServerInterfaceWrapper) CleanupExpiredSessions(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CleanupExpiredSessions(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ValidateSession operation middleware
-func (siw *ServerInterfaceWrapper) ValidateSession(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ValidateSessionParams
-
-	// ------------- Optional query parameter "token" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "token", r.URL.Query(), &params.Token, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ValidateSession(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// EndSession operation middleware
-func (siw *ServerInterfaceWrapper) EndSession(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id SessionID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.EndSession(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetSession operation middleware
-func (siw *ServerInterfaceWrapper) GetSession(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id SessionID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSession(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// RefreshSession operation middleware
-func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id SessionID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RefreshSession(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// EndAllUserSessions operation middleware
-func (siw *ServerInterfaceWrapper) EndAllUserSessions(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "user_id" -------------
-	var userId UserID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.EndAllUserSessions(w, r, userId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetUserSessions operation middleware
-func (siw *ServerInterfaceWrapper) GetUserSessions(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// ------------- Path parameter "user_id" -------------
-	var userId UserID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "user_id", chi.URLParam(r, "user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetUserSessions(w, r, userId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -888,6 +765,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/confirm", wrapper.PostAuthConfirm)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/enter", wrapper.PostAuthEnter)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/logout", wrapper.PostAuthLogout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/me", wrapper.GetAuthMe)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/games", wrapper.ListGames)
 	})
 	r.Group(func(r chi.Router) {
@@ -914,35 +803,167 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/problems/{problem_id}", wrapper.GetProblem)
 	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/sessions", wrapper.CreateSession)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/sessions/cleanup", wrapper.CleanupExpiredSessions)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/sessions/validate", wrapper.ValidateSession)
-	})
-	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/sessions/{id}", wrapper.EndSession)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/sessions/{id}", wrapper.GetSession)
-	})
-	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/sessions/{id}/refresh", wrapper.RefreshSession)
-	})
-	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/users/{user_id}/sessions", wrapper.EndAllUserSessions)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/users/{user_id}/sessions", wrapper.GetUserSessions)
-	})
 
 	return r
 }
 
 type ErrorJSONResponse ErrorResponse
+
+type PostAuthConfirmRequestObject struct {
+	Body *PostAuthConfirmJSONRequestBody
+}
+
+type PostAuthConfirmResponseObject interface {
+	VisitPostAuthConfirmResponse(w http.ResponseWriter) error
+}
+
+type PostAuthConfirm200JSONResponse TokenResponse
+
+func (response PostAuthConfirm200JSONResponse) VisitPostAuthConfirmResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthConfirm400JSONResponse struct{ ErrorJSONResponse }
+
+func (response PostAuthConfirm400JSONResponse) VisitPostAuthConfirmResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthConfirm404JSONResponse ErrorResponse
+
+func (response PostAuthConfirm404JSONResponse) VisitPostAuthConfirmResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthConfirm429JSONResponse ErrorResponse
+
+func (response PostAuthConfirm429JSONResponse) VisitPostAuthConfirmResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthConfirm500JSONResponse ErrorResponse
+
+func (response PostAuthConfirm500JSONResponse) VisitPostAuthConfirmResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthEnterRequestObject struct {
+	Body *PostAuthEnterJSONRequestBody
+}
+
+type PostAuthEnterResponseObject interface {
+	VisitPostAuthEnterResponse(w http.ResponseWriter) error
+}
+
+type PostAuthEnter200JSONResponse StatusResponse
+
+func (response PostAuthEnter200JSONResponse) VisitPostAuthEnterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthEnter400JSONResponse struct{ ErrorJSONResponse }
+
+func (response PostAuthEnter400JSONResponse) VisitPostAuthEnterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthEnter500JSONResponse ErrorResponse
+
+func (response PostAuthEnter500JSONResponse) VisitPostAuthEnterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthLogoutRequestObject struct {
+}
+
+type PostAuthLogoutResponseObject interface {
+	VisitPostAuthLogoutResponse(w http.ResponseWriter) error
+}
+
+type PostAuthLogout200JSONResponse StatusResponse
+
+func (response PostAuthLogout200JSONResponse) VisitPostAuthLogoutResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthLogout401JSONResponse struct{ ErrorJSONResponse }
+
+func (response PostAuthLogout401JSONResponse) VisitPostAuthLogoutResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostAuthLogout500JSONResponse ErrorResponse
+
+func (response PostAuthLogout500JSONResponse) VisitPostAuthLogoutResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthMeRequestObject struct {
+}
+
+type GetAuthMeResponseObject interface {
+	VisitGetAuthMeResponse(w http.ResponseWriter) error
+}
+
+type GetAuthMe200JSONResponse MeResponse
+
+func (response GetAuthMe200JSONResponse) VisitGetAuthMeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthMe401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetAuthMe401JSONResponse) VisitGetAuthMeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAuthMe500JSONResponse ErrorResponse
+
+func (response GetAuthMe500JSONResponse) VisitGetAuthMeResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
 
 type ListGamesRequestObject struct {
 	Params ListGamesParams
@@ -966,6 +987,15 @@ type ListGames400JSONResponse struct{ ErrorJSONResponse }
 func (response ListGames400JSONResponse) VisitListGamesResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListGames401JSONResponse ErrorResponse
+
+func (response ListGames401JSONResponse) VisitListGamesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1005,6 +1035,15 @@ func (response CreateGame400JSONResponse) VisitCreateGameResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateGame401JSONResponse ErrorResponse
+
+func (response CreateGame401JSONResponse) VisitCreateGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateGame500JSONResponse ErrorResponse
 
 func (response CreateGame500JSONResponse) VisitCreateGameResponse(w http.ResponseWriter) error {
@@ -1031,7 +1070,16 @@ func (response DeleteGame200JSONResponse) VisitDeleteGameResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteGame404JSONResponse struct{ ErrorJSONResponse }
+type DeleteGame401JSONResponse struct{ ErrorJSONResponse }
+
+func (response DeleteGame401JSONResponse) VisitDeleteGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteGame404JSONResponse ErrorResponse
 
 func (response DeleteGame404JSONResponse) VisitDeleteGameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
@@ -1066,7 +1114,16 @@ func (response GetGame200JSONResponse) VisitGetGameResponse(w http.ResponseWrite
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetGame404JSONResponse struct{ ErrorJSONResponse }
+type GetGame401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetGame401JSONResponse) VisitGetGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGame404JSONResponse ErrorResponse
 
 func (response GetGame404JSONResponse) VisitGetGameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
@@ -1106,6 +1163,15 @@ type CancelGame400JSONResponse struct{ ErrorJSONResponse }
 func (response CancelGame400JSONResponse) VisitCancelGameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelGame401JSONResponse ErrorResponse
+
+func (response CancelGame401JSONResponse) VisitCancelGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1155,6 +1221,15 @@ func (response CompleteGame400JSONResponse) VisitCompleteGameResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CompleteGame401JSONResponse ErrorResponse
+
+func (response CompleteGame401JSONResponse) VisitCompleteGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CompleteGame404JSONResponse ErrorResponse
 
 func (response CompleteGame404JSONResponse) VisitCompleteGameResponse(w http.ResponseWriter) error {
@@ -1195,6 +1270,15 @@ type StartGame400JSONResponse struct{ ErrorJSONResponse }
 func (response StartGame400JSONResponse) VisitStartGameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type StartGame401JSONResponse ErrorResponse
+
+func (response StartGame401JSONResponse) VisitStartGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1277,287 +1361,20 @@ func (response GetProblem500JSONResponse) VisitGetProblemResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
-type CreateSessionRequestObject struct {
-	Body *CreateSessionJSONRequestBody
-}
-
-type CreateSessionResponseObject interface {
-	VisitCreateSessionResponse(w http.ResponseWriter) error
-}
-
-type CreateSession201JSONResponse SessionResponse
-
-func (response CreateSession201JSONResponse) VisitCreateSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CreateSession400JSONResponse struct{ ErrorJSONResponse }
-
-func (response CreateSession400JSONResponse) VisitCreateSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CreateSession500JSONResponse ErrorResponse
-
-func (response CreateSession500JSONResponse) VisitCreateSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CleanupExpiredSessionsRequestObject struct {
-}
-
-type CleanupExpiredSessionsResponseObject interface {
-	VisitCleanupExpiredSessionsResponse(w http.ResponseWriter) error
-}
-
-type CleanupExpiredSessions200JSONResponse CountResponse
-
-func (response CleanupExpiredSessions200JSONResponse) VisitCleanupExpiredSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CleanupExpiredSessions500JSONResponse struct{ ErrorJSONResponse }
-
-func (response CleanupExpiredSessions500JSONResponse) VisitCleanupExpiredSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ValidateSessionRequestObject struct {
-	Params ValidateSessionParams
-}
-
-type ValidateSessionResponseObject interface {
-	VisitValidateSessionResponse(w http.ResponseWriter) error
-}
-
-type ValidateSession200JSONResponse ValidateSessionResponse
-
-func (response ValidateSession200JSONResponse) VisitValidateSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ValidateSession401JSONResponse struct{ ErrorJSONResponse }
-
-func (response ValidateSession401JSONResponse) VisitValidateSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ValidateSession500JSONResponse ErrorResponse
-
-func (response ValidateSession500JSONResponse) VisitValidateSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type EndSessionRequestObject struct {
-	Id SessionID `json:"id"`
-}
-
-type EndSessionResponseObject interface {
-	VisitEndSessionResponse(w http.ResponseWriter) error
-}
-
-type EndSession200JSONResponse EndedResponse
-
-func (response EndSession200JSONResponse) VisitEndSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type EndSession404JSONResponse struct{ ErrorJSONResponse }
-
-func (response EndSession404JSONResponse) VisitEndSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type EndSession500JSONResponse ErrorResponse
-
-func (response EndSession500JSONResponse) VisitEndSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetSessionRequestObject struct {
-	Id SessionID `json:"id"`
-}
-
-type GetSessionResponseObject interface {
-	VisitGetSessionResponse(w http.ResponseWriter) error
-}
-
-type GetSession200JSONResponse SessionResponse
-
-func (response GetSession200JSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetSession404JSONResponse struct{ ErrorJSONResponse }
-
-func (response GetSession404JSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetSession500JSONResponse ErrorResponse
-
-func (response GetSession500JSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type RefreshSessionRequestObject struct {
-	Id SessionID `json:"id"`
-}
-
-type RefreshSessionResponseObject interface {
-	VisitRefreshSessionResponse(w http.ResponseWriter) error
-}
-
-type RefreshSession200JSONResponse SessionResponse
-
-func (response RefreshSession200JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type RefreshSession401JSONResponse struct{ ErrorJSONResponse }
-
-func (response RefreshSession401JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type RefreshSession404JSONResponse ErrorResponse
-
-func (response RefreshSession404JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type RefreshSession500JSONResponse ErrorResponse
-
-func (response RefreshSession500JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type EndAllUserSessionsRequestObject struct {
-	UserId UserID `json:"user_id"`
-}
-
-type EndAllUserSessionsResponseObject interface {
-	VisitEndAllUserSessionsResponse(w http.ResponseWriter) error
-}
-
-type EndAllUserSessions200JSONResponse CountResponse
-
-func (response EndAllUserSessions200JSONResponse) VisitEndAllUserSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type EndAllUserSessions400JSONResponse struct{ ErrorJSONResponse }
-
-func (response EndAllUserSessions400JSONResponse) VisitEndAllUserSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type EndAllUserSessions500JSONResponse ErrorResponse
-
-func (response EndAllUserSessions500JSONResponse) VisitEndAllUserSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetUserSessionsRequestObject struct {
-	UserId UserID `json:"user_id"`
-}
-
-type GetUserSessionsResponseObject interface {
-	VisitGetUserSessionsResponse(w http.ResponseWriter) error
-}
-
-type GetUserSessions200JSONResponse UserSessionsResponse
-
-func (response GetUserSessions200JSONResponse) VisitGetUserSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetUserSessions400JSONResponse struct{ ErrorJSONResponse }
-
-func (response GetUserSessions400JSONResponse) VisitGetUserSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetUserSessions500JSONResponse ErrorResponse
-
-func (response GetUserSessions500JSONResponse) VisitGetUserSessionsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Verify magic code and get session token
+	// (POST /auth/confirm)
+	PostAuthConfirm(ctx context.Context, request PostAuthConfirmRequestObject) (PostAuthConfirmResponseObject, error)
+	// Request a magic code via email
+	// (POST /auth/enter)
+	PostAuthEnter(ctx context.Context, request PostAuthEnterRequestObject) (PostAuthEnterResponseObject, error)
+	// End current session
+	// (POST /auth/logout)
+	PostAuthLogout(ctx context.Context, request PostAuthLogoutRequestObject) (PostAuthLogoutResponseObject, error)
+	// Get current authenticated user
+	// (GET /auth/me)
+	GetAuthMe(ctx context.Context, request GetAuthMeRequestObject) (GetAuthMeResponseObject, error)
 	// List games with pagination
 	// (GET /games)
 	ListGames(ctx context.Context, request ListGamesRequestObject) (ListGamesResponseObject, error)
@@ -1585,30 +1402,6 @@ type StrictServerInterface interface {
 	// Get problem by ID
 	// (GET /problems/{problem_id})
 	GetProblem(ctx context.Context, request GetProblemRequestObject) (GetProblemResponseObject, error)
-	// Create a new session
-	// (POST /sessions)
-	CreateSession(ctx context.Context, request CreateSessionRequestObject) (CreateSessionResponseObject, error)
-	// Remove all expired sessions
-	// (POST /sessions/cleanup)
-	CleanupExpiredSessions(ctx context.Context, request CleanupExpiredSessionsRequestObject) (CleanupExpiredSessionsResponseObject, error)
-	// Validate a session token
-	// (GET /sessions/validate)
-	ValidateSession(ctx context.Context, request ValidateSessionRequestObject) (ValidateSessionResponseObject, error)
-	// End (delete) a session
-	// (DELETE /sessions/{id})
-	EndSession(ctx context.Context, request EndSessionRequestObject) (EndSessionResponseObject, error)
-	// Get session by ID
-	// (GET /sessions/{id})
-	GetSession(ctx context.Context, request GetSessionRequestObject) (GetSessionResponseObject, error)
-	// Refresh session expiry
-	// (POST /sessions/{id}/refresh)
-	RefreshSession(ctx context.Context, request RefreshSessionRequestObject) (RefreshSessionResponseObject, error)
-	// End all sessions for a user
-	// (DELETE /users/{user_id}/sessions)
-	EndAllUserSessions(ctx context.Context, request EndAllUserSessionsRequestObject) (EndAllUserSessionsResponseObject, error)
-	// List all sessions for a user
-	// (GET /users/{user_id}/sessions)
-	GetUserSessions(ctx context.Context, request GetUserSessionsRequestObject) (GetUserSessionsResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1638,6 +1431,116 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// PostAuthConfirm operation middleware
+func (sh *strictHandler) PostAuthConfirm(w http.ResponseWriter, r *http.Request) {
+	var request PostAuthConfirmRequestObject
+
+	var body PostAuthConfirmJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostAuthConfirm(ctx, request.(PostAuthConfirmRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostAuthConfirm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostAuthConfirmResponseObject); ok {
+		if err := validResponse.VisitPostAuthConfirmResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostAuthEnter operation middleware
+func (sh *strictHandler) PostAuthEnter(w http.ResponseWriter, r *http.Request) {
+	var request PostAuthEnterRequestObject
+
+	var body PostAuthEnterJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostAuthEnter(ctx, request.(PostAuthEnterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostAuthEnter")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostAuthEnterResponseObject); ok {
+		if err := validResponse.VisitPostAuthEnterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostAuthLogout operation middleware
+func (sh *strictHandler) PostAuthLogout(w http.ResponseWriter, r *http.Request) {
+	var request PostAuthLogoutRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostAuthLogout(ctx, request.(PostAuthLogoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostAuthLogout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostAuthLogoutResponseObject); ok {
+		if err := validResponse.VisitPostAuthLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthMe operation middleware
+func (sh *strictHandler) GetAuthMe(w http.ResponseWriter, r *http.Request) {
+	var request GetAuthMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthMe(ctx, request.(GetAuthMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthMeResponseObject); ok {
+		if err := validResponse.VisitGetAuthMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListGames operation middleware
@@ -1884,247 +1787,35 @@ func (sh *strictHandler) GetProblem(w http.ResponseWriter, r *http.Request, prob
 	}
 }
 
-// CreateSession operation middleware
-func (sh *strictHandler) CreateSession(w http.ResponseWriter, r *http.Request) {
-	var request CreateSessionRequestObject
-
-	var body CreateSessionJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateSession(ctx, request.(CreateSessionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateSession")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateSessionResponseObject); ok {
-		if err := validResponse.VisitCreateSessionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// CleanupExpiredSessions operation middleware
-func (sh *strictHandler) CleanupExpiredSessions(w http.ResponseWriter, r *http.Request) {
-	var request CleanupExpiredSessionsRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CleanupExpiredSessions(ctx, request.(CleanupExpiredSessionsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CleanupExpiredSessions")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CleanupExpiredSessionsResponseObject); ok {
-		if err := validResponse.VisitCleanupExpiredSessionsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ValidateSession operation middleware
-func (sh *strictHandler) ValidateSession(w http.ResponseWriter, r *http.Request, params ValidateSessionParams) {
-	var request ValidateSessionRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ValidateSession(ctx, request.(ValidateSessionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ValidateSession")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ValidateSessionResponseObject); ok {
-		if err := validResponse.VisitValidateSessionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// EndSession operation middleware
-func (sh *strictHandler) EndSession(w http.ResponseWriter, r *http.Request, id SessionID) {
-	var request EndSessionRequestObject
-
-	request.Id = id
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.EndSession(ctx, request.(EndSessionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "EndSession")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(EndSessionResponseObject); ok {
-		if err := validResponse.VisitEndSessionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetSession operation middleware
-func (sh *strictHandler) GetSession(w http.ResponseWriter, r *http.Request, id SessionID) {
-	var request GetSessionRequestObject
-
-	request.Id = id
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetSession(ctx, request.(GetSessionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetSession")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetSessionResponseObject); ok {
-		if err := validResponse.VisitGetSessionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// RefreshSession operation middleware
-func (sh *strictHandler) RefreshSession(w http.ResponseWriter, r *http.Request, id SessionID) {
-	var request RefreshSessionRequestObject
-
-	request.Id = id
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RefreshSession(ctx, request.(RefreshSessionRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RefreshSession")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RefreshSessionResponseObject); ok {
-		if err := validResponse.VisitRefreshSessionResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// EndAllUserSessions operation middleware
-func (sh *strictHandler) EndAllUserSessions(w http.ResponseWriter, r *http.Request, userId UserID) {
-	var request EndAllUserSessionsRequestObject
-
-	request.UserId = userId
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.EndAllUserSessions(ctx, request.(EndAllUserSessionsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "EndAllUserSessions")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(EndAllUserSessionsResponseObject); ok {
-		if err := validResponse.VisitEndAllUserSessionsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetUserSessions operation middleware
-func (sh *strictHandler) GetUserSessions(w http.ResponseWriter, r *http.Request, userId UserID) {
-	var request GetUserSessionsRequestObject
-
-	request.UserId = userId
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetUserSessions(ctx, request.(GetUserSessionsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetUserSessions")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetUserSessionsResponseObject); ok {
-		if err := validResponse.VisitGetUserSessionsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"09nOqsKvbq7W638CAAD//xjVcOW1IwAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
