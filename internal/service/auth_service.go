@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -136,7 +138,14 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 			Email:    email,
 		})
 		if err != nil {
-			return sqlcdb.Session{}, fmt.Errorf("create user: %w", err)
+			// Concurrent registration: another request created this user first.
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				user, err = s.db.GetUserByEmail(ctx, email)
+			}
+			if err != nil {
+				return sqlcdb.Session{}, fmt.Errorf("create user: %w", err)
+			}
 		}
 	} else if err != nil {
 		return sqlcdb.Session{}, fmt.Errorf("get user: %w", err)
@@ -146,7 +155,9 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 		return sqlcdb.Session{}, fmt.Errorf("set email verified: %w", err)
 	}
 
-	_ = s.db.DeleteVerificationCode(ctx, email)
+	if err := s.db.DeleteVerificationCode(ctx, email); err != nil {
+		log.Printf("warn: failed to delete verification code for %s: %v", email, err)
+	}
 
 	session, err := s.session.CreateSession(ctx, int(user.ID))
 	if err != nil {
