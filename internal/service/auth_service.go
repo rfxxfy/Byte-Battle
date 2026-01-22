@@ -19,7 +19,6 @@ import (
 
 var (
 	ErrInvalidEmail    = errors.New("invalid email format")
-	ErrUserNotFound    = errors.New("user not found")
 	ErrInvalidCode     = errors.New("invalid or expired verification code")
 	ErrTooManyAttempts = errors.New("too many verification attempts")
 )
@@ -35,11 +34,11 @@ type entranceDB interface {
 	GetUserByEmail(ctx context.Context, email string) (sqlcdb.User, error)
 	GetUserByUsername(ctx context.Context, username string) (sqlcdb.User, error)
 	CreateUserByEmail(ctx context.Context, arg sqlcdb.CreateUserByEmailParams) (sqlcdb.User, error)
-	GetVerificationCodeByUserID(ctx context.Context, userID int32) (sqlcdb.EmailVerificationCode, error)
-	UpsertVerificationCode(ctx context.Context, arg sqlcdb.UpsertVerificationCodeParams) (sqlcdb.EmailVerificationCode, error)
-	IncrementAttemptsIfBelowLimit(ctx context.Context, arg sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.EmailVerificationCode, error)
-	DeleteVerificationCode(ctx context.Context, id int32) error
 	SetEmailVerified(ctx context.Context, id int32) error
+	GetVerificationCode(ctx context.Context, email string) (sqlcdb.VerificationCode, error)
+	UpsertVerificationCode(ctx context.Context, arg sqlcdb.UpsertVerificationCodeParams) (sqlcdb.VerificationCode, error)
+	IncrementAttemptsIfBelowLimit(ctx context.Context, arg sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.VerificationCode, error)
+	DeleteVerificationCode(ctx context.Context, email string) error
 }
 
 type sessionCreator interface {
@@ -72,36 +71,34 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 		return ErrInvalidEmail
 	}
 
-	user, err := s.db.GetUserByEmail(ctx, email)
-	if errors.Is(err, pgx.ErrNoRows) {
-		username, genErr := s.generateUniqueUsername(ctx)
-		if genErr != nil {
-			return fmt.Errorf("generate username: %w", genErr)
-		}
-		user, err = s.db.CreateUserByEmail(ctx, sqlcdb.CreateUserByEmailParams{
-			Username: username,
-			Email:    email,
-		})
-		if err != nil {
-			return fmt.Errorf("create user: %w", err)
-		}
-	} else if err != nil {
-		return fmt.Errorf("get user: %w", err)
+	code, err := generateVerificationCode()
+	if err != nil {
+		return fmt.Errorf("generate code: %w", err)
 	}
 
-	return s.sendCode(ctx, user)
+	codeHash, err := bcrypt.GenerateFromPassword([]byte(code), s.cfg.BcryptCost)
+	if err != nil {
+		return fmt.Errorf("hash code: %w", err)
+	}
+
+	expiresAt := time.Now().Add(s.cfg.CodeTTL)
+	if _, err := s.db.UpsertVerificationCode(ctx, sqlcdb.UpsertVerificationCodeParams{
+		Email:     email,
+		CodeHash:  string(codeHash),
+		ExpiresAt: pgtype.Timestamptz{Time: expiresAt.UTC(), Valid: true},
+	}); err != nil {
+		return fmt.Errorf("save verification code: %w", err)
+	}
+
+	if err := s.mailer.SendVerificationCode(email, code); err != nil {
+		return fmt.Errorf("send email: %w", err)
+	}
+
+	return nil
 }
 
 func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (sqlcdb.Session, error) {
-	user, err := s.db.GetUserByEmail(ctx, email)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlcdb.Session{}, ErrInvalidCode
-	}
-	if err != nil {
-		return sqlcdb.Session{}, fmt.Errorf("get user: %w", err)
-	}
-
-	vc, err := s.db.GetVerificationCodeByUserID(ctx, user.ID)
+	vc, err := s.db.GetVerificationCode(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return sqlcdb.Session{}, ErrInvalidCode
 	}
@@ -113,10 +110,8 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 		return sqlcdb.Session{}, ErrInvalidCode
 	}
 
-	// Atomically increment attempts and check the limit in one query.
-	// If no rows returned, the limit was already reached.
 	vc, err = s.db.IncrementAttemptsIfBelowLimit(ctx, sqlcdb.IncrementAttemptsIfBelowLimitParams{
-		ID:       vc.ID,
+		Email:    email,
 		Attempts: int32(s.cfg.MaxAttempts),
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -130,11 +125,28 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 		return sqlcdb.Session{}, ErrInvalidCode
 	}
 
+	user, err := s.db.GetUserByEmail(ctx, email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		username, genErr := s.generateUniqueUsername(ctx)
+		if genErr != nil {
+			return sqlcdb.Session{}, fmt.Errorf("generate username: %w", genErr)
+		}
+		user, err = s.db.CreateUserByEmail(ctx, sqlcdb.CreateUserByEmailParams{
+			Username: username,
+			Email:    email,
+		})
+		if err != nil {
+			return sqlcdb.Session{}, fmt.Errorf("create user: %w", err)
+		}
+	} else if err != nil {
+		return sqlcdb.Session{}, fmt.Errorf("get user: %w", err)
+	}
+
 	if err := s.db.SetEmailVerified(ctx, user.ID); err != nil {
 		return sqlcdb.Session{}, fmt.Errorf("set email verified: %w", err)
 	}
 
-	_ = s.db.DeleteVerificationCode(ctx, vc.ID)
+	_ = s.db.DeleteVerificationCode(ctx, email)
 
 	session, err := s.session.CreateSession(ctx, int(user.ID))
 	if err != nil {
@@ -142,33 +154,6 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 	}
 
 	return session, nil
-}
-
-func (s *entranceService) sendCode(ctx context.Context, user sqlcdb.User) error {
-	code, err := generateVerificationCode()
-	if err != nil {
-		return fmt.Errorf("generate code: %w", err)
-	}
-
-	codeHash, err := bcrypt.GenerateFromPassword([]byte(code), s.cfg.BcryptCost)
-	if err != nil {
-		return fmt.Errorf("hash code: %w", err)
-	}
-
-	expiresAt := time.Now().Add(s.cfg.CodeTTL)
-	if _, err := s.db.UpsertVerificationCode(ctx, sqlcdb.UpsertVerificationCodeParams{
-		UserID:    user.ID,
-		CodeHash:  string(codeHash),
-		ExpiresAt: pgtype.Timestamptz{Time: expiresAt.UTC(), Valid: true},
-	}); err != nil {
-		return fmt.Errorf("save verification code: %w", err)
-	}
-
-	if err := s.mailer.SendVerificationCode(user.Email, code); err != nil {
-		return fmt.Errorf("send email: %w", err)
-	}
-
-	return nil
 }
 
 func (s *entranceService) generateUniqueUsername(ctx context.Context) (string, error) {

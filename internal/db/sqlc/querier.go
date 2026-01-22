@@ -21,7 +21,7 @@ type Querier interface {
 	DeleteGame(ctx context.Context, id int32) (int64, error)
 	DeleteSession(ctx context.Context, id int32) (int64, error)
 	DeleteSessionsByUserID(ctx context.Context, userID int32) (int64, error)
-	DeleteVerificationCode(ctx context.Context, id int32) error
+	DeleteVerificationCode(ctx context.Context, email string) error
 	GetGameByID(ctx context.Context, id int32) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
@@ -29,14 +29,14 @@ type Querier interface {
 	GetSessionsByUserID(ctx context.Context, userID int32) ([]Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
-	GetVerificationCodeByUserID(ctx context.Context, userID int32) (EmailVerificationCode, error)
-	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (EmailVerificationCode, error)
+	GetVerificationCode(ctx context.Context, email string) (VerificationCode, error)
+	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error)
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error)
 	SetEmailVerified(ctx context.Context, id int32) error
 	StartGame(ctx context.Context, id int32) (Game, error)
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
-	UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (EmailVerificationCode, error)
+	UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (VerificationCode, error)
 }
 
 var _ Querier = (*Queries)(nil)

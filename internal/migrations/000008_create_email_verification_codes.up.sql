@@ -1,10 +1,7 @@
-CREATE TABLE email_verification_codes (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    code_hash VARCHAR(255) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE verification_codes (
+    email      TEXT PRIMARY KEY,
+    code_hash  TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    attempts   INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE INDEX idx_verification_codes_expires_at ON email_verification_codes(expires_at);

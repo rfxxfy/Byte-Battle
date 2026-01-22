@@ -165,11 +165,6 @@ func makeAuthToken(email string) (string, error) {
 	ctx := context.Background()
 	q := sqlcdb.New(testPool)
 
-	user, err := q.GetUserByEmail(ctx, email)
-	if err != nil {
-		return "", fmt.Errorf("get user %s: %w", email, err)
-	}
-
 	const code = "000001"
 	hash, err := bcrypt.GenerateFromPassword([]byte(code), 4) // low cost for tests
 	if err != nil {
@@ -177,7 +172,7 @@ func makeAuthToken(email string) (string, error) {
 	}
 
 	if _, err := q.UpsertVerificationCode(ctx, sqlcdb.UpsertVerificationCodeParams{
-		UserID:    user.ID,
+		Email:     email,
 		CodeHash:  string(hash),
 		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(5 * time.Minute), Valid: true},
 	}); err != nil {
