@@ -90,7 +90,7 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 		return fmt.Errorf("save verification code: %w", err)
 	}
 
-	if err := s.mailer.SendVerificationCode(email, code); err != nil {
+	if err := s.mailer.SendVerificationCode(ctx, email, code); err != nil {
 		return fmt.Errorf("send email: %w", err)
 	}
 

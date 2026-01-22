@@ -140,7 +140,7 @@ type mockMailer struct {
 	err        error
 }
 
-func (m *mockMailer) SendVerificationCode(to, _ string) error {
+func (m *mockMailer) SendVerificationCode(_ context.Context, to, _ string) error {
 	m.sendCalled = true
 	m.lastTo = to
 	return m.err

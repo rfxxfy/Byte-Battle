@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,7 +10,7 @@ import (
 )
 
 type Mailer interface {
-	SendVerificationCode(to, code string) error
+	SendVerificationCode(ctx context.Context, to, code string) error
 }
 
 type resendMailer struct {
@@ -26,7 +27,7 @@ func NewResendMailer(apiKey, fromEmail string) Mailer {
 	}
 }
 
-func (m *resendMailer) SendVerificationCode(to, code string) error {
+func (m *resendMailer) SendVerificationCode(ctx context.Context, to, code string) error {
 	body, err := json.Marshal(map[string]any{
 		"from":    m.fromEmail,
 		"to":      []string{to},
@@ -40,7 +41,7 @@ func (m *resendMailer) SendVerificationCode(to, code string) error {
 		return fmt.Errorf("marshal email body: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -65,7 +66,7 @@ func NewDevMailer() Mailer {
 	return &devMailer{}
 }
 
-func (m *devMailer) SendVerificationCode(to, code string) error {
+func (m *devMailer) SendVerificationCode(_ context.Context, to, code string) error {
 	log.Printf("[DEV MAILER] to=%s | code=%s", to, code)
 	return nil
 }
