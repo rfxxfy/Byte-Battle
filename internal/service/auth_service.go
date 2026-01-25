@@ -20,9 +20,10 @@ import (
 )
 
 var (
-	ErrInvalidEmail    = errors.New("invalid email format")
-	ErrInvalidCode     = errors.New("invalid or expired verification code")
-	ErrTooManyAttempts = errors.New("too many verification attempts")
+	ErrInvalidEmail     = errors.New("invalid email format")
+	ErrInvalidCode      = errors.New("invalid or expired verification code")
+	ErrTooManyAttempts  = errors.New("too many verification attempts")
+	ErrCodeRecentlySent = errors.New("a code was recently sent, please wait before requesting a new one")
 )
 
 // EntranceService handles both registration and login through a single email-code flow.
@@ -68,9 +69,17 @@ func NewEntranceService(
 	}
 }
 
+const sendCooldown = 60 * time.Second
+
 func (s *entranceService) SendCode(ctx context.Context, email string) error {
 	if !isValidEmail(email) {
 		return ErrInvalidEmail
+	}
+
+	if existing, err := s.db.GetVerificationCode(ctx, email); err == nil {
+		if time.Until(existing.ExpiresAt.Time) > s.cfg.CodeTTL-sendCooldown {
+			return ErrCodeRecentlySent
+		}
 	}
 
 	code, err := generateVerificationCode()

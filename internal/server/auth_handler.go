@@ -50,6 +50,8 @@ func entranceAppErr(err error) *apierr.AppError {
 		return apierr.New(apierr.ErrInvalidCode, err.Error())
 	case errors.Is(err, service.ErrTooManyAttempts):
 		return apierr.New(apierr.ErrTooManyAttempts, err.Error())
+	case errors.Is(err, service.ErrCodeRecentlySent):
+		return apierr.New(apierr.ErrCodeRecentlySent, err.Error())
 	default:
 		return apierr.New(apierr.ErrInternal, "internal server error")
 	}
