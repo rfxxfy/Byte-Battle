@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
@@ -13,18 +14,33 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	gorillaws "github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+func allowedOrigins() []string {
+	v := os.Getenv("ALLOWED_ORIGINS")
+	if v == "" {
+		return nil // dev mode — allow all
+	}
+	return strings.Split(v, ",")
+}
+
 func newUpgrader() gorillaws.Upgrader {
-	allowed := os.Getenv("ALLOWED_ORIGIN")
+	origins := allowedOrigins()
 	return gorillaws.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			if allowed == "" {
-				return true // dev mode — allow all
+			if origins == nil {
+				return true
 			}
-			return r.Header.Get("Origin") == allowed
+			origin := r.Header.Get("Origin")
+			for _, o := range origins {
+				if o == origin {
+					return true
+				}
+			}
+			return false
 		},
 	}
 }
@@ -63,7 +79,19 @@ func New(
 		entrance:         entrance,
 	}
 
+	origins := allowedOrigins()
+	corsAllowed := origins
+	if corsAllowed == nil {
+		corsAllowed = []string{"*"}
+	}
+
 	r := chi.NewRouter()
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: corsAllowed,
+		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Authorization", "Content-Type"},
+		MaxAge:         300,
+	}))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
