@@ -77,7 +77,11 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 	}
 
 	if existing, err := s.db.GetVerificationCode(ctx, email); err == nil {
-		if time.Until(existing.ExpiresAt.Time) > s.cfg.CodeTTL-sendCooldown {
+		cooldownThreshold := s.cfg.CodeTTL - sendCooldown
+		if cooldownThreshold < 0 {
+			cooldownThreshold = 0
+		}
+		if time.Until(existing.ExpiresAt.Time) > cooldownThreshold {
 			return ErrCodeRecentlySent
 		}
 	}
@@ -102,6 +106,9 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 	}
 
 	if err := s.mailer.SendVerificationCode(ctx, email, code); err != nil {
+		if delErr := s.db.DeleteVerificationCode(ctx, email); delErr != nil {
+			log.Printf("warn: failed to delete verification code after send error for %s: %v", email, delErr)
+		}
 		return fmt.Errorf("send email: %w", err)
 	}
 
@@ -166,26 +173,42 @@ func (s *entranceService) getOrCreateUser(ctx context.Context, email string) (sq
 		return sqlcdb.User{}, fmt.Errorf("get user: %w", err)
 	}
 
-	username, err := s.generateUniqueUsername(ctx)
-	if err != nil {
-		return sqlcdb.User{}, fmt.Errorf("generate username: %w", err)
-	}
-
-	user, err = s.db.CreateUserByEmail(ctx, sqlcdb.CreateUserByEmailParams{
-		Username: username,
-		Email:    email,
-	})
-	if err != nil {
-		// Concurrent registration: another request created this user first.
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			user, err = s.db.GetUserByEmail(ctx, email)
+	for range 10 {
+		username, genErr := s.generateUniqueUsername(ctx)
+		if genErr != nil {
+			return sqlcdb.User{}, fmt.Errorf("generate username: %w", genErr)
 		}
-		if err != nil {
+
+		user, err = s.db.CreateUserByEmail(ctx, sqlcdb.CreateUserByEmailParams{
+			Username: username,
+			Email:    email,
+		})
+		if err == nil {
+			return user, nil
+		}
+
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+			return sqlcdb.User{}, fmt.Errorf("create user: %w", err)
+		}
+
+		switch pgErr.ConstraintName {
+		case "users_email_key":
+			// Another request registered this email concurrently.
+			user, err = s.db.GetUserByEmail(ctx, email)
+			if err != nil {
+				return sqlcdb.User{}, fmt.Errorf("get user after email conflict: %w", err)
+			}
+			return user, nil
+		case "users_username_key":
+			// Random username collided; retry with a new one.
+			continue
+		default:
 			return sqlcdb.User{}, fmt.Errorf("create user: %w", err)
 		}
 	}
-	return user, nil
+
+	return sqlcdb.User{}, errors.New("failed to create user after repeated username conflicts")
 }
 
 func (s *entranceService) generateUniqueUsername(ctx context.Context) (string, error) {
