@@ -1,5 +1,6 @@
+```mermaid
 sequenceDiagram
-autonumber
+    autonumber
 
     participant U as Браузер игрока
     participant FE as Frontend (Editor)
@@ -53,5 +54,4 @@ autonumber
             ME->>EX: остановить контейнеры остальных игроков
         end
     end
-
-  
+```
