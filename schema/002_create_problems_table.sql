@@ -1,7 +1,7 @@
 -- +goose Up
 -- SQL в разделе 'Up' выполняется при применении этой миграции
 
-CREATE TABLE problems (
+CREATE TABLE IF NOT EXISTS problems (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
@@ -12,4 +12,4 @@ CREATE TABLE problems (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_problems_difficulty ON problems(difficulty);
+CREATE INDEX IF NOT EXISTS idx_problems_difficulty ON problems(difficulty);

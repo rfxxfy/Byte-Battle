@@ -1,7 +1,7 @@
 -- +goose Up
 -- SQL в разделе 'Up' выполняется при применении этой миграции
 
-CREATE TABLE duels (
+CREATE TABLE IF NOT EXISTS duels (
     id SERIAL PRIMARY KEY,
     player1_id INTEGER NOT NULL REFERENCES users(id),
     player2_id INTEGER NOT NULL REFERENCES users(id),
@@ -14,7 +14,7 @@ CREATE TABLE duels (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_duels_player1_id ON duels(player1_id);
-CREATE INDEX idx_duels_player2_id ON duels(player2_id);
-CREATE INDEX idx_duels_problem_id ON duels(problem_id);
-CREATE INDEX idx_duels_status ON duels(status);
+CREATE INDEX IF NOT EXISTS idx_duels_player1_id ON duels(player1_id);
+CREATE INDEX IF NOT EXISTS idx_duels_player2_id ON duels(player2_id);
+CREATE INDEX IF NOT EXISTS idx_duels_problem_id ON duels(problem_id);
+CREATE INDEX IF NOT EXISTS idx_duels_status ON duels(status);
