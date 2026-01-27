@@ -22,7 +22,10 @@ func main() {
 	userRepo := database.NewUserRepository(db)
 	userService := service.NewUserService(userRepo)
 
-	srv := server.NewHTTPServer(userService)
+	duelRepo := database.NewDuelRepository(db)
+	duelService := service.NewDuelService(duelRepo)
+
+	srv := server.NewHTTPServer(userService, duelService)
 
 	log.Printf("Server started on %s", httpCfg.Address)
 	log.Fatal(srv.Run(httpCfg.Address()))
