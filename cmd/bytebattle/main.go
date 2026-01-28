@@ -27,6 +27,7 @@ func main() {
 
 	srv := server.NewHTTPServer(userService, duelService)
 
-	log.Printf("Server started on %s", httpCfg.Address)
-	log.Fatal(srv.Run(httpCfg.Address()))
+	addr := httpCfg.Address()
+	log.Printf("Server started on %s", addr)
+	log.Fatal(srv.Run(addr))
 }
