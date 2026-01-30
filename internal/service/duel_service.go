@@ -125,7 +125,7 @@ func (s *DuelService) CancelDuel(ctx context.Context, id int) (*models.Duel, err
 		return nil, ErrCannotCancelCompleted
 	}
 
-	duel.Status = "cancelled"
+	duel.Status = string(database.DuelStatusCancelled)
 
 	err = s.repo.Upsert(ctx, duel)
 	if err != nil {

@@ -477,7 +477,7 @@ func TestCancelDuel_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if duel.Status != "cancelled" {
+	if duel.Status != string(database.DuelStatusCancelled) {
 		t.Errorf("expected status cancelled, got %s", duel.Status)
 	}
 }
@@ -498,7 +498,7 @@ func TestCancelDuel_ActiveDuel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if duel.Status != "cancelled" {
+	if duel.Status != string(database.DuelStatusCancelled) {
 		t.Errorf("expected status cancelled, got %s", duel.Status)
 	}
 }
