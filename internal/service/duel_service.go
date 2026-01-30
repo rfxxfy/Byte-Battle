@@ -11,25 +11,15 @@ import (
 	"github.com/aarondl/null/v8"
 )
 
-type DuelRepositoryInterface interface {
-	Create(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error)
-	GetByID(ctx context.Context, id int) (*models.Duel, error)
-	GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error)
-	Upsert(ctx context.Context, duel *models.Duel) error
-	Delete(ctx context.Context, id int) error
-	GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error)
-	GetByStatus(ctx context.Context, status database.DuelStatus) (models.DuelSlice, error)
-}
-
 type DuelService struct {
-	repo DuelRepositoryInterface
+	repo database.IDuelRepo
 }
 
-func NewDuelService(repo *database.DuelRepository) *DuelService {
+func NewDuelService(repo database.IDuelRepo) *DuelService {
 	return &DuelService{repo: repo}
 }
 
-func NewDuelServiceWithRepo(repo DuelRepositoryInterface) *DuelService {
+func NewDuelServiceWithRepo(repo database.IDuelRepo) *DuelService {
 	return &DuelService{repo: repo}
 }
 

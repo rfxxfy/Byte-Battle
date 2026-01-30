@@ -19,7 +19,7 @@ var (
 const DefaultSessionDuration = 24 * time.Hour
 
 type SessionService struct {
-	repo            database.SessionRepository
+	repo            database.ISessionRepo
 	sessionDuration time.Duration
 }
 
@@ -31,7 +31,7 @@ func WithSessionDuration(d time.Duration) SessionServiceOption {
 	}
 }
 
-func NewSessionService(repo database.SessionRepository, opts ...SessionServiceOption) *SessionService {
+func NewSessionService(repo database.ISessionRepo, opts ...SessionServiceOption) *SessionService {
 	s := &SessionService{
 		repo:            repo,
 		sessionDuration: DefaultSessionDuration,

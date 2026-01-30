@@ -9,20 +9,20 @@ import (
 	"bytebattle/internal/database/models"
 )
 
-type UserRepository interface {
+type IUserRepo interface {
 	GetByUsername(ctx context.Context, username string) (*models.User, error)
 	Create(ctx context.Context, username, email, password string) (*models.User, error)
 }
 
-type userRepository struct {
+type userRepo struct {
 	db *sql.DB
 }
 
-func NewUserRepository(db *sql.DB) UserRepository {
-	return &userRepository{db: db}
+func NewUserRepository(db *sql.DB) IUserRepo {
+	return &userRepo{db: db}
 }
 
-func (r *userRepository) GetByUsername(
+func (r *userRepo) GetByUsername(
 	ctx context.Context,
 	username string,
 ) (*models.User, error) {
@@ -31,7 +31,7 @@ func (r *userRepository) GetByUsername(
 	).One(ctx, r.db)
 }
 
-func (r *userRepository) Create(
+func (r *userRepo) Create(
 	ctx context.Context,
 	username, email, password string,
 ) (*models.User, error) {

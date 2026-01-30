@@ -9,7 +9,7 @@ import (
 	"bytebattle/internal/database/models"
 )
 
-type mockDuelRepository struct {
+type mockDuelRepo struct {
 	createFunc        func(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error)
 	getByIDFunc       func(ctx context.Context, id int) (*models.Duel, error)
 	getAllFunc        func(ctx context.Context, limit, offset int) (models.DuelSlice, error)
@@ -19,49 +19,49 @@ type mockDuelRepository struct {
 	getByStatusFunc   func(ctx context.Context, status database.DuelStatus) (models.DuelSlice, error)
 }
 
-func (m *mockDuelRepository) Create(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error) {
+func (m *mockDuelRepo) Create(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error) {
 	if m.createFunc != nil {
 		return m.createFunc(ctx, players, problemID)
 	}
 	return &models.Duel{ID: 1}, nil
 }
 
-func (m *mockDuelRepository) GetByID(ctx context.Context, id int) (*models.Duel, error) {
+func (m *mockDuelRepo) GetByID(ctx context.Context, id int) (*models.Duel, error) {
 	if m.getByIDFunc != nil {
 		return m.getByIDFunc(ctx, id)
 	}
 	return &models.Duel{ID: id, Status: string(database.DuelStatusPending)}, nil
 }
 
-func (m *mockDuelRepository) GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
+func (m *mockDuelRepo) GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
 	if m.getAllFunc != nil {
 		return m.getAllFunc(ctx, limit, offset)
 	}
 	return models.DuelSlice{}, nil
 }
 
-func (m *mockDuelRepository) Upsert(ctx context.Context, duel *models.Duel) error {
+func (m *mockDuelRepo) Upsert(ctx context.Context, duel *models.Duel) error {
 	if m.upsertFunc != nil {
 		return m.upsertFunc(ctx, duel)
 	}
 	return nil
 }
 
-func (m *mockDuelRepository) Delete(ctx context.Context, id int) error {
+func (m *mockDuelRepo) Delete(ctx context.Context, id int) error {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, id)
 	}
 	return nil
 }
 
-func (m *mockDuelRepository) GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error) {
+func (m *mockDuelRepo) GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error) {
 	if m.getByPlayerIDFunc != nil {
 		return m.getByPlayerIDFunc(ctx, playerID)
 	}
 	return models.DuelSlice{}, nil
 }
 
-func (m *mockDuelRepository) GetByStatus(ctx context.Context, status database.DuelStatus) (models.DuelSlice, error) {
+func (m *mockDuelRepo) GetByStatus(ctx context.Context, status database.DuelStatus) (models.DuelSlice, error) {
 	if m.getByStatusFunc != nil {
 		return m.getByStatusFunc(ctx, status)
 	}
@@ -69,7 +69,7 @@ func (m *mockDuelRepository) GetByStatus(ctx context.Context, status database.Du
 }
 
 func TestCreateDuel_Success(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		createFunc: func(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error) {
 			return &models.Duel{
 				ID:        1,
@@ -100,7 +100,7 @@ func TestCreateDuel_Success(t *testing.T) {
 
 func TestCreateDuel_ThreePlayers(t *testing.T) {
 	var capturedPlayers []database.Player
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		createFunc: func(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error) {
 			capturedPlayers = players
 			return &models.Duel{ID: 1}, nil
@@ -119,7 +119,7 @@ func TestCreateDuel_ThreePlayers(t *testing.T) {
 }
 
 func TestCreateDuel_NotEnoughPlayers(t *testing.T) {
-	mock := &mockDuelRepository{}
+	mock := &mockDuelRepo{}
 	svc := NewDuelServiceWithRepo(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{1}, 10)
@@ -133,7 +133,7 @@ func TestCreateDuel_NotEnoughPlayers(t *testing.T) {
 }
 
 func TestCreateDuel_EmptyPlayers(t *testing.T) {
-	mock := &mockDuelRepository{}
+	mock := &mockDuelRepo{}
 	svc := NewDuelServiceWithRepo(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{}, 10)
@@ -144,7 +144,7 @@ func TestCreateDuel_EmptyPlayers(t *testing.T) {
 }
 
 func TestCreateDuel_DuplicatePlayers(t *testing.T) {
-	mock := &mockDuelRepository{}
+	mock := &mockDuelRepo{}
 	svc := NewDuelServiceWithRepo(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{1, 1}, 10)
@@ -158,7 +158,7 @@ func TestCreateDuel_DuplicatePlayers(t *testing.T) {
 }
 
 func TestCreateDuel_DuplicateInThree(t *testing.T) {
-	mock := &mockDuelRepository{}
+	mock := &mockDuelRepo{}
 	svc := NewDuelServiceWithRepo(mock)
 
 	_, err := svc.CreateDuel(context.Background(), []int{1, 2, 1}, 10)
@@ -169,7 +169,7 @@ func TestCreateDuel_DuplicateInThree(t *testing.T) {
 }
 
 func TestCreateDuel_RepoError(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		createFunc: func(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error) {
 			return nil, errors.New("database error")
 		},
@@ -184,7 +184,7 @@ func TestCreateDuel_RepoError(t *testing.T) {
 }
 
 func TestGetDuel_Success(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id}, nil
 		},
@@ -202,7 +202,7 @@ func TestGetDuel_Success(t *testing.T) {
 }
 
 func TestGetDuel_NotFound(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return nil, errors.New("not found")
 		},
@@ -218,7 +218,7 @@ func TestGetDuel_NotFound(t *testing.T) {
 
 func TestListDuels_DefaultLimit(t *testing.T) {
 	var capturedLimit int
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getAllFunc: func(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
 			capturedLimit = limit
 			return models.DuelSlice{}, nil
@@ -235,7 +235,7 @@ func TestListDuels_DefaultLimit(t *testing.T) {
 
 func TestListDuels_NegativeLimit(t *testing.T) {
 	var capturedLimit int
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getAllFunc: func(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
 			capturedLimit = limit
 			return models.DuelSlice{}, nil
@@ -252,7 +252,7 @@ func TestListDuels_NegativeLimit(t *testing.T) {
 
 func TestListDuels_MaxLimit(t *testing.T) {
 	var capturedLimit int
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getAllFunc: func(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
 			capturedLimit = limit
 			return models.DuelSlice{}, nil
@@ -269,7 +269,7 @@ func TestListDuels_MaxLimit(t *testing.T) {
 
 func TestListDuels_ValidLimit(t *testing.T) {
 	var capturedLimit int
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getAllFunc: func(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
 			capturedLimit = limit
 			return models.DuelSlice{}, nil
@@ -285,7 +285,7 @@ func TestListDuels_ValidLimit(t *testing.T) {
 }
 
 func TestStartDuel_Success(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusPending)}, nil
 		},
@@ -306,7 +306,7 @@ func TestStartDuel_Success(t *testing.T) {
 }
 
 func TestStartDuel_AlreadyActive(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusActive)}, nil
 		},
@@ -321,7 +321,7 @@ func TestStartDuel_AlreadyActive(t *testing.T) {
 }
 
 func TestStartDuel_AlreadyFinished(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusFinished)}, nil
 		},
@@ -336,7 +336,7 @@ func TestStartDuel_AlreadyFinished(t *testing.T) {
 }
 
 func TestStartDuel_NotFound(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return nil, errors.New("not found")
 		},
@@ -351,7 +351,7 @@ func TestStartDuel_NotFound(t *testing.T) {
 }
 
 func TestStartDuel_UpsertError(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusPending)}, nil
 		},
@@ -369,7 +369,7 @@ func TestStartDuel_UpsertError(t *testing.T) {
 }
 
 func TestCompleteDuel_Success(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{
 				ID:        id,
@@ -398,7 +398,7 @@ func TestCompleteDuel_Success(t *testing.T) {
 }
 
 func TestCompleteDuel_Player2Wins(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{
 				ID:        id,
@@ -424,7 +424,7 @@ func TestCompleteDuel_Player2Wins(t *testing.T) {
 }
 
 func TestCompleteDuel_InvalidWinner(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{
 				ID:        id,
@@ -447,7 +447,7 @@ func TestCompleteDuel_InvalidWinner(t *testing.T) {
 }
 
 func TestCompleteDuel_NotInProgress(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusPending)}, nil
 		},
@@ -462,7 +462,7 @@ func TestCompleteDuel_NotInProgress(t *testing.T) {
 }
 
 func TestCancelDuel_Success(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusPending)}, nil
 		},
@@ -483,7 +483,7 @@ func TestCancelDuel_Success(t *testing.T) {
 }
 
 func TestCancelDuel_ActiveDuel(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusActive)}, nil
 		},
@@ -504,7 +504,7 @@ func TestCancelDuel_ActiveDuel(t *testing.T) {
 }
 
 func TestCancelDuel_AlreadyCompleted(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
 			return &models.Duel{ID: id, Status: string(database.DuelStatusFinished)}, nil
 		},
@@ -519,7 +519,7 @@ func TestCancelDuel_AlreadyCompleted(t *testing.T) {
 }
 
 func TestDeleteDuel_Success(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		deleteFunc: func(ctx context.Context, id int) error {
 			return nil
 		},
@@ -534,7 +534,7 @@ func TestDeleteDuel_Success(t *testing.T) {
 }
 
 func TestDeleteDuel_Error(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		deleteFunc: func(ctx context.Context, id int) error {
 			return errors.New("delete error")
 		},
@@ -549,7 +549,7 @@ func TestDeleteDuel_Error(t *testing.T) {
 }
 
 func TestGetPlayerDuels_Success(t *testing.T) {
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByPlayerIDFunc: func(ctx context.Context, playerID int) (models.DuelSlice, error) {
 			return models.DuelSlice{&models.Duel{ID: 1}, &models.Duel{ID: 2}}, nil
 		},
@@ -568,7 +568,7 @@ func TestGetPlayerDuels_Success(t *testing.T) {
 
 func TestGetActiveDuels_Success(t *testing.T) {
 	var capturedStatus database.DuelStatus
-	mock := &mockDuelRepository{
+	mock := &mockDuelRepo{
 		getByStatusFunc: func(ctx context.Context, status database.DuelStatus) (models.DuelSlice, error) {
 			capturedStatus = status
 			return models.DuelSlice{&models.Duel{ID: 1}}, nil
