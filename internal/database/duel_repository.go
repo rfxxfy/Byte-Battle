@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"sort"
 
 	"bytebattle/internal/database/models"
@@ -15,28 +14,35 @@ import (
 type DuelStatus string
 
 const (
-	DuelStatusPending  DuelStatus = "pending"
-	DuelStatusActive   DuelStatus = "active"
-	DuelStatusFinished DuelStatus = "finished"
+	DuelStatusPending   DuelStatus = "pending"
+	DuelStatusActive    DuelStatus = "active"
+	DuelStatusFinished  DuelStatus = "finished"
+	DuelStatusCancelled DuelStatus = "cancelled"
 )
 
 type Player struct {
 	ID int
 }
 
-type DuelRepository struct {
+type IDuelRepo interface {
+	Create(ctx context.Context, players []Player, problemID int) (*models.Duel, error)
+	GetByID(ctx context.Context, id int) (*models.Duel, error)
+	GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error)
+	Upsert(ctx context.Context, duel *models.Duel) error
+	Delete(ctx context.Context, id int) error
+	GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error)
+	GetByStatus(ctx context.Context, status DuelStatus) (models.DuelSlice, error)
+}
+
+type duelRepo struct {
 	db *sql.DB
 }
 
-func NewDuelRepository(db *sql.DB) *DuelRepository {
-	return &DuelRepository{db: db}
+func NewDuelRepository(db *sql.DB) IDuelRepo {
+	return &duelRepo{db: db}
 }
 
-func (r *DuelRepository) Create(ctx context.Context, players []Player, problemID int) (*models.Duel, error) {
-	if len(players) != 2 {
-		return nil, fmt.Errorf("exactly 2 players required")
-	}
-
+func (r *duelRepo) Create(ctx context.Context, players []Player, problemID int) (*models.Duel, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -58,11 +64,11 @@ func (r *DuelRepository) Create(ctx context.Context, players []Player, problemID
 	return duel, tx.Commit()
 }
 
-func (r *DuelRepository) GetByID(ctx context.Context, id int) (*models.Duel, error) {
+func (r *duelRepo) GetByID(ctx context.Context, id int) (*models.Duel, error) {
 	return models.FindDuel(ctx, r.db, id)
 }
 
-func (r *DuelRepository) GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
+func (r *duelRepo) GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error) {
 	return models.Duels(
 		qm.Limit(limit),
 		qm.Offset(offset),
@@ -70,7 +76,7 @@ func (r *DuelRepository) GetAll(ctx context.Context, limit, offset int) (models.
 	).All(ctx, r.db)
 }
 
-func (r *DuelRepository) Upsert(ctx context.Context, duel *models.Duel) error {
+func (r *duelRepo) Upsert(ctx context.Context, duel *models.Duel) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -85,7 +91,7 @@ func (r *DuelRepository) Upsert(ctx context.Context, duel *models.Duel) error {
 	return tx.Commit()
 }
 
-func (r *DuelRepository) Delete(ctx context.Context, id int) error {
+func (r *duelRepo) Delete(ctx context.Context, id int) error {
 	duel, err := models.FindDuel(ctx, r.db, id)
 	if err != nil {
 		return err
@@ -95,7 +101,7 @@ func (r *DuelRepository) Delete(ctx context.Context, id int) error {
 	return err
 }
 
-func (r *DuelRepository) GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error) {
+func (r *duelRepo) GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error) {
 	asPlayer1, err := models.Duels(
 		qm.Where("player1_id = ?", playerID),
 	).All(ctx, r.db)
@@ -131,7 +137,7 @@ func (r *DuelRepository) GetByPlayerID(ctx context.Context, playerID int) (model
 	return result, nil
 }
 
-func (r *DuelRepository) GetByStatus(ctx context.Context, status DuelStatus) (models.DuelSlice, error) {
+func (r *duelRepo) GetByStatus(ctx context.Context, status DuelStatus) (models.DuelSlice, error) {
 	return models.Duels(
 		qm.Where("status = ?", string(status)),
 		qm.OrderBy("created_at DESC"),

@@ -11,37 +11,36 @@ import (
 	"github.com/aarondl/null/v8"
 )
 
-type DuelRepositoryInterface interface {
-	Create(ctx context.Context, players []database.Player, problemID int) (*models.Duel, error)
-	GetByID(ctx context.Context, id int) (*models.Duel, error)
-	GetAll(ctx context.Context, limit, offset int) (models.DuelSlice, error)
-	Upsert(ctx context.Context, duel *models.Duel) error
-	Delete(ctx context.Context, id int) error
-	GetByPlayerID(ctx context.Context, playerID int) (models.DuelSlice, error)
-	GetByStatus(ctx context.Context, status database.DuelStatus) (models.DuelSlice, error)
-}
+var (
+	ErrNotEnoughPlayers      = errors.New("at least two players are required")
+	ErrDuplicatePlayers      = errors.New("players must be different")
+	ErrDuelAlreadyStarted    = errors.New("duel already started or completed")
+	ErrDuelNotInProgress     = errors.New("duel is not in progress")
+	ErrInvalidWinner         = errors.New("winner must be one of the players")
+	ErrCannotCancelCompleted = errors.New("cannot cancel completed duel")
+)
 
 type DuelService struct {
-	repo DuelRepositoryInterface
+	repo database.IDuelRepo
 }
 
-func NewDuelService(repo *database.DuelRepository) *DuelService {
+func NewDuelService(repo database.IDuelRepo) *DuelService {
 	return &DuelService{repo: repo}
 }
 
-func NewDuelServiceWithRepo(repo DuelRepositoryInterface) *DuelService {
+func NewDuelServiceWithRepo(repo database.IDuelRepo) *DuelService {
 	return &DuelService{repo: repo}
 }
 
 func (s *DuelService) CreateDuel(ctx context.Context, playerIDs []int, problemID int) (*models.Duel, error) {
 	if len(playerIDs) < 2 {
-		return nil, errors.New("at least two players are required")
+		return nil, ErrNotEnoughPlayers
 	}
 
 	seen := make(map[int]struct{})
 	for _, id := range playerIDs {
 		if _, exists := seen[id]; exists {
-			return nil, errors.New("players must be different")
+			return nil, ErrDuplicatePlayers
 		}
 		seen[id] = struct{}{}
 	}
@@ -76,7 +75,7 @@ func (s *DuelService) StartDuel(ctx context.Context, id int) (*models.Duel, erro
 	}
 
 	if duel.Status != string(database.DuelStatusPending) {
-		return nil, errors.New("duel already started or completed")
+		return nil, ErrDuelAlreadyStarted
 	}
 
 	duel.Status = string(database.DuelStatusActive)
@@ -97,11 +96,11 @@ func (s *DuelService) CompleteDuel(ctx context.Context, id int, winnerID int) (*
 	}
 
 	if duel.Status != string(database.DuelStatusActive) {
-		return nil, errors.New("duel is not in progress")
+		return nil, ErrDuelNotInProgress
 	}
 
 	if winnerID != duel.Player1ID && winnerID != duel.Player2ID {
-		return nil, errors.New("winner must be one of the players")
+		return nil, ErrInvalidWinner
 	}
 
 	duel.Status = string(database.DuelStatusFinished)
@@ -123,10 +122,10 @@ func (s *DuelService) CancelDuel(ctx context.Context, id int) (*models.Duel, err
 	}
 
 	if duel.Status == string(database.DuelStatusFinished) {
-		return nil, errors.New("cannot cancel completed duel")
+		return nil, ErrCannotCancelCompleted
 	}
 
-	duel.Status = "cancelled"
+	duel.Status = string(database.DuelStatusCancelled)
 
 	err = s.repo.Upsert(ctx, duel)
 	if err != nil {
