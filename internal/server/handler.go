@@ -1,9 +1,13 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"bytebattle/internal/database"
+	"bytebattle/internal/service"
 
 	"github.com/labstack/echo/v4"
 )
@@ -50,7 +54,12 @@ func (s *HTTPServer) handleCreateDuel(c echo.Context) error {
 
 	duel, err := s.duelService.CreateDuel(c.Request().Context(), req.PlayerIDs, req.ProblemID)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+		if errors.Is(err, database.ErrInvalidPlayerCount) ||
+			errors.Is(err, service.ErrNotEnoughPlayers) ||
+			errors.Is(err, service.ErrDuplicatePlayers) {
+			return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 
 	return c.JSON(http.StatusCreated, echo.Map{"id": duel.ID})
@@ -84,7 +93,10 @@ func (s *HTTPServer) handleStartDuel(c echo.Context) error {
 
 	duel, err := s.duelService.StartDuel(c.Request().Context(), id)
 	if err != nil {
-		return c.String(http.StatusBadRequest, err.Error())
+		if errors.Is(err, service.ErrDuelAlreadyStarted) {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
 	return c.String(http.StatusOK, fmt.Sprintf("Duel started: %+v", duel))
@@ -96,7 +108,11 @@ func (s *HTTPServer) handleCompleteDuel(c echo.Context) error {
 
 	duel, err := s.duelService.CompleteDuel(c.Request().Context(), id, winnerID)
 	if err != nil {
-		return c.String(http.StatusBadRequest, err.Error())
+		if errors.Is(err, service.ErrDuelNotInProgress) ||
+			errors.Is(err, service.ErrInvalidWinner) {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
 	return c.String(http.StatusOK, fmt.Sprintf("Duel completed: %+v", duel))
