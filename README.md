@@ -35,102 +35,101 @@ Byte-Battle — это не просто кодинг, а азартные и п
 
 ### Предварительные требования
 
-- Go 1.16 или выше
+- Go 1.25 или выше
 - Git
-- PostgreSQL 12 или выше
+- Docker и Docker Compose
 
 ### Установка
 
 1. Клонируйте репозиторий:
    ```bash
    git clone <repository-url>
-   cd bytebattle
+   cd Byte-Battle
    ```
-2. Инициализировать репозиторий с зависимостями
 
+2. Создайте файлы конфигурации из примеров:
+   ```bash
+   cp .env.example .env
+   cp sqlboiler.toml.example sqlboiler.toml
+   ```
+
+3. Установите зависимости:
+   ```bash
+   make tidy
+   ```
+
+4. Поднимите базу данных:
+   ```bash
+   docker compose up -d
+   ```
+
+5. Примените миграции:
+   ```bash
+   make migrate-up
+   ```
+
+6. Сгенерируйте модели SQLBoiler:
+   ```bash
+   make generate
+   ```
+
+7. Запустите сервер:
+   ```bash
+   make run
+   ```
+
+8. Проверьте, что сервер работает:
+   ```bash
+   curl -X GET localhost:8080/internal/hello_world
+   ```
+
+## Команды Makefile
+
+### База данных и миграции
+
+```bash
+make migrate-up        # Применить все миграции
+make migrate-down      # Откатить последнюю миграцию
+make migrate-version   # Показать текущую версию миграции
+make migrate-create NAME=add_field  # Создать новую миграцию
 ```
-make init
-make tidy
+
+### Тестирование
+
+```bash
+make test-prepare      # Подготовить окружение для тестов
+make test              # Запустить тесты
 ```
 
-3. Установить colima + Docker (для того чтобы поднять базу)
+### Сборка и запуск
 
-TODO: дописать инструкцию для того чтобы это делать на Linux
-
-```
-brew install colima docker docker-compose
-```
-
-Поднять движок колимы чтобы база стартанула без докера десктопа
-
-```
-colima start
-```
-
-и поднять саму базу
-
-```
-docker-compose up -d
-```
-
-4. Накатить модели которые генерируются Boil'ом
-
-А также нужно перед этим установить `sqlboiler` в PATH.
-
-Как это должно быть:
-
-```
-turbomuza@MacBook-Pro-Muzaffar Byte-Battle % sqlboiler --version
-SQLBoiler v4.19.7
-```
-
-```
-make generate
-```
-
-5. Запустить сервер
-
-```
-make build
-make run
-```
-
-6. Попробовать пострелять в запущенный сервер
-
-```
-curl -X GET localhost:8080/internal/hello_world
+```bash
+make run               # Запустить сервер
+make build             # Собрать бинарник
+make generate          # Сгенерировать модели SQLBoiler
 ```
 
 ## Конечные точки API
 
 - `GET /` - Приветственное сообщение
 - `GET /internal/hello_world` - JSON ответ Hello World с интеграцией базы данных
-- `POST /migrate` - Запуск миграций базы данных (доступно через командную строку)
 
-## Конфигурация базы данных
+## Конфигурация
 
-Приложение использует PostgreSQL в качестве базы данных. Чтобы настроить подключение к базе данных, создайте файл `.env`
-в корневой директории со следующими переменными:
+Приложение использует переменные окружения из файлов `.env` и `sqlboiler.toml`. 
+Скопируйте примеры и настройте под себя (см. шаг 2 в разделе "Установка").
 
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=bytebattle
-DB_PASSWORD=bytebattle
-DB_NAME=bytebattle
-```
+Основные переменные `.env`:
 
-## Конфигурация SQLBoiler
-
-Для генерации моделей SQLBoiler требуется файл конфигурации `sqlboiler.toml`.
-Скопируйте пример файла:
-
-```bash
-cp sqlboiler.toml.example sqlboiler.toml
-```
-
-Затем обновите `sqlboiler.toml` своими учетными данными базы данных.
-Этот файл не должен быть закоммичен в репозиторий, так как содержит чувствительную информацию.
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
+| `HTTP_HOST` | Хост сервера | `localhost` |
+| `HTTP_PORT` | Порт сервера | `8080` |
+| `DB_HOST` | Хост базы данных | `localhost` |
+| `DB_PORT` | Порт базы данных | `5432` |
+| `DB_USER` | Пользователь БД | `bytebattle` |
+| `DB_PASSWORD` | Пароль БД | `bytebattle` |
+| `DB_NAME` | Имя базы данных | `bytebattle` |
 
 ## Схема базы данных
 
@@ -144,9 +143,14 @@ cp sqlboiler.toml.example sqlboiler.toml
 - `solutions`: Хранит отправленные решения (id, user_id, problem_id, duel_id, code, language, status, execution_time,
   memory_used, created_at, updated_at)
 
+- `sessions`: Хранит сессии пользователей (id, user_id, token, expires_at, created_at, updated_at)
+
+Миграции находятся в папке `migrations/` и управляются через [golang-migrate](https://github.com/golang-migrate/migrate).
+
 ## Built With
 
 - [Go](https://golang.org/) - Programming language
 - [Echo](https://echo.labstack.com/) - Web framework
 - [PostgreSQL](https://www.postgresql.org/) - Database
-- [SQLBoiler](https://github.com/volatiletech/sqlboiler) - ORM
+- [SQLBoiler](https://github.com/aarondl/sqlboiler) - ORM
+- [golang-migrate](https://github.com/golang-migrate/migrate) - Database migrations
