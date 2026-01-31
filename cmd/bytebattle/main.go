@@ -12,6 +12,8 @@ import (
 func main() {
 	dbCfg := config.LoadDatabaseConfig()
 	httpCfg := config.LoadHTTPConfig()
+	authCfg := config.LoadAuthConfig()
+	smtpCfg := config.LoadSMTPConfig()
 
 	db, err := database.NewPostgres(dbCfg)
 	if err != nil {
@@ -20,12 +22,17 @@ func main() {
 	defer db.Close()
 
 	userRepo := database.NewUserRepository(db)
-	userService := service.NewUserService(userRepo)
-
 	duelRepo := database.NewDuelRepository(db)
+	verificationRepo := database.NewVerificationRepository(db)
+	sessionRepo := database.NewSessionRepository(db)
+
+	userService := service.NewUserService(userRepo)
 	duelService := service.NewDuelService(duelRepo)
 
-	srv := server.NewHTTPServer(userService, duelService)
+	mailer := service.NewMailer(smtpCfg)
+	authService := service.NewAuthService(userRepo, verificationRepo, sessionRepo, mailer, authCfg)
+
+	srv := server.NewHTTPServer(userService, duelService, authService, authCfg)
 
 	addr := httpCfg.Address()
 	log.Printf("Server started on %s", addr)

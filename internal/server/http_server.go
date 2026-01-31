@@ -1,8 +1,10 @@
 package server
 
 import (
-	"bytebattle/internal/service"
 	"context"
+
+	"bytebattle/internal/config"
+	"bytebattle/internal/service"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -12,9 +14,17 @@ type HTTPServer struct {
 	echo        *echo.Echo
 	users       *service.UserService
 	duelService *service.DuelService
+
+	auth    *service.AuthService
+	authCfg *config.AuthConfig
 }
 
-func NewHTTPServer(users *service.UserService, duelService *service.DuelService) *HTTPServer {
+func NewHTTPServer(
+	users *service.UserService,
+	duelService *service.DuelService,
+	auth *service.AuthService,
+	authCfg *config.AuthConfig,
+) *HTTPServer {
 	e := echo.New()
 
 	e.Use(middleware.Logger())
@@ -24,6 +34,8 @@ func NewHTTPServer(users *service.UserService, duelService *service.DuelService)
 		echo:        e,
 		users:       users,
 		duelService: duelService,
+		auth:        auth,
+		authCfg:     authCfg,
 	}
 
 	s.registerRoutes()

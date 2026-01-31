@@ -27,7 +27,7 @@ generate: tools
 	@echo "Generating sqlboiler models"
 	@rm -rf internal/database/models
 	@mkdir -p internal/database/models
-	@sqlboiler psql --output internal/database/models
+	@sqlboiler psql --no-tests --output internal/database/models
 
 
 clean-models:
