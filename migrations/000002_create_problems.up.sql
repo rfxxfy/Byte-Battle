@@ -1,6 +1,3 @@
--- +goose Up
--- SQL в разделе 'Up' выполняется при применении этой миграции
-
 CREATE TABLE problems (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,

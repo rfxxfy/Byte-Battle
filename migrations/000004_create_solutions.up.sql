@@ -1,6 +1,3 @@
--- +goose Up
--- SQL в разделе 'Up' выполняется при применении этой миграции
-
 CREATE TABLE solutions (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id),
