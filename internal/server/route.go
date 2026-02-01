@@ -10,4 +10,6 @@ func (s *HTTPServer) registerRoutes() {
 	s.echo.POST("/duels/:id/start", s.handleStartDuel)
 	s.echo.POST("/duels/:id/complete", s.handleCompleteDuel)
 	s.echo.DELETE("/duels/:id", s.handleDeleteDuel)
+
+	s.echo.POST("/execute", s.handleExecute)
 }
