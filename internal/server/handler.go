@@ -5,8 +5,15 @@ import (
 	"net/http"
 	"strconv"
 
+	"bytebattle/internal/executor"
 	"github.com/labstack/echo/v4"
 )
+
+type ExecuteRequest struct {
+	Code     string `json:"code"`
+	Language string `json:"language"`
+	Input    string `json:"input"`
+}
 
 type CreateDuelRequest struct {
 	PlayerIDs []int `json:"player_ids"`
@@ -102,4 +109,22 @@ func (s *HTTPServer) handleDeleteDuel(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *HTTPServer) handleExecute(c echo.Context) error {
+	var req ExecuteRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request body"})
+	}
+
+	result, err := s.executionService.Execute(c.Request().Context(), executor.ExecutionRequest{
+		Code:     req.Code,
+		Language: executor.Language(req.Language),
+		Stdin:    req.Input,
+	})
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, result)
 }
