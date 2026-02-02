@@ -5,30 +5,31 @@
 package sqlcdb
 
 import (
+	uuid "github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Game struct {
 	ID          int32              `json:"id"`
 	ProblemID   string             `json:"problem_id"`
-	WinnerID    pgtype.Int4        `json:"winner_id"`
+	CreatorID   uuid.UUID          `json:"creator_id"`
+	WinnerID    uuid.NullUUID      `json:"winner_id"`
 	Status      string             `json:"status"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	CreatorID   int32              `json:"creator_id"`
 }
 
 type GameParticipant struct {
-	ID     int32 `json:"id"`
-	GameID int32 `json:"game_id"`
-	UserID int32 `json:"user_id"`
+	ID     int32     `json:"id"`
+	GameID int32     `json:"game_id"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 type Session struct {
 	ID        int32              `json:"id"`
-	UserID    int32              `json:"user_id"`
+	UserID    uuid.UUID          `json:"user_id"`
 	Token     string             `json:"token"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -37,7 +38,7 @@ type Session struct {
 
 type Solution struct {
 	ID            int32              `json:"id"`
-	UserID        int32              `json:"user_id"`
+	UserID        uuid.UUID          `json:"user_id"`
 	ProblemID     string             `json:"problem_id"`
 	GameID        pgtype.Int4        `json:"game_id"`
 	Code          string             `json:"code"`
@@ -50,14 +51,14 @@ type Solution struct {
 }
 
 type User struct {
-	ID            int32              `json:"id"`
+	ID            uuid.UUID          `json:"id"`
 	Username      string             `json:"username"`
 	Email         string             `json:"email"`
 	PasswordHash  pgtype.Text        `json:"password_hash"`
+	EmailVerified bool               `json:"email_verified"`
 	Rating        pgtype.Int4        `json:"rating"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	EmailVerified bool               `json:"email_verified"`
 }
 
 type VerificationCode struct {

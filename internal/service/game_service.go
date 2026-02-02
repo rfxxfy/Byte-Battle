@@ -8,8 +8,8 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/problems"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,7 +30,7 @@ func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Load
 	return &GameService{q: q, pool: pool, problems: loader}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, creatorID int, problemID string) (sqlcdb.Game, error) {
+func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemID string) (sqlcdb.Game, error) {
 	if _, err := s.problems.Get(problemID); err != nil {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrProblemNotFound, "problem not found")
 	}
@@ -45,7 +45,7 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID int, problemID s
 
 	game, err := qtx.CreateGame(ctx, sqlcdb.CreateGameParams{
 		ProblemID: problemID,
-		CreatorID: int32(creatorID),
+		CreatorID: creatorID,
 	})
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -53,7 +53,7 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID int, problemID s
 
 	if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
 		GameID: game.ID,
-		UserID: int32(creatorID),
+		UserID: creatorID,
 	}); err != nil {
 		return sqlcdb.Game{}, err
 	}
@@ -65,7 +65,7 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID int, problemID s
 	return game, nil
 }
 
-func (s *GameService) JoinGame(ctx context.Context, gameID, userID int) (sqlcdb.Game, error) {
+func (s *GameService) JoinGame(ctx context.Context, gameID int, userID uuid.UUID) (sqlcdb.Game, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -88,7 +88,7 @@ func (s *GameService) JoinGame(ctx context.Context, gameID, userID int) (sqlcdb.
 
 	already, err := qtx.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
 		GameID: game.ID,
-		UserID: int32(userID),
+		UserID: userID,
 	})
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -99,7 +99,7 @@ func (s *GameService) JoinGame(ctx context.Context, gameID, userID int) (sqlcdb.
 
 	if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
 		GameID: game.ID,
-		UserID: int32(userID),
+		UserID: userID,
 	}); err != nil {
 		return sqlcdb.Game{}, err
 	}
@@ -111,7 +111,7 @@ func (s *GameService) JoinGame(ctx context.Context, gameID, userID int) (sqlcdb.
 	return game, nil
 }
 
-func (s *GameService) GetParticipantIDs(ctx context.Context, gameID int) ([]int32, error) {
+func (s *GameService) GetParticipantIDs(ctx context.Context, gameID int) ([]uuid.UUID, error) {
 	return s.q.GetParticipantIDs(ctx, int32(gameID))
 }
 
@@ -154,7 +154,7 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcd
 	return games, total, nil
 }
 
-func (s *GameService) StartGame(ctx context.Context, id, userID int) (sqlcdb.Game, error) {
+func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -175,7 +175,7 @@ func (s *GameService) StartGame(ctx context.Context, id, userID int) (sqlcdb.Gam
 		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "game already started or completed")
 	}
 
-	if int(game.CreatorID) != userID {
+	if game.CreatorID != userID {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrNotGameCreator, "only the game creator can start the game")
 	}
 
@@ -199,7 +199,7 @@ func (s *GameService) StartGame(ctx context.Context, id, userID int) (sqlcdb.Gam
 	return game, nil
 }
 
-func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (sqlcdb.Game, error) {
+func (s *GameService) CompleteGame(ctx context.Context, id int, winnerID uuid.UUID) (sqlcdb.Game, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -222,7 +222,7 @@ func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (sqlcd
 
 	ok, err := qtx.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
 		GameID: game.ID,
-		UserID: int32(winnerID),
+		UserID: winnerID,
 	})
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -233,7 +233,7 @@ func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (sqlcd
 
 	game, err = qtx.CompleteGame(ctx, sqlcdb.CompleteGameParams{
 		ID:       game.ID,
-		WinnerID: pgtype.Int4{Int32: int32(winnerID), Valid: true},
+		WinnerID: uuid.NullUUID{UUID: winnerID, Valid: true},
 	})
 	if err != nil {
 		return sqlcdb.Game{}, err

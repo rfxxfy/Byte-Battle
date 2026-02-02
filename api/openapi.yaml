@@ -388,7 +388,8 @@ components:
         - user_id
       properties:
         user_id:
-          type: integer
+          type: string
+          format: uuid
 
     DeletedResponse:
       type: object
@@ -469,7 +470,8 @@ components:
           type: string
           example: "001-two-sum"
         winner_id:
-          type: integer
+          type: string
+          format: uuid
           nullable: true
         status:
           type: string
@@ -477,7 +479,8 @@ components:
         participant_ids:
           type: array
           items:
-            type: integer
+            type: string
+            format: uuid
         created_at:
           type: string
           format: date-time
@@ -522,5 +525,5 @@ components:
         - winner_id
       properties:
         winner_id:
-          type: integer
-          minimum: 1
+          type: string
+          format: uuid

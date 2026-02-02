@@ -24,6 +24,7 @@ linters:
   exclusions:
     paths:
       - internal/db/sqlc
+      - frontend/node_modules
     rules:
       - path: _test\.go
         linters:

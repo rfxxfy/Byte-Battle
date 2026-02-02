@@ -62,12 +62,12 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 
 	r1 := wsRead(t, conn1)
 	assert.Equal(t, ws.TypeSubmissionResult, r1.Type)
-	assert.Equal(t, int32(user1ID), r1.UserID)
+	assert.Equal(t, user1ID, r1.UserID)
 	assert.True(t, r1.Accepted)
 
 	r2 := wsRead(t, conn2)
 	assert.Equal(t, ws.TypeSubmissionResult, r2.Type)
-	assert.Equal(t, int32(user1ID), r2.UserID)
+	assert.Equal(t, user1ID, r2.UserID)
 	assert.True(t, r2.Accepted)
 }
 
@@ -149,5 +149,5 @@ func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 
 	finished := wsRead(t, conn)
 	assert.Equal(t, ws.TypeGameFinished, finished.Type)
-	assert.Equal(t, int32(user1ID), finished.WinnerID)
+	assert.Equal(t, user1ID, finished.WinnerID)
 }
