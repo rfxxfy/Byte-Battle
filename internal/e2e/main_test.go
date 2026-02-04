@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,6 +44,22 @@ type failingExecutor struct{}
 
 func (failingExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
 	return executor.ExecutionResult{Stdout: "wrong", Stderr: "wrong answer"}, nil
+}
+
+type secondTestFailsExecutor struct {
+	mu    sync.Mutex
+	calls int
+}
+
+func (e *secondTestFailsExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
+	e.mu.Lock()
+	n := e.calls
+	e.calls++
+	e.mu.Unlock()
+	if n == 0 {
+		return executor.ExecutionResult{Stdout: "3"}, nil
+	}
+	return executor.ExecutionResult{Stdout: "wrong"}, nil
 }
 
 var (
