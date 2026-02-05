@@ -57,7 +57,7 @@ func TestProblem_GetByID(t *testing.T) {
 	assert.Equal(t, 1000, p.Problem.TimeLimitMs)
 	assert.Equal(t, 256, p.Problem.MemoryLimitMb)
 	require.NotNil(t, p.Problem.TestCount)
-	assert.Equal(t, 1, *p.Problem.TestCount)
+	assert.Equal(t, 2, *p.Problem.TestCount)
 }
 
 func TestProblem_GetByID_NotFound(t *testing.T) {
