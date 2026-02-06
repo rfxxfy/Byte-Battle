@@ -516,6 +516,18 @@ components:
           items:
             $ref: "#/components/schemas/Problem"
 
+    GameParticipant:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          nullable: true
+
     Game:
       type: object
       required:
@@ -524,6 +536,7 @@ components:
         - creator_id
         - status
         - participant_ids
+        - participants
         - created_at
         - updated_at
       properties:
@@ -547,6 +560,10 @@ components:
           items:
             type: string
             format: uuid
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/GameParticipant"
         created_at:
           type: string
           format: date-time

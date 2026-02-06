@@ -119,6 +119,14 @@ func (s *GameService) GetParticipantIDsByGameIDs(ctx context.Context, gameIDs []
 	return s.q.GetParticipantIDsByGameIDs(ctx, gameIDs)
 }
 
+func (s *GameService) GetParticipants(ctx context.Context, gameID int) ([]sqlcdb.GetParticipantsRow, error) {
+	return s.q.GetParticipants(ctx, int32(gameID))
+}
+
+func (s *GameService) GetParticipantsByGameIDs(ctx context.Context, gameIDs []int32) ([]sqlcdb.GetParticipantsByGameIDsRow, error) {
+	return s.q.GetParticipantsByGameIDs(ctx, gameIDs)
+}
+
 func (s *GameService) GetGame(ctx context.Context, id int) (sqlcdb.Game, error) {
 	game, err := s.q.GetGameByID(ctx, int32(id))
 	if errors.Is(err, pgx.ErrNoRows) {

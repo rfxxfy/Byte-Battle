@@ -29,6 +29,8 @@ type Querier interface {
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
 	GetParticipantIDs(ctx context.Context, gameID int32) ([]uuid.UUID, error)
 	GetParticipantIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantIDsByGameIDsRow, error)
+	GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error)
+	GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
