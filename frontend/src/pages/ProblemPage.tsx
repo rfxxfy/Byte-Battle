@@ -4,19 +4,8 @@ import { getProblem, type Problem } from '@/api/problems'
 import { createGame } from '@/api/games'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
+import { difficultyLabel, difficultyClass } from '@/lib/difficulty'
 import { Button } from '@/components/ui/button'
-
-const difficultyLabel: Record<Problem['difficulty'], string> = {
-  easy: 'Лёгкая',
-  medium: 'Средняя',
-  hard: 'Сложная',
-}
-
-const difficultyClass: Record<Problem['difficulty'], string> = {
-  easy: 'text-green-400 bg-green-400/10 border-green-400/20',
-  medium: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
-  hard: 'text-red-400 bg-red-400/10 border-red-400/20',
-}
 
 export function ProblemPage() {
   const { id } = useParams<{ id: string }>()
@@ -25,6 +14,7 @@ export function ProblemPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -39,11 +29,13 @@ export function ProblemPage() {
   const handleCreateGame = async () => {
     if (!problem) return
     setCreating(true)
+    setCreateError('')
     try {
       const res = await createGame(problem.id)
       navigate(`/games/${res.game.id}`)
     } catch (err) {
-      setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+      setCreateError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+    } finally {
       setCreating(false)
     }
   }
@@ -63,9 +55,12 @@ export function ProblemPage() {
 
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold">{problem.title}</h1>
-        <Button onClick={handleCreateGame} disabled={creating} className="shrink-0">
-          {creating ? 'Создаём...' : 'Создать игру →'}
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={handleCreateGame} disabled={creating} className="shrink-0">
+            {creating ? 'Создаём...' : 'Создать игру →'}
+          </Button>
+          {createError && <p className="text-xs text-destructive">{createError}</p>}
+        </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

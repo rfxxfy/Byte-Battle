@@ -6,7 +6,7 @@ export interface TokenResponse {
 }
 
 export interface MeResponse {
-  user_id: number
+  user_id: string
 }
 
 export const enter = (email: string) =>

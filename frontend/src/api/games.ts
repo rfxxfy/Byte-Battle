@@ -4,8 +4,8 @@ export interface Game {
   id: number
   problem_id: string
   status: 'pending' | 'active' | 'finished' | 'cancelled'
-  participant_ids: number[]
-  winner_id?: number | null
+  participant_ids: string[]
+  winner_id?: string | null
   created_at: string
   updated_at: string
 }
