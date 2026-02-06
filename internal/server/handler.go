@@ -340,23 +340,52 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uuid.UUID, msg ws.ClientMessage) {
-	result, execErr := s.executionService.Execute(ctx, executor.ExecutionRequest{
-		Code:     msg.Code,
-		Language: executor.Language(msg.Language),
-		Stdin:    msg.Input,
-	})
-
-	if execErr != nil {
-		log.Print("executor error during submission")
+	game, err := s.gameService.GetGame(ctx, int(gameID))
+	if err != nil {
+		log.Printf("processSubmit: get game error: %v", err)
+		s.broadcastError(gameID, userID, "failed to load game")
+		return
 	}
-	accepted := execErr == nil && result.ExitCode == 0
+
+	problem, err := s.problemService.GetProblem(game.ProblemID)
+	if err != nil {
+		log.Printf("processSubmit: get problem error: %v", err)
+		s.broadcastError(gameID, userID, "failed to load problem")
+		return
+	}
+
+	accepted := true
+	var failedTest *int
+	var stdout, stderr string
+
+	for i, tc := range problem.TestCases {
+		result, execErr := s.executionService.Execute(ctx, executor.ExecutionRequest{
+			Code:     msg.Code,
+			Language: executor.Language(msg.Language),
+			Stdin:    tc.Input,
+		})
+		stdout = result.Stdout
+		stderr = result.Stderr
+
+		if execErr != nil || !problems.Match(result.Stdout, tc.Expected) {
+			accepted = false
+			idx := i
+			failedTest = &idx
+			break
+		}
+	}
+
+	if accepted {
+		stdout, stderr = "", ""
+	}
 
 	resultMsg, _ := json.Marshal(ws.ServerMessage{
-		Type:     ws.TypeSubmissionResult,
-		UserID:   userID,
-		Accepted: accepted,
-		Stdout:   result.Stdout,
-		Stderr:   result.Stderr,
+		Type:       ws.TypeSubmissionResult,
+		UserID:     userID,
+		Accepted:   accepted,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		FailedTest: failedTest,
 	})
 	s.hub.Broadcast(gameID, resultMsg)
 
@@ -379,4 +408,13 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		WinnerID: winnerID,
 	})
 	s.hub.Broadcast(gameID, finMsg)
+}
+
+func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {
+	errMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:    ws.TypeError,
+		UserID:  userID,
+		Message: msg,
+	})
+	s.hub.Broadcast(gameID, errMsg)
 }
