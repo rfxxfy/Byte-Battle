@@ -41,9 +41,9 @@ jobs:
         env:
           DB_HOST: localhost
           DB_PORT: 5432
-          DB_USER: testuser
-          DB_PASSWORD: testpass
-          DB_NAME: testdb
+          DB_USER: ${{ secrets.PG_USER_TEST }}
+          DB_PASSWORD: ${{ secrets.PG_PASSWORD_TEST }}
+          DB_NAME: ${{ secrets.PG_DB_TEST }}
         run: ./scripts/prepare-test-env.sh
 
       - name: Create sqlboiler config
