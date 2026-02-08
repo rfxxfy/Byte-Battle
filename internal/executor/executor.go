@@ -7,13 +7,6 @@ import (
 
 type Language string
 
-const (
-	Python Language = "python"
-	Go     Language = "go"
-	Cpp    Language = "cpp"
-	Java   Language = "java"
-)
-
 type ExecutionRequest struct {
 	Code        string
 	Language    Language

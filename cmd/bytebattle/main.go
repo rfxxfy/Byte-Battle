@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"bytebattle/internal/config"
@@ -11,14 +12,24 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatalf("%v", err)
+	}
+}
+
+func run() error {
 	dbCfg := config.LoadDatabaseConfig()
 	httpCfg := config.LoadHTTPConfig()
 
 	db, err := database.NewPostgres(dbCfg)
 	if err != nil {
-		log.Fatalf("db error: %v", err)
+		return fmt.Errorf("db: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("failed to close database: %v", err)
+		}
+	}()
 
 	execCfg := executor.DefaultConfig()
 	if cfg, err := executor.LoadConfig("executor_config.json"); err == nil {
@@ -27,14 +38,14 @@ func main() {
 
 	dockerExecutor, err := executor.NewDockerExecutor(execCfg)
 	if err != nil {
-		log.Fatalf("failed to create executor: %v", err)
+		return fmt.Errorf("create executor: %w", err)
 	}
 	executionService := service.NewExecutionService(dockerExecutor)
 
 	userRepo := database.NewUserRepository(db)
 	userService := service.NewUserService(userRepo)
 
-	gameRepo := database.NewDuelRepository(db)
+	gameRepo := database.NewGameRepository(db)
 	gameService := service.NewGameService(gameRepo)
 
 	sessionRepo := database.NewSessionRepository(db)
@@ -44,5 +55,8 @@ func main() {
 
 	addr := httpCfg.Address()
 	log.Printf("Server started on %s", addr)
-	log.Fatal(srv.Run(addr))
+	if err := srv.Run(addr); err != nil {
+		return fmt.Errorf("server: %w", err)
+	}
+	return nil
 }
