@@ -13,6 +13,7 @@ type gameResp struct {
 	Game struct {
 		ID             int      `json:"id"`
 		ProblemID      string   `json:"problem_id"`
+		CreatorID      string   `json:"creator_id"`
 		Status         string   `json:"status"`
 		WinnerID       *string  `json:"winner_id"`
 		ParticipantIDs []string `json:"participant_ids"`
@@ -57,6 +58,7 @@ func TestGame_CreateAndGet(t *testing.T) {
 	g := createGame(t)
 	assert.Equal(t, "pending", g.Game.Status)
 	assert.Equal(t, "test-problem", g.Game.ProblemID)
+	assert.Equal(t, user1ID.String(), g.Game.CreatorID)
 	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, g.Game.ParticipantIDs)
 
 	resp := doAuth(t, http.MethodGet, fmt.Sprintf("/games/%d", g.Game.ID), nil, token1)
@@ -89,6 +91,17 @@ func TestGame_JoinValidation(t *testing.T) {
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token3)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
 		assert.Equal(t, "GAME_ALREADY_STARTED", errCode(t, resp))
+	})
+
+	t.Run("third player can join pending game", func(t *testing.T) {
+		g := createGame(t)
+
+		token3 := authToken(t, "player3-full@test.com")
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token3)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var joined gameResp
+		decodeJSON(t, resp, &joined)
+		assert.Len(t, joined.Game.ParticipantIDs, 3)
 	})
 }
 
@@ -137,11 +150,17 @@ func TestGame_NotFound(t *testing.T) {
 }
 
 func TestGame_List(t *testing.T) {
-	for range 3 {
+	for range 2 {
 		createGame(t)
 	}
 
-	resp := doAuth(t, http.MethodGet, "/games?limit=2&offset=0", nil, token1)
+	// one extra pending game (without join) to increase total
+	resp := doAuth(t, http.MethodPost, "/games", map[string]any{
+		"problem_id": "test-problem",
+	}, token1)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	resp.Body.Close()
+	resp = doAuth(t, http.MethodGet, "/games?limit=2&offset=0", nil, token1)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var list gamesListResp
 	decodeJSON(t, resp, &list)
