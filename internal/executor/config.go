@@ -36,23 +36,23 @@ func LoadConfig(path string) (*Config, error) {
 func DefaultConfig() *Config {
 	return &Config{
 		Languages: map[Language]LangSettings{
-			Python: {
+			"python": {
 				Image:      "python:3.10-slim",
 				SourceFile: "main.py",
 				RunCmd:     []string{"python", "main.py"},
 			},
-			Go: {
+			"go": {
 				Image:      "golang:1.21-alpine",
 				SourceFile: "main.go",
 				RunCmd:     []string{"go", "run", "main.go"},
 			},
-			Cpp: {
+			"cpp": {
 				Image:      "gcc:latest",
 				SourceFile: "main.cpp",
 				CompileCmd: []string{"g++", "-O2", "-o", "solution", "main.cpp"},
 				RunCmd:     []string{"./solution"},
 			},
-			Java: {
+			"java": {
 				Image:      "openjdk:17-slim",
 				SourceFile: "Main.java",
 				CompileCmd: []string{"javac", "Main.java"},

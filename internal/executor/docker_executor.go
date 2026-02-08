@@ -6,19 +6,26 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
-	"sync"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-const poolSize = 3
+const (
+	poolSize  = 3
+	nanoCPUs  = int64(1000000000)
+	pidsLimit = int64(64)
+)
 
 type DockerExecutor struct {
-	cli   *client.Client
+	cli    *client.Client
 	config *Config
 	pools  map[Language]chan string
 	mu     sync.Mutex
@@ -43,7 +50,7 @@ func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
 		config: cfg,
 		pools:  make(map[Language]chan string),
 	}
-	
+
 	e.initPools()
 	return e, nil
 }
@@ -56,21 +63,47 @@ func (e *DockerExecutor) initPools() {
 }
 
 func (e *DockerExecutor) maintainPool(lang Language, settings LangSettings) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
 	for {
-		if len(e.pools[lang]) < poolSize {
-			id, err := e.createWarmContainer(context.Background(), settings)
-			if err == nil {
-				select {
-				case e.pools[lang] <- id:
-				default:
-					// Pool full, cleanup
-					e.cleanupContainer(context.Background(), id)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if len(e.pools[lang]) < poolSize {
+				id, err := e.createWarmContainer(ctx, settings)
+				if err == nil {
+					select {
+					case e.pools[lang] <- id:
+					case <-ctx.Done():
+						e.cleanupContainer(context.Background(), id)
+						return
+					default:
+						e.cleanupContainer(context.Background(), id)
+					}
+				} else {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(time.Second):
+					}
 				}
 			} else {
-				time.Sleep(time.Second) // Backoff on error
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(100 * time.Millisecond):
+				}
 			}
-		} else {
-			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
@@ -81,14 +114,13 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig Lan
 		memLimit = 100 * 1024 * 1024
 	}
 
-	nanoCPUs := int64(1000000000)
-	pidsLimit := int64(64)
+	pidsLimitPtr := pidsLimit
 
 	hostConfig := &container.HostConfig{
 		Resources: container.Resources{
 			Memory:    memLimit,
 			NanoCPUs:  nanoCPUs,
-			PidsLimit: &pidsLimit,
+			PidsLimit: &pidsLimitPtr,
 		},
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
@@ -109,12 +141,12 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig Lan
 	if err != nil {
 		return "", err
 	}
-	
+
 	if err := e.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		e.cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return "", err
 	}
-	
+
 	return resp.ID, nil
 }
 
@@ -134,12 +166,16 @@ func (e *DockerExecutor) Run(ctx context.Context, req ExecutionRequest) (Executi
 	// Try to get from pool if default limits
 	var containerID string
 	var fromPool bool
-	
+
 	defaultMem := langConfig.MemoryLimit
-	if defaultMem == 0 { defaultMem = 100 * 1024 * 1024 }
-	
+	if defaultMem == 0 {
+		defaultMem = 100 * 1024 * 1024
+	}
+
 	reqMem := req.MemoryLimit
-	if reqMem == 0 { reqMem = defaultMem }
+	if reqMem == 0 {
+		reqMem = defaultMem
+	}
 
 	if reqMem == defaultMem {
 		select {
@@ -156,7 +192,7 @@ func (e *DockerExecutor) Run(ctx context.Context, req ExecutionRequest) (Executi
 		// For simplicity, reusing logic but we need to handle non-default limits here if we supported them fully.
 		// Since createWarmContainer uses config limits, we might need a custom create if limits differ.
 		// For MVP, assuming limits match or we use a separate create logic.
-		
+
 		// To support custom limits correctly:
 		var err error
 		containerID, err = e.createContainerWithLimits(ctx, langConfig, reqMem)
@@ -181,13 +217,13 @@ func (e *DockerExecutor) Run(ctx context.Context, req ExecutionRequest) (Executi
 
 	// Exec the code
 	cmd := e.buildShellCommand(langConfig, hasStdin)
-	
+
 	execConfig := container.ExecOptions{
 		Cmd:          []string{"/bin/sh", "-c", cmd},
 		AttachStdout: true,
 		AttachStderr: true,
 	}
-	
+
 	execResp, err := e.cli.ContainerExecCreate(ctx, containerID, execConfig)
 	if err != nil {
 		return ExecutionResult{Error: err}, fmt.Errorf("failed to create exec: %w", err)
@@ -218,7 +254,7 @@ func (e *DockerExecutor) Run(ctx context.Context, req ExecutionRequest) (Executi
 
 	startTime := time.Now()
 	var timedOut bool
-	
+
 	select {
 	case err := <-outputDone:
 		if err != nil {
@@ -230,7 +266,7 @@ func (e *DockerExecutor) Run(ctx context.Context, req ExecutionRequest) (Executi
 	case <-ctx.Done():
 		return ExecutionResult{Error: ctx.Err()}, ctx.Err()
 	}
-	
+
 	duration := time.Since(startTime)
 
 	// Get Exit Code
@@ -241,7 +277,7 @@ func (e *DockerExecutor) Run(ctx context.Context, req ExecutionRequest) (Executi
 	} else if !timedOut {
 		// Log error but proceed?
 	}
-	
+
 	if timedOut {
 		exitCode = 124
 	}
@@ -274,14 +310,13 @@ func (e *DockerExecutor) Run(ctx context.Context, req ExecutionRequest) (Executi
 // Helper to create ad-hoc container with specific limits
 func (e *DockerExecutor) createContainerWithLimits(ctx context.Context, langConfig LangSettings, memLimit int64) (string, error) {
 	// Similar to createWarmContainer but with specific memory
-	nanoCPUs := int64(1000000000)
-	pidsLimit := int64(64)
+	pidsLimitPtr := pidsLimit
 
 	hostConfig := &container.HostConfig{
 		Resources: container.Resources{
 			Memory:    memLimit,
 			NanoCPUs:  nanoCPUs,
-			PidsLimit: &pidsLimit,
+			PidsLimit: &pidsLimitPtr,
 		},
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
@@ -302,27 +337,26 @@ func (e *DockerExecutor) createContainerWithLimits(ctx context.Context, langConf
 	if err != nil {
 		return "", err
 	}
-	
+
 	if err := e.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		e.cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return "", err
 	}
-	
+
 	return resp.ID, nil
 }
-
 
 func (e *DockerExecutor) buildShellCommand(cfg LangSettings, hasStdin bool) string {
 	var parts []string
 	if len(cfg.CompileCmd) > 0 {
 		parts = append(parts, strings.Join(cfg.CompileCmd, " "))
 	}
-	
+
 	runCmd := strings.Join(cfg.RunCmd, " ")
 	if hasStdin {
 		runCmd += " < input.txt"
 	}
-	
+
 	if len(parts) > 0 {
 		parts = append(parts, runCmd)
 		return strings.Join(parts, " && ")
@@ -347,7 +381,7 @@ func (e *DockerExecutor) copyFilesToContainer(ctx context.Context, containerID s
 			return err
 		}
 	}
-	
+
 	if err := tw.Close(); err != nil {
 		return err
 	}
