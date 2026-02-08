@@ -6,9 +6,6 @@ on:
       - '**'
   pull_request:
 
-env:
-  GO_VERSION: '1.25'
-
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
