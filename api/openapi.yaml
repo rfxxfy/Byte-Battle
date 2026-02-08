@@ -67,6 +67,28 @@ paths:
                 $ref: "#/components/schemas/MeResponse"
         "401":
           $ref: "#/components/responses/Error"
+    patch:
+      operationId: PatchAuthMe
+      summary: Update current user profile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
 
   /auth/logout:
     post:
@@ -381,6 +403,19 @@ components:
         expires_at:
           type: string
           format: date-time
+        name:
+          type: string
+          nullable: true
+
+    UpdateMeRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
 
     MeResponse:
       type: object
@@ -390,6 +425,9 @@ components:
         user_id:
           type: string
           format: uuid
+        name:
+          type: string
+          nullable: true
 
     DeletedResponse:
       type: object
