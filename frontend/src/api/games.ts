@@ -1,10 +1,16 @@
 import { apiFetch } from './client'
 
+export interface GameParticipant {
+  id: string
+  name?: string | null
+}
+
 export interface Game {
   id: number
   problem_id: string
+  creator_id: string
   status: 'pending' | 'active' | 'finished' | 'cancelled'
-  participant_ids: string[]
+  participants: GameParticipant[]
   winner_id?: string | null
   created_at: string
   updated_at: string
@@ -27,5 +33,11 @@ export const createGame = (problemId: string) =>
 export const joinGame = (id: number) =>
   apiFetch<{ game: Game }>(`/games/${id}/join`, { method: 'POST' })
 
+export const leaveGame = (id: number) =>
+  apiFetch<{ game: Game }>(`/games/${id}/leave`, { method: 'POST' })
+
 export const startGame = (id: number) =>
   apiFetch<{ game: Game }>(`/games/${id}/start`, { method: 'POST' })
+
+export const cancelGame = (id: number) =>
+  apiFetch<{ game: Game }>(`/games/${id}/cancel`, { method: 'POST' })

@@ -248,7 +248,12 @@ func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"stdout":       result.Stdout,
+		"stderr":       result.Stderr,
+		"exit_code":    result.ExitCode,
+		"time_used_ms": result.TimeUsed.Milliseconds(),
+	})
 }
 
 func toAPIGame(g sqlcdb.Game, participants []service.Participant) api.Game {
@@ -338,11 +343,17 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	})
 	s.hub.Broadcast(int32(gameID), joinedMsg)
 
+	connCtx, connCancel := context.WithCancel(context.Background())
+	defer connCancel()
+
 	conn.SetReadLimit(32 * 1024)
 	conn.SetReadDeadline(time.Now().Add(ws.PongWait)) //nolint:errcheck // not actionable
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 	})
+
+	// allow only one submit at a time per connection
+	submitSem := make(chan struct{}, 1)
 
 	for {
 		_, data, err := conn.ReadMessage()
@@ -358,11 +369,27 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		s.processSubmit(r.Context(), int32(gameID), session.UserID, msg)
+		s.tryDispatchSubmit(connCtx, submitSem, int32(gameID), session.UserID, msg)
+	}
+}
+
+// tryDispatchSubmit runs processSubmit in a goroutine if no submit is already in progress.
+func (s *HTTPServer) tryDispatchSubmit(ctx context.Context, sem chan struct{}, gameID int32, userID uuid.UUID, msg ws.ClientMessage) {
+	select {
+	case sem <- struct{}{}:
+		go func(m ws.ClientMessage) {
+			defer func() { <-sem }()
+			s.processSubmit(ctx, gameID, userID, m)
+		}(msg)
+	default:
+		// submit already in progress, ignore
 	}
 }
 
 func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uuid.UUID, msg ws.ClientMessage) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
 	game, err := s.gameService.GetGame(ctx, int(gameID))
 	if err != nil {
 		log.Printf("processSubmit: get game error: %v", err)
