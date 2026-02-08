@@ -1,6 +1,3 @@
--- +goose Up
--- SQL в разделе 'Up' выполняется при применении этой миграции
-
 CREATE TABLE duels (
     id SERIAL PRIMARY KEY,
     player1_id INTEGER NOT NULL REFERENCES users(id),
