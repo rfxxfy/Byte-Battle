@@ -52,8 +52,6 @@ check_db() {
         PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1" > /dev/null 2>&1
     elif command -v nc > /dev/null 2>&1; then
         nc -z "$DB_HOST" "$DB_PORT" > /dev/null 2>&1
-    elif command -v docker > /dev/null 2>&1; then
-        docker exec bytebattle-postgres pg_isready -U "$DB_USER" -d "$DB_NAME" > /dev/null 2>&1
     else
         # Just try to connect with migrate
         return 0
