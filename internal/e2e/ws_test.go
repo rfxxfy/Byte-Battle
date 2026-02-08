@@ -21,20 +21,20 @@ import (
 func TestGameWS_InvalidParams(t *testing.T) {
 	t.Run("missing token", func(t *testing.T) {
 		g := createActiveGame(t)
-		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), "")
+		_, resp := wsDial(t, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), "")
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
 		g := createActiveGame(t)
-		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), "badtoken")
+		_, resp := wsDial(t, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), "badtoken")
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("nonexistent game", func(t *testing.T) {
-		_, resp := wsDial(t, "/games/999999/ws", token1)
+		_, resp := wsDial(t, "/api/games/999999/ws", token1)
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
@@ -42,14 +42,14 @@ func TestGameWS_InvalidParams(t *testing.T) {
 
 func TestGameWS_PendingGame(t *testing.T) {
 	g := createGame(t) // pending, not started
-	_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), token1)
+	_, resp := wsDial(t, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
 	require.NotNil(t, resp)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 	g := createActiveGame(t)
-	wsPath := fmt.Sprintf("/games/%d/ws", g.Game.ID)
+	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 
 	conn1 := wsConnect(t, wsPath, token1)
 	joined1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
@@ -79,7 +79,7 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 
 func TestGameWS_PlayerJoinedBroadcast(t *testing.T) {
 	g := createActiveGame(t)
-	wsPath := fmt.Sprintf("/games/%d/ws", g.Game.ID)
+	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 
 	conn1 := wsConnect(t, wsPath, token1)
 	joined1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
@@ -114,23 +114,23 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 		return resp
 	}
 
-	r := doFailing(http.MethodPost, "/games", map[string]any{
+	r := doFailing(http.MethodPost, "/api/games", map[string]any{
 		"problem_id": "test-problem",
 	})
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
 	decodeJSON(t, r, &g)
 
-	// user2 joins via the main test server (same DB)
-	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token2)
+	// user2 joins
+	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
 	require.Equal(t, http.StatusOK, joinResp.StatusCode)
 	joinResp.Body.Close()
 
-	r = doFailing(http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil)
+	r = doFailing(http.MethodPost, fmt.Sprintf("/api/games/%d/start", g.Game.ID), nil)
 	require.Equal(t, http.StatusOK, r.StatusCode)
 	r.Body.Close()
 
-	wsURLFailing := "ws" + strings.TrimPrefix(srvURL, "http") + fmt.Sprintf("/games/%d/ws", g.Game.ID)
+	wsURLFailing := "ws" + strings.TrimPrefix(srvURL, "http") + fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 	conn, _, err := wsDialer(token1).Dial(wsURLFailing, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
@@ -156,7 +156,7 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 }
 
 func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
-	// secondTestFailsExecutor passes test 0 but fails test 1 → failed_test must be 1
+	// secondTestFailsExecutor passes test 0 but fails test 1, failed_test must be 1
 	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, &secondTestFailsExecutor{}, testLoader, config.Load()))
 	t.Cleanup(srv.Close)
 
@@ -177,20 +177,20 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 		return resp
 	}
 
-	r := doSrv(http.MethodPost, "/games", map[string]any{"problem_id": "test-problem"}, token1)
+	r := doSrv(http.MethodPost, "/api/games", map[string]any{"problem_id": "test-problem"}, token1)
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
 	decodeJSON(t, r, &g)
 
-	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token2)
+	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
 	require.Equal(t, http.StatusOK, joinResp.StatusCode)
 	joinResp.Body.Close()
 
-	r = doSrv(http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil, token1)
+	r = doSrv(http.MethodPost, fmt.Sprintf("/api/games/%d/start", g.Game.ID), nil, token1)
 	require.Equal(t, http.StatusOK, r.StatusCode)
 	r.Body.Close()
 
-	wsURLSrv := "ws" + strings.TrimPrefix(srvURL, "http") + fmt.Sprintf("/games/%d/ws", g.Game.ID)
+	wsURLSrv := "ws" + strings.TrimPrefix(srvURL, "http") + fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 	conn, _, err := wsDialer(token1).Dial(wsURLSrv, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
@@ -211,7 +211,7 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 
 func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 	g := createActiveGame(t)
-	conn := wsConnect(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), token1)
+	conn := wsConnect(t, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
 	joined := wsReadUntilType(t, conn, ws.TypePlayerJoined)
 	assert.Equal(t, user1ID, joined.UserID)
 

@@ -98,8 +98,8 @@ func New(
 	r.Get("/health", s.handleHealth)
 	r.Get("/", s.handleRoot)
 	r.Get("/internal/hello_world", s.handleHello)
-	r.Post("/execute", s.handleExecute)
-	r.Get("/games/{id}/ws", s.handleGameWS)
+	r.Post("/api/execute", s.handleExecute)
+	r.Get("/api/games/{id}/ws", s.handleGameWS)
 
 	strictOpts := api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestErrorHandler,
@@ -107,7 +107,7 @@ func New(
 	}
 	publicOps := publicOpsFromSpec()
 	strictHandler := api.NewStrictHandlerWithOptions(s, []api.StrictMiddlewareFunc{s.strictAuthMiddleware(publicOps)}, strictOpts)
-	api.HandlerFromMux(strictHandler, r)
+	api.HandlerFromMuxWithBaseURL(strictHandler, r, "/api")
 
 	return r
 }
