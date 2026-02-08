@@ -11,10 +11,10 @@ import (
 
 type gameResp struct {
 	Game struct {
-		ID           int    `json:"id"`
-		ProblemID    string `json:"problem_id"`
-		CreatorID    string `json:"creator_id"`
-		Status       string `json:"status"`
+		ID           int     `json:"id"`
+		ProblemID    string  `json:"problem_id"`
+		CreatorID    string  `json:"creator_id"`
+		Status       string  `json:"status"`
 		WinnerID     *string `json:"winner_id"`
 		Participants []struct {
 			ID   string  `json:"id"`
