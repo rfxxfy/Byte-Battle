@@ -7,15 +7,10 @@
 *.so
 *.dylib
 *.test
-*.toml
 
 # Go workspace
 go.work
 go.work.sum
-
-# Go modules
-go.mod
-go.sum
 
 # IDE files
 .vscode/
@@ -23,6 +18,12 @@ go.sum
 *.swp
 *.swo
 *~
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+sqlboiler.toml
 
 # Database files
 *.db
