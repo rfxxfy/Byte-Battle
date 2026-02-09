@@ -79,7 +79,7 @@ jobs:
           DB_PASSWORD: ${{ secrets.PG_PASSWORD_TEST }}
           DB_NAME: ${{ secrets.PG_DB_TEST }}
         run: |
-          go install github.com/jstemmer/go-junit-report@latest
+          go install github.com/jstemmer/go-junit-report@v2.1.0
           go test -v -json ./cmd/... ./internal/config/... ./internal/server/... ./internal/service/... 2>&1 | go-junit-report > report.xml || true
 
       - name: Upload test report

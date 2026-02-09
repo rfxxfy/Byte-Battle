@@ -21,7 +21,7 @@ jobs:
 
       - name: Install golang-migrate
         run: |
-          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
 
       # ─────────────────────────────────────────────────────────────────────
       # Step 1: Run migrations BEFORE deploying new code
