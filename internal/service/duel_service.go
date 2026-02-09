@@ -28,10 +28,6 @@ func NewDuelService(repo database.IDuelRepo) *DuelService {
 	return &DuelService{repo: repo}
 }
 
-func NewDuelServiceWithRepo(repo database.IDuelRepo) *DuelService {
-	return &DuelService{repo: repo}
-}
-
 func (s *DuelService) CreateDuel(ctx context.Context, playerIDs []int, problemID int) (*models.Duel, error) {
 	if len(playerIDs) < 2 {
 		return nil, ErrNotEnoughPlayers
