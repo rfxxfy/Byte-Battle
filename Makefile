@@ -13,7 +13,6 @@ tidy:
 # SQLBoiler
 # ─────────────────────────────────────────────────────────────────────────────
 
-# CLI tool versions (single source of truth)
 MIGRATE_VERSION := v4.19.1
 SQLBOILER_VERSION := v4.19.7
 
