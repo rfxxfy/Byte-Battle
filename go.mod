@@ -8,7 +8,6 @@ require (
 	github.com/aarondl/sqlboiler/v4 v4.19.7
 	github.com/aarondl/strmangle v0.0.9
 	github.com/friendsofgo/errors v0.9.2
-	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/kat-co/vala v0.0.0-20170210184112-42e1d8b61f12
 	github.com/labstack/echo/v4 v4.15.0
 	github.com/lib/pq v1.10.9
