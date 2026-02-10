@@ -2,6 +2,9 @@ package database
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDuelStatus_Constants(t *testing.T) {
@@ -17,9 +20,7 @@ func TestDuelStatus_Constants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			if string(tt.status) != tt.expected {
-				t.Errorf("expected %s, got %s", tt.expected, string(tt.status))
-			}
+			assert.Equal(t, tt.expected, string(tt.status))
 		})
 	}
 }
@@ -27,23 +28,17 @@ func TestDuelStatus_Constants(t *testing.T) {
 func TestPlayer_Struct(t *testing.T) {
 	player := Player{ID: 42}
 
-	if player.ID != 42 {
-		t.Errorf("expected ID 42, got %d", player.ID)
-	}
+	assert.Equal(t, 42, player.ID)
 }
 
 func TestPlayer_ZeroValue(t *testing.T) {
 	var player Player
 
-	if player.ID != 0 {
-		t.Errorf("expected ID 0, got %d", player.ID)
-	}
+	assert.Equal(t, 0, player.ID)
 }
 
 func TestNewDuelRepository(t *testing.T) {
 	repo := NewDuelRepository(nil)
 
-	if repo == nil {
-		t.Fatal("expected repository, got nil")
-	}
+	require.NotNil(t, repo)
 }
