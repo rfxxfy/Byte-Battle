@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strconv"
 )
@@ -20,12 +21,12 @@ func LoadDatabaseConfig() *DatabaseConfig {
 	port, _ := strconv.Atoi(getEnv("DB_PORT", "5432"))
 
 	return &DatabaseConfig{
-		Host:     getEnv("DB_HOST", "localhost"),
+		Host:     requireEnv("DB_HOST"),
 		Port:     port,
-		User:     getEnv("DB_USER", "bytebattle"),
-		Password: getEnv("DB_PASSWORD", "bytebattle"),
-		Name:     getEnv("DB_NAME", "bytebattle"),
-		SSLMode:  getEnv("DB_SSLMODE", "disable"),
+		User:     requireEnv("DB_USER"),
+		Password: requireEnv("DB_PASSWORD"),
+		Name:     requireEnv("DB_NAME"),
+		SSLMode:  requireEnv("DB_SSLMODE"),
 	}
 }
 
@@ -35,4 +36,13 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// requireEnv - возвращает значение переменной окружения или завершает процесс с ошибкой
+func requireEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("required environment variable %s is not set", key)
+	}
+	return value
 }
