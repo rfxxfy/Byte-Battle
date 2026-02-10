@@ -12,6 +12,7 @@ func TestDuelStatus_Constants(t *testing.T) {
 		{DuelStatusPending, "pending"},
 		{DuelStatusActive, "active"},
 		{DuelStatusFinished, "finished"},
+		{DuelStatusCancelled, "cancelled"},
 	}
 
 	for _, tt := range tests {
