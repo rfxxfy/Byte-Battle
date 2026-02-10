@@ -1,89 +1,64 @@
 name: Deploy
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  migrate-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      # ─── Build & push Docker image ──────────────────────────────────────
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          go-version-file: go.mod
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install golang-migrate
-        run: |
-          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-      # ─────────────────────────────────────────────────────────────────────
-      # Step 1: Run migrations BEFORE deploying new code
-      # ─────────────────────────────────────────────────────────────────────
-      - name: Run database migrations
-        env:
-          DB_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          echo "Running migrations..."
-          migrate -path ./migrations -database "$DB_URL" up
-          echo "Migrations completed successfully"
+      # ─── Deploy to VPS ─────────────────────────────────────────────────
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/bytebattle
 
-      # ─────────────────────────────────────────────────────────────────────
-      # Step 2: Build application
-      # ─────────────────────────────────────────────────────────────────────
-      - name: Build application
-        run: |
-          go build -o bin/bytebattle ./cmd/bytebattle
+            # Login to GitHub Container Registry
+            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # ─────────────────────────────────────────────────────────────────────
-      # Step 3: Deploy (example - adjust for your infrastructure)
-      # ─────────────────────────────────────────────────────────────────────
-      # Uncomment and configure based on your deployment target:
+            # Update image reference in .env
+            IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            sed -i "s|^IMAGE=.*|IMAGE=${IMAGE}|" .env || echo "IMAGE=${IMAGE}" >> .env
 
-      # Option A: Deploy to a VPS via SSH
-      # - name: Deploy to server
-      #   uses: appleboy/ssh-action@v1.0.0
-      #   with:
-      #     host: ${{ secrets.SSH_HOST }}
-      #     username: ${{ secrets.SSH_USER }}
-      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
-      #     script: |
-      #       cd /opt/bytebattle
-      #       docker compose pull
-      #       docker compose up -d
+            # Pull new image
+            docker compose -f docker-compose.prod.yaml pull app
 
-      # Option B: Deploy to Docker Hub + trigger deployment
-      # - name: Login to Docker Hub
-      #   uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.DOCKER_USERNAME }}
-      #     password: ${{ secrets.DOCKER_TOKEN }}
-      #
-      # - name: Build and push Docker image
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     push: true
-      #     tags: ${{ secrets.DOCKER_USERNAME }}/bytebattle:latest
+            # Run migrations
+            docker compose -f docker-compose.prod.yaml run --rm app \
+              sh -c 'migrate -path ./migrations -database "postgres://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=$DB_SSLMODE" up'
 
-      # Option C: Deploy to Kubernetes
-      # - name: Deploy to Kubernetes
-      #   run: |
-      #     kubectl set image deployment/bytebattle app=bytebattle:${{ github.sha }}
-
-      - name: Deployment placeholder
-        run: |
-          echo "Migrations applied successfully"
-          echo "Application built: bin/bytebattle"
-          echo ""
-          echo "  Configure deployment step based on your infrastructure:"
-          echo "   - VPS via SSH"
-          echo "   - Docker Hub + container orchestration"
-          echo "   - Kubernetes"
-          echo "   - Cloud Run / App Engine / etc."
+            # Restart app
+            docker compose -f docker-compose.prod.yaml up -d --no-deps app
