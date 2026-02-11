@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -228,6 +229,58 @@ func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 	finished := wsReadUntilType(t, conn, ws.TypeGameFinished)
 	assert.Equal(t, ws.TypeGameFinished, finished.Type)
 	assert.Equal(t, user1ID, finished.WinnerID)
+}
+
+func TestGameWS_ConcurrentSlotRejected(t *testing.T) {
+	exec := newBlockingExecutor()
+	srv := newGameServer(t, exec)
+	t.Cleanup(func() { close(exec.unblock) }) // unblock so goroutines can exit
+
+	g := createActiveGameOnServer(t, srv)
+	conn := wsConnectOnServer(t, srv, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
+	wsReadUntilType(t, conn, ws.TypePlayerJoined)
+
+	// first submit — will block inside the executor, holding the slot
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{Type: ws.TypeSubmit, Code: "x", Language: "go"}))
+
+	// wait until the executor has actually started (slot is held)
+	<-exec.started
+
+	// second submit while slot is held — should get an error broadcast
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{Type: ws.TypeSubmit, Code: "x", Language: "go"}))
+	errMsg := wsReadUntilType(t, conn, ws.TypeError)
+	assert.Contains(t, errMsg.Message, "in progress")
+}
+
+func TestGameWS_TwoPlayersRace_OnlyOneWins(t *testing.T) {
+	g := createActiveGame(t)
+	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
+
+	conn1 := wsConnect(t, wsPath, token1)
+	wsReadUntilType(t, conn1, ws.TypePlayerJoined)
+	conn2 := wsConnect(t, wsPath, token2)
+	wsReadUntilType(t, conn1, ws.TypePlayerJoined) // user2 joined (on conn1)
+	wsReadUntilType(t, conn2, ws.TypePlayerJoined)
+
+	// both players submit simultaneously
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		conn1.WriteJSON(ws.ClientMessage{Type: ws.TypeSubmit, Code: "solution", Language: "go"}) //nolint:errcheck // test goroutine, failure caught by wsReadUntilType timeout
+	}()
+	go func() {
+		defer wg.Done()
+		conn2.WriteJSON(ws.ClientMessage{Type: ws.TypeSubmit, Code: "solution", Language: "go"}) //nolint:errcheck // test goroutine, failure caught by wsReadUntilType timeout
+	}()
+	wg.Wait()
+
+	// both connections must see exactly one game_finished broadcast with the same winner
+	finished1 := wsReadUntilType(t, conn1, ws.TypeGameFinished)
+	finished2 := wsReadUntilType(t, conn2, ws.TypeGameFinished)
+
+	assert.Equal(t, finished1.WinnerID, finished2.WinnerID, "both connections must see the same winner")
+	assert.True(t, finished1.WinnerID == user1ID || finished1.WinnerID == user2ID, "winner must be one of the players")
 }
 
 func wsReadUntilType(t *testing.T, conn wsJSONReader, wantType string) ws.ServerMessage {

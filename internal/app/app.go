@@ -34,18 +34,19 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	return NewRouterWithExecutor(pool, dockerExecutor, loader, cfg)
 }
 
-func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, loader *problems.Loader, cfg config.Config) http.Handler {
+func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, loader *problems.Loader, cfg config.Config, rlCfg ...service.RateLimitConfig) http.Handler {
 	q := sqlcdb.New(pool)
 
 	userService := service.NewUserService(q)
 	gameService := service.NewGameService(q, pool, loader)
 	problemService := service.NewProblemService(loader)
 	sessionService := service.NewSessionService(q, service.WithSessionDuration(cfg.Entrance.SessionTTL))
-	executionService := service.NewExecutionService(exec)
+	executionService := service.NewExecutionService(exec, rlCfg...)
+	submissionService := service.NewSubmissionService(executionService, gameService, loader)
 
 	mailer := service.NewMailer(cfg.Entrance.ResendAPIKey, cfg.Entrance.FromEmail)
 	entranceService := service.NewEntranceService(q, sessionService, mailer, cfg.Entrance)
 
 	hub := ws.NewHub()
-	return server.New(pool, userService, gameService, problemService, sessionService, executionService, hub, entranceService)
+	return server.New(pool, userService, gameService, problemService, sessionService, executionService, submissionService, hub, entranceService)
 }
