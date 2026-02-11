@@ -275,7 +275,7 @@ func (s *GameService) CompleteGame(ctx context.Context, id int, winnerID uuid.UU
 	return game, nil
 }
 
-func (s *GameService) CancelGame(ctx context.Context, id int) (sqlcdb.Game, error) {
+func (s *GameService) CancelGame(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -290,6 +290,10 @@ func (s *GameService) CancelGame(ctx context.Context, id int) (sqlcdb.Game, erro
 	}
 	if err != nil {
 		return sqlcdb.Game{}, err
+	}
+
+	if game.CreatorID != userID {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrNotGameCreator, "only the game creator can cancel the game")
 	}
 
 	if game.Status == gameStatusFinished {
@@ -357,7 +361,17 @@ func (s *GameService) LeaveGame(ctx context.Context, gameID int, userID uuid.UUI
 	return game, nil
 }
 
-func (s *GameService) DeleteGame(ctx context.Context, id int) error {
+func (s *GameService) DeleteGame(ctx context.Context, id int, userID uuid.UUID) error {
+	game, err := s.q.GetGameByID(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return err
+	}
+	if game.CreatorID != userID {
+		return apierr.New(apierr.ErrNotGameCreator, "only the game creator can delete the game")
+	}
 	rowsAff, err := s.q.DeleteGame(ctx, int32(id))
 	if err != nil {
 		return err

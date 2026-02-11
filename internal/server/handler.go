@@ -145,7 +145,8 @@ func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) 
 }
 
 func (s *HTTPServer) DeleteGame(ctx context.Context, req api.DeleteGameRequestObject) (api.DeleteGameResponseObject, error) {
-	if err := s.gameService.DeleteGame(ctx, req.Id); err != nil {
+	userID, _ := userIDFromContext(ctx)
+	if err := s.gameService.DeleteGame(ctx, req.Id, userID); err != nil {
 		return nil, err
 	}
 
@@ -168,6 +169,15 @@ func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObje
 }
 
 func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameRequestObject) (api.CompleteGameResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	gameInfo, err := s.gameService.GetGame(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	if gameInfo.CreatorID != userID {
+		return nil, apierr.New(apierr.ErrNotGameCreator, "only the game creator can complete the game")
+	}
+
 	game, err := s.gameService.CompleteGame(ctx, req.Id, req.Body.WinnerId)
 	if err != nil {
 		return nil, err
@@ -197,7 +207,8 @@ func (s *HTTPServer) LeaveGame(ctx context.Context, req api.LeaveGameRequestObje
 }
 
 func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestObject) (api.CancelGameResponseObject, error) {
-	game, err := s.gameService.CancelGame(ctx, req.Id)
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.CancelGame(ctx, req.Id, userID)
 	if err != nil {
 		return nil, err
 	}
