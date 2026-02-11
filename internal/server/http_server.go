@@ -98,7 +98,6 @@ func New(
 	r.Get("/health", s.handleHealth)
 	r.Get("/", s.handleRoot)
 	r.Get("/internal/hello_world", s.handleHello)
-	r.Post("/api/execute", s.handleExecute)
 	r.Get("/api/games/{id}/ws", s.handleGameWS)
 
 	strictOpts := api.StrictHTTPServerOptions{

@@ -333,6 +333,30 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
 
+  /execute:
+    post:
+      operationId: PostExecute
+      summary: Execute code and return output
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteRequest"
+      responses:
+        "200":
+          description: Execution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+
   /games/{id}/cancel:
     post:
       operationId: CancelGame
@@ -607,3 +631,34 @@ components:
         winner_id:
           type: string
           format: uuid
+
+    ExecuteRequest:
+      type: object
+      required:
+        - code
+        - language
+        - input
+      properties:
+        code:
+          type: string
+        language:
+          type: string
+        input:
+          type: string
+
+    ExecuteResponse:
+      type: object
+      required:
+        - stdout
+        - stderr
+        - exit_code
+        - time_used_ms
+      properties:
+        stdout:
+          type: string
+        stderr:
+          type: string
+        exit_code:
+          type: integer
+        time_used_ms:
+          type: integer
