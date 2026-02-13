@@ -2,8 +2,8 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 
 	"bytebattle/internal/apierr"
 	"bytebattle/internal/executor"
@@ -80,17 +80,16 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 		}, nil
 	}
 
-	completed, err := s.gameSvc.completeGame(ctx, gameID, userID)
+	completed, err := s.gameSvc.CompleteGameAsWinner(ctx, gameID, userID)
 	if err != nil {
-		// Another player already won — submission is still accepted but we
-		// don't set WinnerID (the other player's submit already broadcast it).
-		log.Printf("submit: CompleteGame: %v", err)
-		return SubmissionResult{Accepted: true}, nil
+		var appErr *apierr.AppError
+		if errors.As(err, &appErr) && appErr.ErrorCode == apierr.ErrGameNotInProgress {
+			// Another player already won — submission is still accepted but we
+			// don't set WinnerID (the other player's submit already broadcast it).
+			return SubmissionResult{Accepted: true}, nil
+		}
+		return SubmissionResult{}, fmt.Errorf("complete game: %w", err)
 	}
 
-	var winnerID uuid.UUID
-	if completed.WinnerID.Valid {
-		winnerID = completed.WinnerID.UUID
-	}
-	return SubmissionResult{Accepted: true, WinnerID: winnerID}, nil
+	return SubmissionResult{Accepted: true, WinnerID: completed.WinnerID.UUID}, nil
 }
