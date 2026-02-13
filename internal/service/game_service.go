@@ -228,7 +228,25 @@ func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (
 	return game, nil
 }
 
-func (s *GameService) CompleteGame(ctx context.Context, id int, winnerID uuid.UUID) (sqlcdb.Game, error) {
+func (s *GameService) CompleteGameAsWinner(ctx context.Context, id int, winnerID uuid.UUID) (sqlcdb.Game, error) {
+	return s.completeGame(ctx, id, winnerID)
+}
+
+func (s *GameService) CompleteGame(ctx context.Context, id int, callerID, winnerID uuid.UUID) (sqlcdb.Game, error) {
+	game, err := s.q.GetGameByID(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	if game.CreatorID != callerID {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrNotGameCreator, "only the game creator can complete the game")
+	}
+	return s.completeGame(ctx, id, winnerID)
+}
+
+func (s *GameService) completeGame(ctx context.Context, id int, winnerID uuid.UUID) (sqlcdb.Game, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, err

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -170,14 +171,7 @@ func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObje
 
 func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameRequestObject) (api.CompleteGameResponseObject, error) {
 	userID, _ := userIDFromContext(ctx)
-	gameInfo, err := s.gameService.GetGame(ctx, req.Id)
-	if err != nil {
-		return nil, err
-	}
-	if gameInfo.CreatorID != userID {
-		return nil, apierr.New(apierr.ErrNotGameCreator, "only the game creator can complete the game")
-	}
-	game, err := s.gameService.CompleteGame(ctx, req.Id, req.Body.WinnerId)
+	game, err := s.gameService.CompleteGame(ctx, req.Id, userID, req.Body.WinnerId)
 	if err != nil {
 		return nil, err
 	}
@@ -363,84 +357,35 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	game, err := s.gameService.GetGame(ctx, int(gameID))
+	result, err := s.submissionService.Submit(ctx, int(gameID), userID, msg.Code, executor.Language(msg.Language))
 	if err != nil {
-		log.Printf("processSubmit: get game error: %v", err)
-		s.broadcastError(gameID, userID, "failed to load game")
-		return
-	}
-
-	problem, err := s.problemService.GetProblem(game.ProblemID)
-	if err != nil {
-		log.Printf("processSubmit: get problem error: %v", err)
-		s.broadcastError(gameID, userID, "failed to load problem")
-		return
-	}
-
-	if !s.executionService.TryAcquireSlot(userID) {
-		s.broadcastError(gameID, userID, "execution already in progress")
-		return
-	}
-	defer s.executionService.ReleaseSlot(userID)
-	if err := s.executionService.CheckRateLimit(userID); err != nil {
-		s.broadcastError(gameID, userID, "execution rate limit exceeded")
-		return
-	}
-
-	accepted := true
-	var failedTest *int
-	var stdout, stderr string
-
-	for i, tc := range problem.TestCases {
-		result, execErr := s.executionService.Execute(ctx, executor.ExecutionRequest{
-			Code:     msg.Code,
-			Language: executor.Language(msg.Language),
-			Stdin:    tc.Input,
-		})
-		stdout = result.Stdout
-		stderr = result.Stderr
-
-		if execErr != nil || !problems.Match(result.Stdout, tc.Expected) {
-			accepted = false
-			idx := i
-			failedTest = &idx
-			break
+		log.Printf("processSubmit: %v", err)
+		var appErr *apierr.AppError
+		if errors.As(err, &appErr) {
+			s.broadcastError(gameID, userID, appErr.Message)
+		} else {
+			s.broadcastError(gameID, userID, "internal error")
 		}
-	}
-
-	if accepted {
-		stdout, stderr = "", ""
+		return
 	}
 
 	resultMsg, _ := json.Marshal(ws.ServerMessage{
 		Type:       ws.TypeSubmissionResult,
 		UserID:     userID,
-		Accepted:   accepted,
-		Stdout:     stdout,
-		Stderr:     stderr,
-		FailedTest: failedTest,
+		Accepted:   result.Accepted,
+		Stdout:     result.Stdout,
+		Stderr:     result.Stderr,
+		FailedTest: result.FailedTest,
 	})
 	s.hub.Broadcast(gameID, resultMsg)
 
-	if !accepted {
-		return
+	if result.Accepted && result.WinnerID != uuid.Nil {
+		finMsg, _ := json.Marshal(ws.ServerMessage{
+			Type:     ws.TypeGameFinished,
+			WinnerID: result.WinnerID,
+		})
+		s.hub.Broadcast(gameID, finMsg)
 	}
-
-	completed, err := s.gameService.CompleteGame(ctx, int(gameID), userID)
-	if err != nil {
-		// another player already won — ignore
-		return
-	}
-
-	var winnerID uuid.UUID
-	if completed.WinnerID.Valid {
-		winnerID = completed.WinnerID.UUID
-	}
-	finMsg, _ := json.Marshal(ws.ServerMessage{
-		Type:     ws.TypeGameFinished,
-		WinnerID: winnerID,
-	})
-	s.hub.Broadcast(gameID, finMsg)
 }
 
 func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {
