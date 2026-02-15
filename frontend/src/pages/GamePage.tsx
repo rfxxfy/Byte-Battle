@@ -387,16 +387,16 @@ export function GamePage() {
       <div className="flex gap-4 flex-1 min-h-0">
         {/* Left: problem + participants */}
         <div className="w-2/5 flex flex-col gap-3 overflow-y-auto">
-          <div className="rounded-lg border border-border/60 bg-card/50 p-5 flex-shrink-0">
+          <div className="rounded-lg border border-border bg-card p-5 flex-shrink-0 shadow-sm">
             <h2 className="text-base font-semibold mb-3">{problem.title}</h2>
             <p className="text-xs text-muted-foreground mb-3">
               Прогресс: {game.current_problem_index + 1}/{game.problem_ids.length}
             </p>
             <div className="flex items-center gap-2 flex-wrap mb-4">
-              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted border border-border">
                 {problem.time_limit_ms} мс
               </span>
-              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted border border-border">
                 {problem.memory_limit_mb} МБ
               </span>
             </div>
@@ -405,11 +405,11 @@ export function GamePage() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-border/60 bg-card/50 p-4 flex-shrink-0">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Участники</p>
-            <div className="flex flex-col gap-1.5">
+          <div className="rounded-lg border border-border bg-card p-4 flex-shrink-0 shadow-sm">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Участники</p>
+            <div className="flex flex-col divide-y divide-border">
               {game.participants.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 text-sm">
+                <div key={p.id} className="flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0">
                   <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
                   <span className={p.id === userId ? 'text-primary font-medium' : ''}>
                     {participantLabel(p)}
@@ -461,7 +461,7 @@ export function GamePage() {
           </div>
 
           {/* Monaco editor */}
-          <div className="flex-1 rounded-lg border border-border/60 overflow-hidden min-h-0">
+          <div className="flex-1 rounded-lg border border-border overflow-hidden min-h-0 shadow-sm">
             <Editor
               height="100%"
               language={monacoLang}
@@ -491,7 +491,7 @@ export function GamePage() {
 
           {/* Run output */}
           {runOutput && (
-            <div className="flex-shrink-0 rounded-md border border-border/60 bg-muted/20 p-3 text-xs font-mono max-h-32 overflow-y-auto">
+            <div className="flex-shrink-0 rounded-md border border-border bg-muted/30 p-3 text-xs font-mono max-h-32 overflow-y-auto">
               {runOutput.stdout && (
                 <pre className="whitespace-pre-wrap">{runOutput.stdout}</pre>
               )}
