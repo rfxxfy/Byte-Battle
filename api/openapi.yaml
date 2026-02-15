@@ -524,6 +524,11 @@ components:
         test_count:
           type: integer
           description: Number of test cases
+        starter_code:
+          type: object
+          additionalProperties:
+            type: string
+          description: Starter code templates per language (python, go, javascript)
 
     ProblemResponse:
       type: object
