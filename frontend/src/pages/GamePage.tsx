@@ -8,6 +8,7 @@ import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
+import { ProblemDescription } from '@/components/ProblemDescription'
 
 const LANGUAGES = [
   { value: 'python', label: 'Python', monaco: 'python' },
@@ -400,9 +401,7 @@ export function GamePage() {
                 {problem.memory_limit_mb} МБ
               </span>
             </div>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-              {problem.description}
-            </p>
+            <ProblemDescription content={problem.description} />
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 flex-shrink-0 shadow-sm">
