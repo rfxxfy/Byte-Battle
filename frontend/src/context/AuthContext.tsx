@@ -4,6 +4,7 @@ import { me, logout as apiLogout } from '../api/auth'
 interface AuthState {
   token: string | null
   userId: string | null
+  email: string | null
   loading: boolean
 }
 
@@ -18,22 +19,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     token: localStorage.getItem('token'),
     userId: null,
+    email: null,
     loading: true,
   })
 
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
-      setState({ token: null, userId: null, loading: false })
+      setState({ token: null, userId: null, email: null, loading: false })
       return
     }
     me()
       .then((res) => {
-        setState({ token, userId: res.user_id, loading: false })
+        setState({ token, userId: res.user_id, email: res.email, loading: false })
       })
       .catch(() => {
         localStorage.removeItem('token')
-        setState({ token: null, userId: null, loading: false })
+        setState({ token: null, userId: null, email: null, loading: false })
       })
   }, [])
 
@@ -41,14 +43,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('token', token)
     setState((prev) => ({ ...prev, token, loading: true }))
     me().then((res) => {
-      setState({ token, userId: res.user_id, loading: false })
+      setState({ token, userId: res.user_id, email: res.email, loading: false })
     })
   }
 
   const logout = async () => {
     await apiLogout().catch(() => {})
     localStorage.removeItem('token')
-    setState({ token: null, userId: null, loading: false })
+    setState({ token: null, userId: null, email: null, loading: false })
   }
 
   return (

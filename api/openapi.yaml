@@ -472,10 +472,13 @@ components:
       type: object
       required:
         - user_id
+        - email
       properties:
         user_id:
           type: string
           format: uuid
+        email:
+          type: string
         name:
           type: string
           nullable: true
