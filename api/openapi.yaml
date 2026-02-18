@@ -559,7 +559,8 @@ components:
       type: object
       required:
         - id
-        - problem_id
+        - problem_ids
+        - current_problem_index
         - creator_id
         - status
         - participants
@@ -568,9 +569,17 @@ components:
       properties:
         id:
           type: integer
-        problem_id:
-          type: string
-          example: "001-two-sum"
+        problem_ids:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+          example: ["001-two-sum", "002-fizzbuzz"]
+        current_problem_index:
+          type: integer
+          minimum: 0
+          example: 0
         creator_id:
           type: string
           format: uuid
@@ -617,11 +626,15 @@ components:
     CreateGameRequest:
       type: object
       required:
-        - problem_id
+        - problem_ids
       properties:
-        problem_id:
-          type: string
-          example: "001-two-sum"
+        problem_ids:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+          example: ["001-two-sum", "002-fizzbuzz"]
 
     CompleteGameRequest:
       type: object

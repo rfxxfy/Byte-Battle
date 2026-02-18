@@ -42,7 +42,7 @@ export function GamesPage() {
 
   const [modalOpen, setModalOpen] = useState(false)
   const [problems, setProblems] = useState<Problem[]>([])
-  const [selectedProblemId, setSelectedProblemId] = useState('')
+  const [selectedProblemIds, setSelectedProblemIds] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export function GamesPage() {
       try {
         const res = await listProblems()
         setProblems(res.problems)
-        if (res.problems.length > 0) setSelectedProblemId(res.problems[0].id)
+        if (res.problems.length > 0) setSelectedProblemIds([res.problems[0].id])
       } catch (err) {
         setActionError(
           err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err),
@@ -72,11 +72,15 @@ export function GamesPage() {
   }
 
   const handleCreateGame = async () => {
-    if (!selectedProblemId) return
+    if (selectedProblemIds.length === 0) return
+    if (selectedProblemIds.length > 20) {
+      setActionError('Можно выбрать не более 20 задач')
+      return
+    }
     setCreating(true)
     setActionError('')
     try {
-      const res = await createGame(selectedProblemId)
+      const res = await createGame(selectedProblemIds)
       setModalOpen(false)
       navigate(`/games/${res.game.id}`)
     } catch (err) {
@@ -146,6 +150,16 @@ export function GamesPage() {
     )
   }
 
+  const toggleProblem = (problemId: string, checked: boolean) => {
+    setSelectedProblemIds((prev) => {
+      if (checked) {
+        if (prev.includes(problemId) || prev.length >= 20) return prev
+        return [...prev, problemId]
+      }
+      return prev.filter((id) => id !== problemId)
+    })
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
   if (error) return <p className="text-sm text-destructive">{error}</p>
 
@@ -163,7 +177,7 @@ export function GamesPage() {
           <thead>
             <tr className="border-b border-border/60 bg-muted/30">
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-16">#</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Задача</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Задачи</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-32">Статус</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-28">Участники</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-40">Дата</th>
@@ -185,7 +199,9 @@ export function GamesPage() {
                   className="border-b border-border/40 last:border-0 hover:bg-muted/10 cursor-pointer transition-colors"
                 >
                   <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{g.id}</td>
-                  <td className="px-4 py-3 text-xs font-mono">{g.problem_id}</td>
+                  <td className="px-4 py-3 text-xs font-mono">
+                    {g.current_problem_index + 1}/{g.problem_ids.length} · {g.problem_ids[g.current_problem_index] ?? '—'}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusClass[g.status]}`}
@@ -220,21 +236,32 @@ export function GamesPage() {
             <h2 className="text-lg font-semibold mb-5">Новая игра</h2>
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm text-muted-foreground">Задача</label>
+              <label className="text-sm text-muted-foreground">
+                Задачи ({selectedProblemIds.length}/20)
+              </label>
               {problems.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Загрузка задач...</p>
               ) : (
-                <select
-                  value={selectedProblemId}
-                  onChange={(e) => setSelectedProblemId(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {problems.map((p) => (
-                    <option key={p.id} value={p.id} className="bg-background">
-                      {p.title}
-                    </option>
-                  ))}
-                </select>
+                <div className="max-h-52 overflow-y-auto rounded-md border border-input px-3 py-2">
+                  <div className="flex flex-col gap-2">
+                    {problems.map((p) => {
+                      const checked = selectedProblemIds.includes(p.id)
+                      const disabled = !checked && selectedProblemIds.length >= 20
+                      return (
+                        <label key={p.id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={(e) => toggleProblem(p.id, e.target.checked)}
+                          />
+                          <span>{p.title}</span>
+                          <span className="text-xs text-muted-foreground">({p.id})</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -254,7 +281,7 @@ export function GamesPage() {
               <Button
                 className="flex-1"
                 onClick={handleCreateGame}
-                disabled={creating || !selectedProblemId}
+                disabled={creating || selectedProblemIds.length === 0}
               >
                 {creating ? 'Создаём...' : 'Создать →'}
               </Button>

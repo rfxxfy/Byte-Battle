@@ -5,6 +5,7 @@ import "github.com/google/uuid"
 const (
 	TypeSubmit           = "submit"
 	TypeSubmissionResult = "submission_result"
+	TypeRoundAdvanced    = "round_advanced"
 	TypeGameFinished     = "game_finished"
 	TypePlayerJoined     = "player_joined"
 	TypeError            = "error"
@@ -25,4 +26,6 @@ type ServerMessage struct {
 	Stderr     string    `json:"stderr,omitempty"`
 	Message    string    `json:"message,omitempty"`
 	FailedTest *int      `json:"failed_test,omitempty"`
+	ProblemID  string    `json:"problem_id,omitempty"`
+	ProblemIdx int       `json:"problem_index"`
 }
