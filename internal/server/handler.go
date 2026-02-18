@@ -416,6 +416,8 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		Stdout:     result.Stdout,
 		Stderr:     result.Stderr,
 		FailedTest: result.FailedTest,
+		Code:       msg.Code,
+		Language:   msg.Language,
 	})
 	s.hub.Broadcast(gameID, resultMsg)
 
