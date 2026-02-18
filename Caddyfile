@@ -1,3 +1,24 @@
+staging.bytebattle.online {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# API + WebSocket → Go (staging)
+	handle /api/* {
+		reverse_proxy bytebattle-staging-app:8080
+	}
+
+	# SPA static files (staging)
+	handle {
+		root * /srv/staging-frontend
+		try_files {path} /index.html
+		file_server
+	}
+}
+
 bytebattle.online {
 	header {
 		X-Content-Type-Options nosniff
