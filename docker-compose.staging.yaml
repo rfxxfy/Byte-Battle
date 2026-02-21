@@ -4,6 +4,8 @@
 #
 # Requires /opt/bytebattle-staging/.env with the same variables as production .env.
 
+name: bytebattle-staging
+
 services:
   migrate:
     image: ${IMAGE}:staging

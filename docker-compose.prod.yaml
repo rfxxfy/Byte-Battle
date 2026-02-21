@@ -4,6 +4,8 @@
 # IMAGE is set by the deploy workflow, e.g.:
 #   IMAGE=ghcr.io/owner/byte-battle
 
+name: bytebattle
+
 services:
   caddy:
     image: caddy:2.11.2-alpine
