@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/aarondl/sqlboiler/v4/boil"
 
@@ -26,9 +27,13 @@ func (r *userRepo) GetByUsername(
 	ctx context.Context,
 	username string,
 ) (*models.User, error) {
-	return models.Users(
+	user, err := models.Users(
 		models.UserWhere.Username.EQ(username),
 	).One(ctx, r.db)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return user, err
 }
 
 func (r *userRepo) Create(
