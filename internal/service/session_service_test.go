@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"bytebattle/internal/database"
 	"bytebattle/internal/database/mocks"
 	"bytebattle/internal/database/models"
 
@@ -113,7 +114,7 @@ func (s *SessionServiceTestSuite) TestGetSession_Success() {
 func (s *SessionServiceTestSuite) TestGetSession_NotFound() {
 	sessionID := 999
 
-	s.mockRepo.On("GetByID", s.ctx, sessionID).Return(nil, sql.ErrNoRows)
+	s.mockRepo.On("GetByID", s.ctx, sessionID).Return(nil, database.ErrNotFound)
 
 	session, err := s.service.GetSession(s.ctx, sessionID)
 
@@ -153,7 +154,7 @@ func (s *SessionServiceTestSuite) TestValidateToken_EmptyToken() {
 func (s *SessionServiceTestSuite) TestValidateToken_NotFound() {
 	token := "invalid-token"
 
-	s.mockRepo.On("GetByToken", s.ctx, token).Return(nil, sql.ErrNoRows)
+	s.mockRepo.On("GetByToken", s.ctx, token).Return(nil, database.ErrNotFound)
 
 	session, err := s.service.ValidateToken(s.ctx, token)
 
@@ -233,7 +234,7 @@ func (s *SessionServiceTestSuite) TestRefreshSession_Success() {
 func (s *SessionServiceTestSuite) TestRefreshSession_NotFound() {
 	sessionID := 999
 
-	s.mockRepo.On("GetByID", s.ctx, sessionID).Return(nil, sql.ErrNoRows)
+	s.mockRepo.On("GetByID", s.ctx, sessionID).Return(nil, database.ErrNotFound)
 
 	session, err := s.service.RefreshSession(s.ctx, sessionID)
 
@@ -265,7 +266,7 @@ func (s *SessionServiceTestSuite) TestRefreshSessionByToken_Success() {
 func (s *SessionServiceTestSuite) TestRefreshSessionByToken_NotFound() {
 	token := "invalid-token"
 
-	s.mockRepo.On("GetByToken", s.ctx, token).Return(nil, sql.ErrNoRows)
+	s.mockRepo.On("GetByToken", s.ctx, token).Return(nil, database.ErrNotFound)
 
 	session, err := s.service.RefreshSessionByToken(s.ctx, token)
 
@@ -289,7 +290,7 @@ func (s *SessionServiceTestSuite) TestEndSession_Success() {
 func (s *SessionServiceTestSuite) TestEndSession_NotFound() {
 	sessionID := 999
 
-	s.mockRepo.On("Delete", s.ctx, sessionID).Return(sql.ErrNoRows)
+	s.mockRepo.On("Delete", s.ctx, sessionID).Return(database.ErrNotFound)
 
 	err := s.service.EndSession(s.ctx, sessionID)
 
@@ -312,7 +313,7 @@ func (s *SessionServiceTestSuite) TestEndSessionByToken_Success() {
 func (s *SessionServiceTestSuite) TestEndSessionByToken_NotFound() {
 	token := "invalid-token"
 
-	s.mockRepo.On("DeleteByToken", s.ctx, token).Return(sql.ErrNoRows)
+	s.mockRepo.On("DeleteByToken", s.ctx, token).Return(database.ErrNotFound)
 
 	err := s.service.EndSessionByToken(s.ctx, token)
 
