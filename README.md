@@ -19,134 +19,91 @@ Byte-Battle — это не просто кодинг, а азартные и п
 - Создать систему рейтинга пользователей.
 - Сделать удобный и простой интерфейс.
 
-## Задачи проекта Byte-Battle:
-
-- Разработать серверную часть с автоматической проверкой решений.
-- Реализовать фронтенд для дуэлей и соло-режима.
-- Сделать систему регистрации, профилей и рейтинга.
-- Настроить хранение и выборку задач.
-- Обеспечить быстрый матчмейкинг для дуэлей.
-- Внедрить таймеры и учёт времени прохождения.
-- Организовать логику начисления очков и отображения результатов.
-
 ## Начало работы
-
-Эти инструкции помогут вам запустить копию проекта на вашей локальной машине.
 
 ### Предварительные требования
 
-- Go 1.16 или выше
+- Go 1.25 или выше
 - Git
-- PostgreSQL 12 или выше
+- Docker и Docker Compose
 
 ### Установка
 
 1. Клонируйте репозиторий:
    ```bash
    git clone <repository-url>
-   cd bytebattle
+   cd Byte-Battle
    ```
-2. Инициализировать репозиторий с зависимостями
 
-```
-make init
-make tidy
-```
+2. Создайте файлы конфигурации из примеров:
+   ```bash
+   cp .env.example .env
+   cp sqlboiler.toml.example sqlboiler.toml
+   ```
 
-3. Установить colima + Docker (для того чтобы поднять базу)
+3. Поднимите базу данных и примените миграции:
+   ```bash
+   docker compose up -d --wait
+   make migrate-up
+   ```
 
-TODO: дописать инструкцию для того чтобы это делать на Linux
+4. Сгенерируйте модели и запустите сервер:
+   ```bash
+   make generate
+   make run
+   ```
 
-```
-brew install colima docker docker-compose
-```
+5. Проверьте, что сервер работает:
+   ```bash
+   curl http://localhost:8080/
+   ```
 
-Поднять движок колимы чтобы база стартанула без докера десктопа
-
-```
-colima start
-```
-
-и поднять саму базу
-
-```
-docker-compose up -d
-```
-
-4. Накатить модели которые генерируются Boil'ом
-
-А также нужно перед этим установить `sqlboiler` в PATH.
-
-Как это должно быть:
-
-```
-turbomuza@MacBook-Pro-Muzaffar Byte-Battle % sqlboiler --version
-SQLBoiler v4.19.7
-```
-
-```
-make generate
-```
-
-5. Запустить сервер
-
-```
-make build
-make run
-```
-
-6. Попробовать пострелять в запущенный сервер
-
-```
-curl -X GET localhost:8080/internal/hello_world
-```
-
-## Конечные точки API
-
-- `GET /` - Приветственное сообщение
-- `GET /internal/hello_world` - JSON ответ Hello World с интеграцией базы данных
-- `POST /migrate` - Запуск миграций базы данных (доступно через командную строку)
-
-## Конфигурация базы данных
-
-Приложение использует PostgreSQL в качестве базы данных. Чтобы настроить подключение к базе данных, создайте файл `.env`
-в корневой директории со следующими переменными:
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=bytebattle
-DB_PASSWORD=bytebattle
-DB_NAME=bytebattle
-```
-
-## Конфигурация SQLBoiler
-
-Для генерации моделей SQLBoiler требуется файл конфигурации `sqlboiler.toml`.
-Скопируйте пример файла:
+## Команды Makefile
 
 ```bash
-cp sqlboiler.toml.example sqlboiler.toml
+make run                        # Запустить сервер
+make build                      # Собрать бинарник
+make generate                   # Сгенерировать модели SQLBoiler
+make clean-models               # Удалить сгенерированные модели
+make test                       # Запустить тесты
+make migrate-up                 # Применить все миграции
+make migrate-down               # Откатить последнюю миграцию
+make migrate-down-all           # Откатить все миграции
+make migrate-drop               # Удалить все таблицы
+make migrate-version            # Текущая версия миграции
+make migrate-create NAME=...    # Создать новую миграцию
+make migrate-force VERSION=...  # Принудительно задать версию миграции
 ```
 
-Затем обновите `sqlboiler.toml` своими учетными данными базы данных.
-Этот файл не должен быть закоммичен в репозиторий, так как содержит чувствительную информацию.
+## Структура проекта
 
-## Схема базы данных
+```
+cmd/bytebattle/          # Точка входа приложения
+internal/
+  config/                # Конфигурация (env-переменные)
+  database/              # Репозитории и подключение к БД
+    models/              # Сгенерированные модели SQLBoiler (в .gitignore)
+  server/                # HTTP-сервер, роуты, хендлеры
+  service/               # Бизнес-логика
+migrations/              # SQL-миграции (golang-migrate)
+scripts/                 # Вспомогательные скрипты
+.env.example             # Пример переменных окружения
+sqlboiler.toml.example   # Пример конфига SQLBoiler
+```
 
-Приложение использует следующие таблицы базы данных:
+## Конфигурация
 
-- `users`: Хранит информацию о пользователях (id, username, email, password_hash, rating, created_at, updated_at)
-- `problems`: Содержит задачи по программированию (id, title, description, difficulty, time_limit, memory_limit,
-  created_at, updated_at)
-- `duels`: Отслеживает дуэли между пользователями (id, player1_id, player2_id, problem_id, winner_id, status,
-  started_at, completed_at, created_at, updated_at)
-- `solutions`: Хранит отправленные решения (id, user_id, problem_id, duel_id, code, language, status, execution_time,
-  memory_used, created_at, updated_at)
+Приложение настраивается через переменные окружения.
+Все доступные переменные и их значения по умолчанию описаны в `.env.example`.
+
+`sqlboiler.toml` используется для генерации моделей — формат описан в `sqlboiler.toml.example`.
+
+Оба файла (`.env`, `sqlboiler.toml`) содержат креды и **не должны коммититься** в репозиторий.
 
 ## Built With
 
 - [Go](https://golang.org/) - Programming language
 - [Echo](https://echo.labstack.com/) - Web framework
 - [PostgreSQL](https://www.postgresql.org/) - Database
-- [SQLBoiler](https://github.com/volatiletech/sqlboiler) - ORM
+- [SQLBoiler](https://github.com/aarondl/sqlboiler) - ORM
+- [golang-migrate](https://github.com/golang-migrate/migrate) - Database migrations
