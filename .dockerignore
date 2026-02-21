@@ -1,0 +1,12 @@
+# Tracked files not needed in Docker image
+.github/
+scripts/
+*.md
+Makefile
+docker-compose*.yaml
+
+# Gitignored but relevant if building locally
+.git/
+.idea/
+.env
+bin/
