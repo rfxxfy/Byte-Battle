@@ -21,6 +21,23 @@ linters:
 
     - gocognit
 
+  exclusions:
+    paths:
+      - internal/database/models
+    rules:
+      - path: _test\.go
+        linters:
+          - gocognit
+      # weak random is fine for non-security purposes
+      - linters: [gosec]
+        text: "G404"
+      # http server without timeout is acceptable in this context
+      - linters: [gosec]
+        text: "G114"
+      # directory/file permission checks
+      - linters: [gosec]
+        text: "G30[1246]"
+
   settings:
     errcheck:
       exclude-functions:
@@ -38,20 +55,3 @@ linters:
       min-complexity: 20
 
     misspell: {}
-
-issues:
-  exclude-dirs:
-    - internal/database/models
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gocognit
-    # weak random is fine for non-security purposes
-    - linters: [gosec]
-      text: "G404"
-    # http server without timeout is acceptable in this context
-    - linters: [gosec]
-      text: "G114"
-    # directory/file permission checks
-    - linters: [gosec]
-      text: "G30[1246]"
