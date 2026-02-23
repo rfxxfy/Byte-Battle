@@ -15,6 +15,14 @@ type CreateDuelRequest struct {
 	ProblemID int   `json:"problem_id"`
 }
 
+type CompleteDuelRequest struct {
+	WinnerID int `json:"winner_id"`
+}
+
+type CreateSessionRequest struct {
+	UserID int `json:"user_id"`
+}
+
 func jsonError(c echo.Context, code int, err error) error {
 	return c.JSON(code, echo.Map{"error": err.Error()})
 }
@@ -125,12 +133,18 @@ func (s *HTTPServer) handleCompleteDuel(c echo.Context) error {
 		return jsonErrorMsg(c, http.StatusBadRequest, "invalid duel id")
 	}
 
-	winnerID, err := strconv.Atoi(c.FormValue("winner_id"))
-	if err != nil {
+	var req CompleteDuelRequest
+	if err := c.Bind(&req); err != nil {
+		return jsonErrorMsg(c, http.StatusBadRequest, "invalid request body")
+	}
+	if req.WinnerID == 0 {
+		return jsonErrorMsg(c, http.StatusBadRequest, "winner_id is required")
+	}
+	if req.WinnerID < 0 {
 		return jsonErrorMsg(c, http.StatusBadRequest, "invalid winner_id")
 	}
 
-	duel, err := s.duelService.CompleteDuel(c.Request().Context(), id, winnerID)
+	duel, err := s.duelService.CompleteDuel(c.Request().Context(), id, req.WinnerID)
 	if err != nil {
 		if errors.Is(err, service.ErrDuelNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
@@ -183,12 +197,18 @@ func (s *HTTPServer) handleDeleteDuel(c echo.Context) error {
 }
 
 func (s *HTTPServer) handleCreateSession(c echo.Context) error {
-	userID, err := strconv.Atoi(c.FormValue("user_id"))
-	if err != nil {
+	var req CreateSessionRequest
+	if err := c.Bind(&req); err != nil {
+		return jsonErrorMsg(c, http.StatusBadRequest, "invalid request body")
+	}
+	if req.UserID == 0 {
+		return jsonErrorMsg(c, http.StatusBadRequest, "user_id is required")
+	}
+	if req.UserID < 0 {
 		return jsonErrorMsg(c, http.StatusBadRequest, "invalid user_id")
 	}
 
-	session, err := s.sessionService.CreateSession(c.Request().Context(), userID)
+	session, err := s.sessionService.CreateSession(c.Request().Context(), req.UserID)
 	if err != nil {
 		return jsonError(c, http.StatusInternalServerError, err)
 	}

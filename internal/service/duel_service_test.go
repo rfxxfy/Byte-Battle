@@ -215,8 +215,8 @@ func TestStartDuel_SqlNoRows_ReturnsErrDuelNotFound(t *testing.T) {
 
 func TestDeleteDuel_SqlNoRows_ReturnsErrDuelNotFound(t *testing.T) {
 	mock := &mockDuelRepo{
-		getByIDFunc: func(ctx context.Context, id int) (*models.Duel, error) {
-			return nil, database.ErrNotFound
+		deleteFunc: func(ctx context.Context, id int) error {
+			return database.ErrNotFound
 		},
 	}
 
