@@ -65,6 +65,7 @@ make run                        # Запустить сервер
 make build                      # Собрать бинарник
 make generate                   # Сгенерировать модели SQLBoiler
 make clean-models               # Удалить сгенерированные модели
+make lint                       # Запустить линтер
 make test                       # Запустить тесты
 make migrate-up                 # Применить все миграции
 make migrate-down               # Откатить последнюю миграцию

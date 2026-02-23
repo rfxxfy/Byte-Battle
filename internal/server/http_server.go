@@ -18,7 +18,7 @@ type HTTPServer struct {
 func NewHTTPServer(users *service.UserService, duelService *service.DuelService, sessionService *service.SessionService) *HTTPServer {
 	e := echo.New()
 
-	e.Use(middleware.Logger())
+	e.Use(middleware.RequestLogger())
 	e.Use(middleware.Recover())
 
 	s := &HTTPServer{
