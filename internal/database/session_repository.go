@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	"bytebattle/internal/database/models"
@@ -61,13 +62,21 @@ func (r *sessionRepo) Create(ctx context.Context, userID int, expiresAt time.Tim
 }
 
 func (r *sessionRepo) GetByID(ctx context.Context, id int) (*models.Session, error) {
-	return models.FindSession(ctx, r.db, id)
+	session, err := models.FindSession(ctx, r.db, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return session, err
 }
 
 func (r *sessionRepo) GetByToken(ctx context.Context, token string) (*models.Session, error) {
-	return models.Sessions(
+	session, err := models.Sessions(
 		models.SessionWhere.Token.EQ(token),
 	).One(ctx, r.db)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return session, err
 }
 
 func (r *sessionRepo) GetByUserID(ctx context.Context, userID int) (models.SessionSlice, error) {
@@ -86,6 +95,9 @@ func (r *sessionRepo) Update(ctx context.Context, session *models.Session) error
 func (r *sessionRepo) Delete(ctx context.Context, id int) error {
 	session, err := models.FindSession(ctx, r.db, id)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
 		return err
 	}
 

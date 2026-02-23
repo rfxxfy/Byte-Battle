@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -57,7 +56,7 @@ func (s *SessionService) CreateSessionWithDuration(ctx context.Context, userID i
 func (s *SessionService) GetSession(ctx context.Context, id int) (*models.Session, error) {
 	session, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrSessionNotFound
 		}
 		return nil, err
@@ -73,7 +72,7 @@ func (s *SessionService) ValidateToken(ctx context.Context, token string) (*mode
 
 	session, err := s.repo.GetByToken(ctx, token)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrSessionNotFound
 		}
 		return nil, err
@@ -93,7 +92,7 @@ func (s *SessionService) GetUserSessions(ctx context.Context, userID int) (model
 func (s *SessionService) RefreshSession(ctx context.Context, id int) (*models.Session, error) {
 	session, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrSessionNotFound
 		}
 		return nil, err
@@ -111,7 +110,7 @@ func (s *SessionService) RefreshSession(ctx context.Context, id int) (*models.Se
 func (s *SessionService) RefreshSessionByToken(ctx context.Context, token string) (*models.Session, error) {
 	session, err := s.repo.GetByToken(ctx, token)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrSessionNotFound
 		}
 		return nil, err
@@ -129,7 +128,7 @@ func (s *SessionService) RefreshSessionByToken(ctx context.Context, token string
 func (s *SessionService) EndSession(ctx context.Context, id int) error {
 	err := s.repo.Delete(ctx, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, database.ErrNotFound) {
 			return ErrSessionNotFound
 		}
 		return err
@@ -140,7 +139,7 @@ func (s *SessionService) EndSession(ctx context.Context, id int) error {
 func (s *SessionService) EndSessionByToken(ctx context.Context, token string) error {
 	err := s.repo.DeleteByToken(ctx, token)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, database.ErrNotFound) {
 			return ErrSessionNotFound
 		}
 		return err
