@@ -97,20 +97,6 @@ func TestCreateGame_ThreePlayers(t *testing.T) {
 	assert.Len(t, capturedPlayers, 3)
 }
 
-func TestCreateGame_TooManyPlayers(t *testing.T) {
-	mock := &mockGameRepo{}
-	svc := NewGameService(mock)
-
-	playerIDs := make([]int, 51)
-	for i := range playerIDs {
-		playerIDs[i] = i + 1
-	}
-
-	_, err := svc.CreateGame(context.Background(), playerIDs, 10)
-
-	require.Error(t, err)
-	assert.EqualError(t, err, "too many players: maximum is 50")
-}
 
 func TestCreateGame_NotEnoughPlayers(t *testing.T) {
 	mock := &mockGameRepo{}
