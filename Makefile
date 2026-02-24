@@ -98,7 +98,7 @@ test-prepare: check-db-env
 
 test: test-prepare
 	@echo "Running tests..."
-	@go test -v ./cmd/... ./internal/config/... ./internal/server/... ./internal/service/...
+	@go test -v ./cmd/... ./internal/config/... ./internal/server/... ./internal/service/... ./internal/database
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Lint
