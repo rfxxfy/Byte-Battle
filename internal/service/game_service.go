@@ -3,12 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"time"
 
 	"bytebattle/internal/database"
 	"bytebattle/internal/database/models"
-
-	"github.com/aarondl/null/v8"
 )
 
 var (
@@ -50,19 +47,12 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 	return s.repo.Create(ctx, players, problemID)
 }
 
-func (s *GameService) getGame(ctx context.Context, id int) (*models.Game, error) {
-	game, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return nil, ErrGameNotFound
-		}
-		return nil, err
-	}
-	return game, nil
-}
-
 func (s *GameService) GetGame(ctx context.Context, id int) (*models.Game, error) {
-	return s.getGame(ctx, id)
+	game, err := s.repo.GetByID(ctx, id)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil, ErrGameNotFound
+	}
+	return game, err
 }
 
 func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.GameSlice, int64, error) {
@@ -90,76 +80,48 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.
 }
 
 func (s *GameService) StartGame(ctx context.Context, id int) (*models.Game, error) {
-	game, err := s.getGame(ctx, id)
+	game, err := s.repo.StartGame(ctx, id)
 	if err != nil {
+		switch {
+		case errors.Is(err, database.ErrNotFound):
+			return nil, ErrGameNotFound
+		case errors.Is(err, database.ErrGameNotPending):
+			return nil, ErrGameAlreadyStarted
+		}
 		return nil, err
 	}
-
-	if game.Status != database.GameStatusPending {
-		return nil, ErrGameAlreadyStarted
-	}
-
-	game.Status = database.GameStatusActive
-	game.StartedAt = null.TimeFrom(time.Now())
-
-	err = s.repo.Upsert(ctx, game)
-	if err != nil {
-		return nil, err
-	}
-
 	return game, nil
 }
 
 func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (*models.Game, error) {
-	game, err := s.getGame(ctx, id)
+	game, err := s.repo.CompleteGame(ctx, id, winnerID)
 	if err != nil {
+		switch {
+		case errors.Is(err, database.ErrNotFound):
+			return nil, ErrGameNotFound
+		case errors.Is(err, database.ErrGameNotActive):
+			return nil, ErrGameNotInProgress
+		case errors.Is(err, database.ErrNotParticipant):
+			return nil, ErrInvalidWinner
+		}
 		return nil, err
 	}
-
-	if game.Status != database.GameStatusActive {
-		return nil, ErrGameNotInProgress
-	}
-
-	ok, err := s.repo.IsParticipant(ctx, id, winnerID)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, ErrInvalidWinner
-	}
-
-	game.Status = database.GameStatusFinished
-	game.WinnerID = null.IntFrom(winnerID)
-	game.CompletedAt = null.TimeFrom(time.Now())
-
-	err = s.repo.Upsert(ctx, game)
-	if err != nil {
-		return nil, err
-	}
-
 	return game, nil
 }
 
 func (s *GameService) CancelGame(ctx context.Context, id int) (*models.Game, error) {
-	game, err := s.getGame(ctx, id)
+	game, err := s.repo.CancelGame(ctx, id)
 	if err != nil {
+		switch {
+		case errors.Is(err, database.ErrNotFound):
+			return nil, ErrGameNotFound
+		case errors.Is(err, database.ErrGameFinished):
+			return nil, ErrCannotCancelFinished
+		case errors.Is(err, database.ErrGameAlreadyCancelled):
+			return nil, ErrGameAlreadyCancelled
+		}
 		return nil, err
 	}
-
-	if game.Status == database.GameStatusFinished {
-		return nil, ErrCannotCancelFinished
-	}
-	if game.Status == database.GameStatusCancelled {
-		return nil, ErrGameAlreadyCancelled
-	}
-
-	game.Status = database.GameStatusCancelled
-
-	err = s.repo.Upsert(ctx, game)
-	if err != nil {
-		return nil, err
-	}
-
 	return game, nil
 }
 
