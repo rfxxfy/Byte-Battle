@@ -4,14 +4,14 @@ func (s *HTTPServer) registerRoutes() {
 	s.echo.GET("/", s.handleRoot)
 	s.echo.GET("/internal/hello_world", s.handleHello)
 
-	// Duel routes
-	s.echo.POST("/duels", s.handleCreateDuel)
-	s.echo.GET("/duels/:id", s.handleGetDuel)
-	s.echo.GET("/duels", s.handleListDuels)
-	s.echo.POST("/duels/:id/start", s.handleStartDuel)
-	s.echo.POST("/duels/:id/complete", s.handleCompleteDuel)
-	s.echo.POST("/duels/:id/cancel", s.handleCancelDuel)
-	s.echo.DELETE("/duels/:id", s.handleDeleteDuel)
+	// Game routes
+	s.echo.POST("/games", s.handleCreateGame)
+	s.echo.GET("/games/:id", s.handleGetGame)
+	s.echo.GET("/games", s.handleListGames)
+	s.echo.POST("/games/:id/start", s.handleStartGame)
+	s.echo.POST("/games/:id/complete", s.handleCompleteGame)
+	s.echo.POST("/games/:id/cancel", s.handleCancelGame)
+	s.echo.DELETE("/games/:id", s.handleDeleteGame)
 
 	// Session routes
 	s.echo.POST("/sessions", s.handleCreateSession)
