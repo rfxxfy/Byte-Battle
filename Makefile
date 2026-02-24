@@ -51,6 +51,18 @@ check-db-env:
 ifndef DB_HOST
 	$(error DB_HOST is not set. Create .env from .env.example or export env vars)
 endif
+ifndef DB_PORT
+	$(error DB_PORT is not set)
+endif
+ifndef DB_USER
+	$(error DB_USER is not set)
+endif
+ifndef DB_PASSWORD
+	$(error DB_PASSWORD is not set)
+endif
+ifndef DB_NAME
+	$(error DB_NAME is not set)
+endif
 
 migrate-tools:
 	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
