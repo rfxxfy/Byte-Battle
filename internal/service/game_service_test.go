@@ -32,7 +32,7 @@ func (m *mockGameRepo) GetByID(ctx context.Context, id int) (*models.Game, error
 	if m.getByIDFunc != nil {
 		return m.getByIDFunc(ctx, id)
 	}
-	return &models.Game{ID: id, Status: string(database.GameStatusPending)}, nil
+	return &models.Game{ID: id, Status: database.GameStatusPending}, nil
 }
 
 func (m *mockGameRepo) GetAll(ctx context.Context, limit, offset int) (models.GameSlice, error) {
@@ -69,7 +69,7 @@ func TestCreateGame_Success(t *testing.T) {
 			return &models.Game{
 				ID:        1,
 				ProblemID: problemID,
-				Status:    string(database.GameStatusPending),
+				Status:    database.GameStatusPending,
 			}, nil
 		},
 	}
@@ -278,7 +278,7 @@ func TestListGames_ValidLimit(t *testing.T) {
 func TestStartGame_Success(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusPending)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
 		},
 		upsertFunc: func(ctx context.Context, game *models.Game) error {
 			return nil
@@ -289,13 +289,13 @@ func TestStartGame_Success(t *testing.T) {
 	game, err := svc.StartGame(context.Background(), 1)
 
 	require.NoError(t, err)
-	assert.Equal(t, string(database.GameStatusActive), game.Status)
+	assert.Equal(t, database.GameStatusActive, game.Status)
 }
 
 func TestStartGame_AlreadyActive(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusActive)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
 		},
 	}
 
@@ -308,7 +308,7 @@ func TestStartGame_AlreadyActive(t *testing.T) {
 func TestStartGame_AlreadyFinished(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusFinished)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusFinished}, nil
 		},
 	}
 
@@ -334,7 +334,7 @@ func TestStartGame_NotFound(t *testing.T) {
 func TestStartGame_UpsertError(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusPending)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
 		},
 		upsertFunc: func(ctx context.Context, game *models.Game) error {
 			return errors.New("upsert error")
@@ -350,7 +350,7 @@ func TestStartGame_UpsertError(t *testing.T) {
 func TestCompleteGame_Success(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusActive)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
 		},
 		isParticipantFunc: func(ctx context.Context, gameID, userID int) (bool, error) {
 			return userID == 1 || userID == 2, nil
@@ -364,7 +364,7 @@ func TestCompleteGame_Success(t *testing.T) {
 	game, err := svc.CompleteGame(context.Background(), 1, 1)
 
 	require.NoError(t, err)
-	assert.Equal(t, string(database.GameStatusFinished), game.Status)
+	assert.Equal(t, database.GameStatusFinished, game.Status)
 	assert.True(t, game.WinnerID.Valid)
 	assert.Equal(t, 1, game.WinnerID.Int)
 }
@@ -372,7 +372,7 @@ func TestCompleteGame_Success(t *testing.T) {
 func TestCompleteGame_SecondPlayerWins(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusActive)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
 		},
 		isParticipantFunc: func(ctx context.Context, gameID, userID int) (bool, error) {
 			return userID == 1 || userID == 2, nil
@@ -393,7 +393,7 @@ func TestCompleteGame_SecondPlayerWins(t *testing.T) {
 func TestCompleteGame_InvalidWinner(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusActive)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
 		},
 		isParticipantFunc: func(ctx context.Context, gameID, userID int) (bool, error) {
 			return false, nil
@@ -410,7 +410,7 @@ func TestCompleteGame_InvalidWinner(t *testing.T) {
 func TestCompleteGame_NotInProgress(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusPending)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
 		},
 	}
 
@@ -423,7 +423,7 @@ func TestCompleteGame_NotInProgress(t *testing.T) {
 func TestCancelGame_Success(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusPending)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusPending}, nil
 		},
 		upsertFunc: func(ctx context.Context, game *models.Game) error {
 			return nil
@@ -434,13 +434,13 @@ func TestCancelGame_Success(t *testing.T) {
 	game, err := svc.CancelGame(context.Background(), 1)
 
 	require.NoError(t, err)
-	assert.Equal(t, string(database.GameStatusCancelled), game.Status)
+	assert.Equal(t, database.GameStatusCancelled, game.Status)
 }
 
 func TestCancelGame_ActiveGame(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusActive)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusActive}, nil
 		},
 		upsertFunc: func(ctx context.Context, game *models.Game) error {
 			return nil
@@ -451,13 +451,13 @@ func TestCancelGame_ActiveGame(t *testing.T) {
 	game, err := svc.CancelGame(context.Background(), 1)
 
 	require.NoError(t, err)
-	assert.Equal(t, string(database.GameStatusCancelled), game.Status)
+	assert.Equal(t, database.GameStatusCancelled, game.Status)
 }
 
 func TestCancelGame_AlreadyFinished(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusFinished)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusFinished}, nil
 		},
 	}
 
@@ -470,7 +470,7 @@ func TestCancelGame_AlreadyFinished(t *testing.T) {
 func TestCancelGame_AlreadyCancelled(t *testing.T) {
 	mock := &mockGameRepo{
 		getByIDFunc: func(ctx context.Context, id int) (*models.Game, error) {
-			return &models.Game{ID: id, Status: string(database.GameStatusCancelled)}, nil
+			return &models.Game{ID: id, Status: database.GameStatusCancelled}, nil
 		},
 	}
 

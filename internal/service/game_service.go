@@ -85,11 +85,11 @@ func (s *GameService) StartGame(ctx context.Context, id int) (*models.Game, erro
 		return nil, err
 	}
 
-	if game.Status != string(database.GameStatusPending) {
+	if game.Status != database.GameStatusPending {
 		return nil, ErrGameAlreadyStarted
 	}
 
-	game.Status = string(database.GameStatusActive)
+	game.Status = database.GameStatusActive
 	game.StartedAt = null.TimeFrom(time.Now())
 
 	err = s.repo.Upsert(ctx, game)
@@ -106,7 +106,7 @@ func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (*mode
 		return nil, err
 	}
 
-	if game.Status != string(database.GameStatusActive) {
+	if game.Status != database.GameStatusActive {
 		return nil, ErrGameNotInProgress
 	}
 
@@ -118,7 +118,7 @@ func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (*mode
 		return nil, ErrInvalidWinner
 	}
 
-	game.Status = string(database.GameStatusFinished)
+	game.Status = database.GameStatusFinished
 	game.WinnerID = null.IntFrom(winnerID)
 	game.CompletedAt = null.TimeFrom(time.Now())
 
@@ -136,14 +136,14 @@ func (s *GameService) CancelGame(ctx context.Context, id int) (*models.Game, err
 		return nil, err
 	}
 
-	if game.Status == string(database.GameStatusFinished) {
+	if game.Status == database.GameStatusFinished {
 		return nil, ErrCannotCancelFinished
 	}
-	if game.Status == string(database.GameStatusCancelled) {
+	if game.Status == database.GameStatusCancelled {
 		return nil, ErrGameAlreadyCancelled
 	}
 
-	game.Status = string(database.GameStatusCancelled)
+	game.Status = database.GameStatusCancelled
 
 	err = s.repo.Upsert(ctx, game)
 	if err != nil {

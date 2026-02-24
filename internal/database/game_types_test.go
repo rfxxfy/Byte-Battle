@@ -9,7 +9,7 @@ import (
 
 func TestGameStatus_Constants(t *testing.T) {
 	tests := []struct {
-		status   GameStatus
+		status   string
 		expected string
 	}{
 		{GameStatusPending, "pending"},
@@ -20,7 +20,7 @@ func TestGameStatus_Constants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			assert.Equal(t, tt.expected, string(tt.status))
+			assert.Equal(t, tt.expected, tt.status)
 		})
 	}
 }

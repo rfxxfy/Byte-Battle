@@ -11,13 +11,11 @@ import (
 	"github.com/aarondl/sqlboiler/v4/queries/qm"
 )
 
-type GameStatus string
-
 const (
-	GameStatusPending   GameStatus = "pending"
-	GameStatusActive    GameStatus = "active"
-	GameStatusFinished  GameStatus = "finished"
-	GameStatusCancelled GameStatus = "cancelled"
+	GameStatusPending   = "pending"
+	GameStatusActive    = "active"
+	GameStatusFinished  = "finished"
+	GameStatusCancelled = "cancelled"
 )
 
 type Player struct {
@@ -50,7 +48,7 @@ func (r *gameRepo) Create(ctx context.Context, players []Player, problemID int) 
 
 	game := &models.Game{
 		ProblemID: problemID,
-		Status:    string(GameStatusPending),
+		Status:    GameStatusPending,
 	}
 
 	err = game.Insert(ctx, tx, boil.Infer())
