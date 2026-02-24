@@ -28,6 +28,4 @@ type ServerMessage struct {
 	FailedTest *int      `json:"failed_test,omitempty"`
 	ProblemID  string    `json:"problem_id,omitempty"`
 	ProblemIdx int       `json:"problem_index"`
-	Code       string    `json:"code,omitempty"`
-	Language   string    `json:"language,omitempty"`
 }

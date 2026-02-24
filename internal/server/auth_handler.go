@@ -41,7 +41,7 @@ func (s *HTTPServer) GetAuthMe(ctx context.Context, _ api.GetAuthMeRequestObject
 	if err != nil {
 		return nil, apierr.New(apierr.ErrInternal, "internal server error")
 	}
-	resp := api.GetAuthMe200JSONResponse{UserId: userID, Email: user.Email}
+	resp := api.GetAuthMe200JSONResponse{UserId: userID}
 	if user.Name.Valid {
 		resp.Name = &user.Name.String
 	}
