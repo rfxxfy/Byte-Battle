@@ -30,7 +30,7 @@ generate: tools
 	@echo "Generating sqlboiler models..."
 	@rm -rf internal/database/models
 	@mkdir -p internal/database/models
-	@PATH="$(GOBIN):$$PATH" $(SQLBOILER) psql --output internal/database/models
+	@PATH="$(GOBIN):$$PATH" $(SQLBOILER) psql --output internal/database/models --no-tests
 
 clean-models:
 	rm -rf internal/database/models
@@ -110,7 +110,7 @@ test-prepare: check-db-env
 
 test: test-prepare
 	@echo "Running tests..."
-	@go test -v ./cmd/... ./internal/config/... ./internal/server/... ./internal/service/... ./internal/database
+	@go test -v ./...
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Lint
