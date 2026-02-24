@@ -168,7 +168,8 @@ func (s *HTTPServer) handleCancelGame(c echo.Context) error {
 		if errors.Is(err, service.ErrGameNotFound) {
 			return jsonError(c, http.StatusNotFound, err)
 		}
-		if errors.Is(err, service.ErrCannotCancelFinished) {
+		if errors.Is(err, service.ErrCannotCancelFinished) ||
+			errors.Is(err, service.ErrGameAlreadyCancelled) {
 			return jsonError(c, http.StatusBadRequest, err)
 		}
 		return jsonError(c, http.StatusInternalServerError, err)

@@ -11,6 +11,8 @@ import (
 	"github.com/aarondl/null/v8"
 )
 
+const maxPlayers = 50
+
 var (
 	ErrNotEnoughPlayers     = errors.New("at least two players are required")
 	ErrTooManyPlayers       = errors.New("too many players: maximum is 50")
@@ -20,6 +22,7 @@ var (
 	ErrGameNotInProgress    = errors.New("game is not in progress")
 	ErrInvalidWinner        = errors.New("winner must be one of the players")
 	ErrCannotCancelFinished = errors.New("cannot cancel finished game")
+	ErrGameAlreadyCancelled = errors.New("game is already cancelled")
 )
 
 type GameService struct {
@@ -34,7 +37,7 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 	if len(playerIDs) < 2 {
 		return nil, ErrNotEnoughPlayers
 	}
-	if len(playerIDs) > 50 {
+	if len(playerIDs) > maxPlayers {
 		return nil, ErrTooManyPlayers
 	}
 
@@ -75,6 +78,9 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.
 	}
 	if limit > 100 {
 		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
 	}
 
 	return s.repo.GetAll(ctx, limit, offset)
@@ -137,9 +143,11 @@ func (s *GameService) CancelGame(ctx context.Context, id int) (*models.Game, err
 		return nil, err
 	}
 
-	if game.Status == string(database.GameStatusFinished) ||
-		game.Status == string(database.GameStatusCancelled) {
+	if game.Status == string(database.GameStatusFinished) {
 		return nil, ErrCannotCancelFinished
+	}
+	if game.Status == string(database.GameStatusCancelled) {
+		return nil, ErrGameAlreadyCancelled
 	}
 
 	game.Status = string(database.GameStatusCancelled)

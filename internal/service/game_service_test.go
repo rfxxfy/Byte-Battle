@@ -491,7 +491,7 @@ func TestCancelGame_AlreadyCancelled(t *testing.T) {
 	svc := NewGameService(mock)
 	_, err := svc.CancelGame(context.Background(), 1)
 
-	require.ErrorIs(t, err, ErrCannotCancelFinished)
+	require.ErrorIs(t, err, ErrGameAlreadyCancelled)
 }
 
 func TestDeleteGame_Success(t *testing.T) {
