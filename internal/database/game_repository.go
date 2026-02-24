@@ -26,6 +26,7 @@ type IGameRepo interface {
 	Create(ctx context.Context, players []Player, problemID int) (*models.Game, error)
 	GetByID(ctx context.Context, id int) (*models.Game, error)
 	GetAll(ctx context.Context, limit, offset int) (models.GameSlice, error)
+	Count(ctx context.Context) (int64, error)
 	Upsert(ctx context.Context, game *models.Game) error
 	Delete(ctx context.Context, id int) error
 	IsParticipant(ctx context.Context, gameID, userID int) (bool, error)
@@ -84,6 +85,10 @@ func (r *gameRepo) GetAll(ctx context.Context, limit, offset int) (models.GameSl
 		qm.Offset(offset),
 		qm.OrderBy("created_at DESC"),
 	).All(ctx, r.db)
+}
+
+func (r *gameRepo) Count(ctx context.Context) (int64, error) {
+	return models.Games().Count(ctx, r.db)
 }
 
 func (r *gameRepo) Upsert(ctx context.Context, game *models.Game) error {

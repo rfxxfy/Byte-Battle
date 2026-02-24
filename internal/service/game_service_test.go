@@ -15,7 +15,8 @@ import (
 type mockGameRepo struct {
 	createFunc        func(ctx context.Context, players []database.Player, problemID int) (*models.Game, error)
 	getByIDFunc       func(ctx context.Context, id int) (*models.Game, error)
-	getAllFunc        func(ctx context.Context, limit, offset int) (models.GameSlice, error)
+	getAllFunc         func(ctx context.Context, limit, offset int) (models.GameSlice, error)
+	countFunc         func(ctx context.Context) (int64, error)
 	upsertFunc        func(ctx context.Context, game *models.Game) error
 	deleteFunc        func(ctx context.Context, id int) error
 	isParticipantFunc func(ctx context.Context, gameID, userID int) (bool, error)
@@ -40,6 +41,13 @@ func (m *mockGameRepo) GetAll(ctx context.Context, limit, offset int) (models.Ga
 		return m.getAllFunc(ctx, limit, offset)
 	}
 	return models.GameSlice{}, nil
+}
+
+func (m *mockGameRepo) Count(ctx context.Context) (int64, error) {
+	if m.countFunc != nil {
+		return m.countFunc(ctx)
+	}
+	return 0, nil
 }
 
 func (m *mockGameRepo) Upsert(ctx context.Context, game *models.Game) error {
@@ -225,7 +233,7 @@ func TestListGames_DefaultLimit(t *testing.T) {
 	}
 
 	svc := NewGameService(mock)
-	_, _ = svc.ListGames(context.Background(), 0, 0)
+	_, _, _ = svc.ListGames(context.Background(), 0, 0)
 
 	assert.Equal(t, 10, capturedLimit)
 }
@@ -240,7 +248,7 @@ func TestListGames_NegativeLimit(t *testing.T) {
 	}
 
 	svc := NewGameService(mock)
-	_, _ = svc.ListGames(context.Background(), -5, 0)
+	_, _, _ = svc.ListGames(context.Background(), -5, 0)
 
 	assert.Equal(t, 10, capturedLimit)
 }
@@ -255,7 +263,7 @@ func TestListGames_MaxLimit(t *testing.T) {
 	}
 
 	svc := NewGameService(mock)
-	_, _ = svc.ListGames(context.Background(), 500, 0)
+	_, _, _ = svc.ListGames(context.Background(), 500, 0)
 
 	assert.Equal(t, 100, capturedLimit)
 }
@@ -270,7 +278,7 @@ func TestListGames_ValidLimit(t *testing.T) {
 	}
 
 	svc := NewGameService(mock)
-	_, _ = svc.ListGames(context.Background(), 50, 0)
+	_, _, _ = svc.ListGames(context.Background(), 50, 0)
 
 	assert.Equal(t, 50, capturedLimit)
 }
