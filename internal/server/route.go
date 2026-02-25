@@ -22,4 +22,7 @@ func (s *HTTPServer) registerRoutes() {
 	s.echo.GET("/users/:user_id/sessions", s.handleGetUserSessions)
 	s.echo.DELETE("/users/:user_id/sessions", s.handleEndAllUserSessions)
 	s.echo.POST("/sessions/cleanup", s.handleCleanupExpiredSessions)
+
+	// Execution routes
+	s.echo.POST("/execute", s.handleExecute)
 }
