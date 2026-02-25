@@ -61,3 +61,14 @@ linters:
       min-complexity: 20
 
     misspell: {}
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - bytebattle
+  exclusions:
+    paths:
+      - internal/database/models

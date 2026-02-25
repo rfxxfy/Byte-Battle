@@ -1,8 +1,9 @@
 package server
 
 import (
-	"bytebattle/internal/service"
 	"context"
+
+	"bytebattle/internal/service"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
