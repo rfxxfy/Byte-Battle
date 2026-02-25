@@ -74,7 +74,7 @@ jobs:
 
       - name: Run tests
         run: |
-          go test -v -json ./cmd/... ./internal/config/... ./internal/server/... ./internal/service/... 2>test-stderr.log | tee test-output.json | go-junit-report -set-exit-code > report.xml
+          go test -v -json ./... 2>test-stderr.log | tee test-output.json | go-junit-report -set-exit-code > report.xml
 
       - name: Upload test report
         if: always()
