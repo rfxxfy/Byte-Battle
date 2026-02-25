@@ -4,6 +4,15 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deploy target'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
 
 env:
   REGISTRY: ghcr.io
@@ -12,7 +21,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ inputs.target == 'staging' && 'staging' || 'production' }}
     permissions:
       contents: read
       packages: write
@@ -20,6 +29,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Set deployment config
+        run: |
+          TARGET="${{ inputs.target || 'production' }}"
+          if [ "$TARGET" = "staging" ]; then
+            echo "DEPLOY_DIR=/opt/bytebattle-staging" >> $GITHUB_ENV
+            echo "COMPOSE_FILE=docker-compose.staging.yaml" >> $GITHUB_ENV
+            echo "IMAGE_TAG=staging" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_DIR=/opt/bytebattle" >> $GITHUB_ENV
+            echo "COMPOSE_FILE=docker-compose.prod.yaml" >> $GITHUB_ENV
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+          fi
 
       # ─── Build & push Docker image ──────────────────────────────────────
       - name: Log in to Docker Hub
@@ -47,7 +69,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_LC }}:latest
+            ${{ env.IMAGE_LC }}:${{ env.IMAGE_TAG }}
             ${{ env.IMAGE_LC }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -64,14 +86,23 @@ jobs:
         run: cd frontend && npm ci && npm run build
 
       # ─── Deploy to VPS ─────────────────────────────────────────────────
-      - name: Copy files to server
+      - name: Copy compose and Caddyfile to prod dir
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.prod.yaml,Caddyfile,frontend/dist"
+          source: "docker-compose.prod.yaml,docker-compose.staging.yaml,Caddyfile"
           target: /opt/bytebattle/
+
+      - name: Copy frontend to target dir
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "frontend/dist"
+          target: ${{ env.DEPLOY_DIR }}/
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
@@ -80,17 +111,19 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/bytebattle
-
             # Login to GitHub Container Registry
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Update image reference in .env
             IMAGE=${{ env.IMAGE_LC }}
-            sed -i "s|^IMAGE=.*|IMAGE=${IMAGE}|" .env || echo "IMAGE=${IMAGE}" >> .env
 
-            # Pull new images
-            docker compose -f docker-compose.prod.yaml pull app caddy
+            # Update image in target .env
+            sed -i "s|^IMAGE=.*|IMAGE=${IMAGE}|" ${{ env.DEPLOY_DIR }}/.env \
+              || echo "IMAGE=${IMAGE}" >> ${{ env.DEPLOY_DIR }}/.env
 
-            # Run migrations and restart all services
-            docker compose -f docker-compose.prod.yaml up -d
+            # Pull new image and restart stack
+            docker compose -f /opt/bytebattle/${{ env.COMPOSE_FILE }} pull app
+            docker compose -f /opt/bytebattle/${{ env.COMPOSE_FILE }} up -d
+
+            # Reload Caddy to pick up any Caddyfile changes
+            docker compose -f /opt/bytebattle/docker-compose.prod.yaml exec -T caddy \
+              caddy reload --config /etc/caddy/Caddyfile 2>/dev/null || true

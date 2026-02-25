@@ -1,63 +1,47 @@
-# Production compose — used on VPS
-# Requires .env with IMAGE, DB_*, HTTP_PORT variables
+# Staging stack — runs on the same VPS alongside production.
+# Requires a shared Docker network to exist (created once on the VPS):
+#   docker network create bytebattle-shared
 #
-# IMAGE is set by the deploy workflow, e.g.:
-#   IMAGE=ghcr.io/owner/byte-battle
+# Requires /opt/bytebattle-staging/.env with the same variables as production .env.
 
-name: bytebattle
+name: bytebattle-staging
 
 services:
-  caddy:
-    image: caddy:2.11.2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./frontend/dist:/srv/frontend:ro
-      - /opt/bytebattle-staging/frontend/dist:/srv/staging-frontend:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - default
-      - shared
-    depends_on:
-      app:
-        condition: service_healthy
-
   migrate:
-    image: ${IMAGE}:latest
+    image: ${IMAGE}:staging
     entrypoint: ["/usr/local/bin/migrate"]
-    command: ["-path", "/app/migrations", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable", "up"]
+    command: ["-path", "/app/migrations", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@staging-postgres:5432/${DB_NAME}?sslmode=disable", "up"]
     restart: "no"
     depends_on:
-      postgres:
+      staging-postgres:
         condition: service_healthy
 
   app:
-    image: ${IMAGE}:latest
-    container_name: bytebattle-app
+    image: ${IMAGE}:staging
+    container_name: bytebattle-staging-app
     restart: unless-stopped
     user: "${DEPLOY_UID}"
     depends_on:
-      postgres:
+      staging-postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
     environment:
-      DB_DSN: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable
+      DB_DSN: postgres://${DB_USER}:${DB_PASSWORD}@staging-postgres:5432/${DB_NAME}?sslmode=disable
       HTTP_PORT: "8080"
       PROBLEMS_DIR: /app/problems
-      ALLOWED_ORIGINS: https://bytebattle.online
+      ALLOWED_ORIGINS: https://staging.bytebattle.online
       HTTP_RATE_PER_MINUTE: ${HTTP_RATE_PER_MINUTE:-100}
     volumes:
-      - ./problems:/app/problems:ro
+      - /opt/bytebattle/problems:/app/problems:ro
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
+    networks:
+      - default
+      - shared
     deploy:
       resources:
         limits:
@@ -70,16 +54,16 @@ services:
       start_period: 15s
       retries: 3
 
-  postgres:
+  staging-postgres:
     image: postgres:18
-    container_name: bytebattle-postgres
+    container_name: bytebattle-staging-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - staging_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
@@ -96,6 +80,4 @@ networks:
     name: bytebattle-shared
 
 volumes:
-  postgres_data:
-  caddy_data:
-  caddy_config:
+  staging_postgres_data:
