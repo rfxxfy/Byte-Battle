@@ -296,7 +296,7 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 
 func toAPIProblem(p *problems.Problem) api.Problem {
 	testCount := len(p.TestCases)
-	return api.Problem{
+	result := api.Problem{
 		Id:            p.ID,
 		Title:         p.Meta.Title,
 		Description:   p.Meta.Description,
@@ -304,8 +304,11 @@ func toAPIProblem(p *problems.Problem) api.Problem {
 		TimeLimitMs:   p.Meta.TimeLimitMs,
 		MemoryLimitMb: p.Meta.MemoryLimitMb,
 		TestCount:     &testCount,
-		StarterCode:   &p.Meta.StarterCode,
 	}
+	if len(p.Meta.StarterCode) > 0 {
+		result.StarterCode = &p.Meta.StarterCode
+	}
+	return result
 }
 
 func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
@@ -416,8 +419,6 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		Stdout:     result.Stdout,
 		Stderr:     result.Stderr,
 		FailedTest: result.FailedTest,
-		Code:       msg.Code,
-		Language:   msg.Language,
 	})
 	s.hub.Broadcast(gameID, resultMsg)
 
@@ -425,6 +426,8 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		finMsg, _ := json.Marshal(ws.ServerMessage{
 			Type:     ws.TypeGameFinished,
 			WinnerID: result.WinnerID,
+			Code:     msg.Code,
+			Language: msg.Language,
 		})
 		s.hub.Broadcast(gameID, finMsg)
 		return
