@@ -1,31 +1,34 @@
 package server
 
 import (
-	"bytebattle/internal/service"
 	"context"
+
+	"bytebattle/internal/service"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
 type HTTPServer struct {
-	echo           *echo.Echo
-	users          *service.UserService
-	gameService    *service.GameService
-	sessionService *service.SessionService
+	echo             *echo.Echo
+	users            *service.UserService
+	gameService      *service.GameService
+	sessionService   *service.SessionService
+	executionService *service.ExecutionService
 }
 
-func NewHTTPServer(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService) *HTTPServer {
+func NewHTTPServer(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService, executionService *service.ExecutionService) *HTTPServer {
 	e := echo.New()
 
 	e.Use(middleware.RequestLogger())
 	e.Use(middleware.Recover())
 
 	s := &HTTPServer{
-		echo:           e,
-		users:          users,
-		gameService:    gameService,
-		sessionService: sessionService,
+		echo:             e,
+		users:            users,
+		gameService:      gameService,
+		sessionService:   sessionService,
+		executionService: executionService,
 	}
 
 	s.registerRoutes()

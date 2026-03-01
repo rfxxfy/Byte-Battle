@@ -16,7 +16,7 @@ import (
 type mockGameRepo struct {
 	createFunc       func(ctx context.Context, players []database.Player, problemID int) (*models.Game, error)
 	getByIDFunc      func(ctx context.Context, id int) (*models.Game, error)
-	getAllFunc        func(ctx context.Context, limit, offset int) (models.GameSlice, error)
+	getAllFunc       func(ctx context.Context, limit, offset int) (models.GameSlice, error)
 	countFunc        func(ctx context.Context) (int64, error)
 	startGameFunc    func(ctx context.Context, id int) (*models.Game, error)
 	completeGameFunc func(ctx context.Context, id, winnerID int) (*models.Game, error)

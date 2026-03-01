@@ -58,6 +58,17 @@ linters:
         - hugeParam
 
     gocognit:
-      min-complexity: 20
+      min-complexity: 15
 
     misspell: {}
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - bytebattle
+  exclusions:
+    paths:
+      - internal/database/models
