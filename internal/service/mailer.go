@@ -76,15 +76,10 @@ func NewMailer(apiKey, fromEmail string) Mailer {
 }
 
 func renderVerificationEmailHTML(code string) (string, error) {
-	digits := make([]string, len(code))
-	for i, c := range code {
-		digits[i] = string(c)
-	}
 	var b bytes.Buffer
 	if err := verificationEmailTemplate.Execute(&b, struct {
-		Code   string
-		Digits []string
-	}{Code: code, Digits: digits}); err != nil {
+		Code string
+	}{Code: code}); err != nil {
 		return "", err
 	}
 	return b.String(), nil
