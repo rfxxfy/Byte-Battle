@@ -8,21 +8,23 @@ import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { ProblemDescription } from '@/components/ProblemDescription'
 
 const LANGUAGES = [
   { value: 'python', label: 'Python', monaco: 'python' },
   { value: 'go', label: 'Go', monaco: 'go' },
+  { value: 'cpp', label: 'C++', monaco: 'cpp' },
   { value: 'javascript', label: 'JavaScript', monaco: 'javascript' },
 ] as const
 
 type LangValue = (typeof LANGUAGES)[number]['value']
 
 const DEFAULT_CODE: Record<LangValue, string> = {
-  python: '# Введи решение здесь\n',
+  python: '\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\t\n}\n',
-  javascript: '// Введи решение здесь\n',
+  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n\t\n\treturn 0;\n}\n',
+  javascript: '\n',
 }
 
 const starterCode = (problem: Problem | null, lang: LangValue): string =>
@@ -465,7 +467,9 @@ export function GamePage() {
               disabled={isFinished}
             >
               <SelectTrigger size="sm">
-                <SelectValue />
+                <span className="flex flex-1 text-left text-sm">
+                  {LANGUAGES.find((l) => l.value === editorLanguage)?.label}
+                </span>
               </SelectTrigger>
               <SelectContent>
                 {LANGUAGES.map((l) => (
