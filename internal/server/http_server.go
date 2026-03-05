@@ -72,6 +72,7 @@ type HTTPServer struct {
 	submissionService *service.SubmissionService
 	hub               *ws.Hub
 	entrance          service.EntranceService
+	scores            *scoreTracker
 }
 
 func New(
@@ -95,6 +96,7 @@ func New(
 		submissionService: submissionService,
 		hub:               hub,
 		entrance:          entrance,
+		scores:            newScoreTracker(),
 	}
 
 	origins := allowedOrigins()
