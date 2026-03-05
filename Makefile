@@ -4,36 +4,32 @@ MODULE_NAME := bytebattle
 -include .env
 export
 
-.PHONY: tidy
+OAPI_CODEGEN := $(shell go env GOPATH)/bin/oapi-codegen
+MIGRATE_VERSION := v4.19.1
+
+GOBIN := $(shell go env GOPATH)/bin
+
+.PHONY: tidy tools generate clean
 
 tidy:
 	go mod tidy
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SQLBoiler
+# Code generation
 # ─────────────────────────────────────────────────────────────────────────────
 
-MIGRATE_VERSION := v4.19.1
-SQLBOILER_VERSION := v4.19.7
-
-GOBIN := $(shell go env GOPATH)/bin
-SQLBOILER := $(GOBIN)/sqlboiler
-SQLBOILER_PSQL := $(GOBIN)/sqlboiler-psql
-
-.PHONY: tools generate clean-models
-
+# Install codegen tools
 tools:
-	@test -f $(SQLBOILER) || go install github.com/aarondl/sqlboiler/v4@$(SQLBOILER_VERSION)
-	@test -f $(SQLBOILER_PSQL) || go install github.com/aarondl/sqlboiler/v4/drivers/sqlboiler-psql@$(SQLBOILER_VERSION)
+	go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 
-generate: tools
-	@echo "Generating sqlboiler models..."
-	@rm -rf internal/database/models
-	@mkdir -p internal/database/models
-	@PATH="$(GOBIN):$$PATH" $(SQLBOILER) psql --output internal/database/models --no-tests
+# Generate API types and server interface from openapi.yaml
+generate:
+	mkdir -p internal/api
+	cd api && $(OAPI_CODEGEN) -config oapi-codegen.yaml openapi.yaml
 
-clean-models:
-	rm -rf internal/database/models
+# Remove generated files and binaries
+clean:
+	rm -rf internal/api/ bin/
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Migrations (golang-migrate)

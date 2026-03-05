@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"bytebattle/internal/app"
 	"bytebattle/internal/config"
 	"bytebattle/internal/database"
-	"bytebattle/internal/server"
-	"bytebattle/internal/service"
 )
 
 func main() {
@@ -17,21 +21,30 @@ func main() {
 	if err != nil {
 		log.Fatalf("db error: %v", err)
 	}
+	defer db.Close()
 
-	userRepo := database.NewUserRepository(db)
-	userService := service.NewUserService(userRepo)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
-	gameRepo := database.NewGameRepository(db)
-	gameService := service.NewGameService(gameRepo)
-
-	sessionRepo := database.NewSessionRepository(db)
-	sessionService := service.NewSessionService(sessionRepo)
-
-	srv := server.NewHTTPServer(userService, gameService, sessionService)
-
-	addr := httpCfg.Address()
-	log.Printf("Server started on %s", addr)
-	if err := srv.Run(addr); err != nil {
-		log.Fatalf("server error: %v", err)
+	srv := &http.Server{
+		Addr:              httpCfg.Address(),
+		Handler:           app.NewRouter(db),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
+
+	go func() {
+		log.Printf("Server started on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown error: %v", err)
+	}
+	log.Printf("Server shut down")
 }
