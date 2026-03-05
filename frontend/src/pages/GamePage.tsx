@@ -88,6 +88,7 @@ export function GamePage() {
   const [submitting, setSubmitting] = useState(false)
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
   const [winner, setWinner] = useState<GameFinished | null>(null)
+  const [roundTransition, setRoundTransition] = useState<{ from: number; to: number } | null>(null)
   const [playerSolutions, setPlayerSolutions] = useState<Record<string, { code: string; language: LangValue }>>({})
   const [viewingUserId, setViewingUserId] = useState<string | null>(null)
 
@@ -155,6 +156,7 @@ export function GamePage() {
             setSubmissionResult(msg)
             setSubmitting(false)
           } else if (msg.type === 'round_advanced') {
+            setRoundTransition({ from: msg.problem_index - 1, to: msg.problem_index })
             setGame((prev) => {
               if (!prev) return prev
               return {
@@ -174,8 +176,10 @@ export function GamePage() {
                 try { localStorage.removeItem(storageKey) } catch {}
                 setCodePerLang(fresh)
                 setSubmissionResult(null)
+                setTimeout(() => setRoundTransition(null), 1800)
               })
               .catch(() => {
+                setRoundTransition(null)
                 setActionError('Не удалось загрузить следующую задачу')
               })
           } else if (msg.type === 'game_finished') {
@@ -604,6 +608,23 @@ export function GamePage() {
           )}
         </div>
       </div>
+
+      {/* Round transition overlay */}
+      {roundTransition !== null && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/90 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-5 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xl font-semibold">Задача {roundTransition.from + 1} решена!</p>
+              <p className="text-sm text-muted-foreground">Переходим к задаче {roundTransition.to + 1}...</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Winner modal */}
       {winner && (
