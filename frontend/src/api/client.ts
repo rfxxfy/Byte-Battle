@@ -30,7 +30,7 @@ export async function apiFetch<T>(
 
   if (res.status === 401) {
     localStorage.removeItem('token')
-    window.location.href = '/login'
+    window.dispatchEvent(new Event('unauthorized'))
     throw new ApiError('UNAUTHORIZED', 'Unauthorized', 401)
   }
 
