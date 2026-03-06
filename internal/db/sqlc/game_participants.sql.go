@@ -27,6 +27,25 @@ func (q *Queries) AddGameParticipant(ctx context.Context, arg AddGameParticipant
 	return err
 }
 
+const advanceParticipantProblem = `-- name: AdvanceParticipantProblem :one
+UPDATE game_participants
+SET current_problem_index = current_problem_index + 1
+WHERE game_id = $1 AND user_id = $2
+RETURNING current_problem_index
+`
+
+type AdvanceParticipantProblemParams struct {
+	GameID int32     `json:"game_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) AdvanceParticipantProblem(ctx context.Context, arg AdvanceParticipantProblemParams) (int32, error) {
+	row := q.db.QueryRow(ctx, advanceParticipantProblem, arg.GameID, arg.UserID)
+	var current_problem_index int32
+	err := row.Scan(&current_problem_index)
+	return current_problem_index, err
+}
+
 const countGameParticipants = `-- name: CountGameParticipants :one
 SELECT count(*) FROM game_participants WHERE game_id = $1
 `
@@ -36,6 +55,53 @@ func (q *Queries) CountGameParticipants(ctx context.Context, gameID int32) (int6
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const getAllParticipantsProblemIndices = `-- name: GetAllParticipantsProblemIndices :many
+SELECT user_id, current_problem_index FROM game_participants
+WHERE game_id = $1
+`
+
+type GetAllParticipantsProblemIndicesRow struct {
+	UserID              uuid.UUID `json:"user_id"`
+	CurrentProblemIndex int32     `json:"current_problem_index"`
+}
+
+func (q *Queries) GetAllParticipantsProblemIndices(ctx context.Context, gameID int32) ([]GetAllParticipantsProblemIndicesRow, error) {
+	rows, err := q.db.Query(ctx, getAllParticipantsProblemIndices, gameID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllParticipantsProblemIndicesRow{}
+	for rows.Next() {
+		var i GetAllParticipantsProblemIndicesRow
+		if err := rows.Scan(&i.UserID, &i.CurrentProblemIndex); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getParticipantProblemIndex = `-- name: GetParticipantProblemIndex :one
+SELECT current_problem_index FROM game_participants
+WHERE game_id = $1 AND user_id = $2
+`
+
+type GetParticipantProblemIndexParams struct {
+	GameID int32     `json:"game_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetParticipantProblemIndex(ctx context.Context, arg GetParticipantProblemIndexParams) (int32, error) {
+	row := q.db.QueryRow(ctx, getParticipantProblemIndex, arg.GameID, arg.UserID)
+	var current_problem_index int32
+	err := row.Scan(&current_problem_index)
+	return current_problem_index, err
 }
 
 const getParticipants = `-- name: GetParticipants :many

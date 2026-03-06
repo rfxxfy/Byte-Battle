@@ -37,7 +37,7 @@ func httpRatePerMinute() int {
 func allowedOrigins() []string {
 	v := os.Getenv("ALLOWED_ORIGINS")
 	if v == "" {
-		return nil // dev mode — allow all
+		return nil // dev mode, allow all
 	}
 	return strings.Split(v, ",")
 }
@@ -72,7 +72,6 @@ type HTTPServer struct {
 	submissionService *service.SubmissionService
 	hub               *ws.Hub
 	entrance          service.EntranceService
-	scores            *scoreTracker
 }
 
 func New(
@@ -96,7 +95,6 @@ func New(
 		submissionService: submissionService,
 		hub:               hub,
 		entrance:          entrance,
-		scores:            newScoreTracker(),
 	}
 
 	origins := allowedOrigins()
@@ -120,7 +118,6 @@ func New(
 
 	r.Get("/health", s.handleHealth)
 	r.Get("/", s.handleRoot)
-	r.Get("/internal/hello_world", s.handleHello)
 	r.Get("/api/games/{id}/ws", s.handleGameWS)
 
 	strictOpts := api.StrictHTTPServerOptions{

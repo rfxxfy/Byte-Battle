@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
@@ -278,14 +279,56 @@ func (s *GameService) CompleteGameAsWinner(ctx context.Context, id int, winnerID
 	return s.completeGame(ctx, id, winnerID)
 }
 
-func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, userID uuid.UUID, expectedProblemIndex int32) (sqlcdb.Game, bool, error) {
+// HandleAcceptedSubmission advances the player's individual problem index.
+// If the player has now solved all problems they win the game.
+// Returns (game, finished, error). finished=true means this player won.
+func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, bool, error) {
+	// 1. Advance this player's problem index atomically.
+	newIdx, err := s.q.AdvanceParticipantProblem(ctx, sqlcdb.AdvanceParticipantProblemParams{
+		GameID: int32(id),
+		UserID: userID,
+	})
+	if err != nil {
+		return sqlcdb.Game{}, false, fmt.Errorf("advance participant problem: %w", err)
+	}
+
+	// 2. Check total problems.
+	totalProblems, err := s.q.CountGameProblems(ctx, int32(id))
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	// 3. Not finished yet — return early.
+	if int64(newIdx) < totalProblems {
+		game, err := s.q.GetGameByID(ctx, int32(id))
+		return game, false, err
+	}
+
+	// 4. Player solved all problems — try to claim the win inside a transaction.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, false, err
 	}
 	defer tx.Rollback(ctx)
 
-	game, finished, err := s.handleAcceptedSubmissionTx(ctx, tx, int32(id), userID, expectedProblemIndex)
+	qtx := s.q.WithTx(tx)
+	game, err := qtx.GetGameForUpdate(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, false, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	// Another player may have already finished.
+	if game.Status != gameStatusActive {
+		return game, false, apierr.New(apierr.ErrRoundAlreadyAdvanced, "game already finished")
+	}
+
+	updated, err := qtx.CompleteGame(ctx, sqlcdb.CompleteGameParams{
+		ID:       game.ID,
+		WinnerID: uuid.NullUUID{UUID: userID, Valid: true},
+	})
 	if err != nil {
 		return sqlcdb.Game{}, false, err
 	}
@@ -294,99 +337,30 @@ func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, user
 		return sqlcdb.Game{}, false, err
 	}
 
-	return game, finished, nil
+	return updated, true, nil
 }
 
-func (s *GameService) handleAcceptedSubmissionTx(
-	ctx context.Context,
-	tx pgx.Tx,
-	id int32,
-	userID uuid.UUID,
-	expectedProblemIndex int32,
-) (sqlcdb.Game, bool, error) {
-	qtx := s.q.WithTx(tx)
-
-	game, err := qtx.GetGameForUpdate(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlcdb.Game{}, false, apierr.New(apierr.ErrGameNotFound, "game not found")
-	}
-	if err != nil {
-		return sqlcdb.Game{}, false, err
-	}
-
-	totalProblems, err := validateAcceptedSubmissionState(ctx, qtx, game, userID)
-	if err != nil {
-		return sqlcdb.Game{}, false, err
-	}
-	if err := validateAcceptedSubmissionRound(game.CurrentProblemIndex, expectedProblemIndex); err != nil {
-		return sqlcdb.Game{}, false, err
-	}
-
-	return finishOrAdvanceAfterAcceptedSubmit(ctx, qtx, game, userID, totalProblems)
-}
-
-func validateAcceptedSubmissionRound(currentProblemIndex, expectedProblemIndex int32) error {
-	if currentProblemIndex != expectedProblemIndex {
-		return apierr.New(apierr.ErrRoundAlreadyAdvanced, "round already advanced")
-	}
-	return nil
-}
-
-func validateAcceptedSubmissionState(ctx context.Context, qtx *sqlcdb.Queries, game sqlcdb.Game, userID uuid.UUID) (int64, error) {
-	if game.Status != gameStatusActive {
-		return 0, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
-	}
-
-	ok, err := qtx.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
-		GameID: game.ID,
+func (s *GameService) GetParticipantProblemIndex(ctx context.Context, gameID int, userID uuid.UUID) (int32, error) {
+	idx, err := s.q.GetParticipantProblemIndex(ctx, sqlcdb.GetParticipantProblemIndexParams{
+		GameID: int32(gameID),
 		UserID: userID,
 	})
-	if err != nil {
-		return 0, err
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, apierr.New(apierr.ErrNotParticipant, "not a participant")
 	}
-	if !ok {
-		return 0, apierr.New(apierr.ErrInvalidWinner, "winner must be one of the players")
-	}
-
-	totalProblems, err := qtx.CountGameProblems(ctx, game.ID)
-	if err != nil {
-		return 0, err
-	}
-	if totalProblems == 0 {
-		return 0, apierr.New(apierr.ErrValidation, "game has no problems")
-	}
-
-	return totalProblems, nil
+	return idx, err
 }
 
-func finishOrAdvanceAfterAcceptedSubmit(
-	ctx context.Context,
-	qtx *sqlcdb.Queries,
-	game sqlcdb.Game,
-	userID uuid.UUID,
-	totalProblems int64,
-) (sqlcdb.Game, bool, error) {
-	if int64(game.CurrentProblemIndex) >= totalProblems-1 {
-		updated, err := qtx.CompleteGame(ctx, sqlcdb.CompleteGameParams{
-			ID:       game.ID,
-			WinnerID: uuid.NullUUID{UUID: userID, Valid: true},
-		})
-		if err != nil {
-			return sqlcdb.Game{}, false, err
-		}
-		return updated, true, nil
-	}
-
-	nextIndex := game.CurrentProblemIndex + 1
-	updated, err := qtx.AdvanceGameProblem(ctx, sqlcdb.AdvanceGameProblemParams{
-		ID:                  game.ID,
-		CurrentProblemIndex: nextIndex,
-	})
+func (s *GameService) GetAllParticipantsProblemIndices(ctx context.Context, gameID int) (map[string]int32, error) {
+	rows, err := s.q.GetAllParticipantsProblemIndices(ctx, int32(gameID))
 	if err != nil {
-		return sqlcdb.Game{}, false, err
+		return nil, err
 	}
-
-	return updated, false, nil
+	result := make(map[string]int32, len(rows))
+	for _, r := range rows {
+		result[r.UserID.String()] = r.CurrentProblemIndex
+	}
+	return result, nil
 }
 
 func (s *GameService) CompleteGame(ctx context.Context, id int, callerID, winnerID uuid.UUID) (sqlcdb.Game, error) {
