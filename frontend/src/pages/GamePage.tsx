@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 const LANGUAGES = [
   { value: 'python', label: 'Python', monaco: 'python' },
   { value: 'go', label: 'Go', monaco: 'go' },
-  { value: 'javascript', label: 'JavaScript', monaco: 'javascript' },
+  { value: 'java', label: 'Java', monaco: 'java' },
 ] as const
 
 type LangValue = (typeof LANGUAGES)[number]['value']
@@ -20,7 +20,7 @@ type LangValue = (typeof LANGUAGES)[number]['value']
 const DEFAULT_CODE: Record<LangValue, string> = {
   python: '# Введи решение здесь\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\t\n}\n',
-  javascript: '// Введи решение здесь\n',
+  java: 'public class Main {\n    public static void main(String[] args) {\n        \n    }\n}\n',
 }
 
 interface SubmissionResult {
