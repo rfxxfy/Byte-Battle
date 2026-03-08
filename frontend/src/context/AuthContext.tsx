@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { me, logout as apiLogout } from '../api/auth'
+import { ApiError } from '../api/client'
 
 interface AuthState {
   token: string | null
@@ -34,20 +35,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     me()
       .then((res) => {
-        setState({ token, userId: res.user_id, email: res.email, name: res.name ?? null, loading: false })
+        setState((prev) => ({ ...prev, token, userId: res.user_id, name: res.name ?? null, loading: false }))
       })
-      .catch(() => {
-        localStorage.removeItem('token')
+      .catch((err) => {
+        if (err instanceof ApiError) {
+          localStorage.removeItem('token')
+        }
         setState({ token: null, userId: null, email: null, name: null, loading: false })
       })
+  }, [])
+
+  useEffect(() => {
+    const handler = () => {
+      localStorage.removeItem('token')
+      setState({ token: null, userId: null, email: null, name: null, loading: false })
+    }
+    window.addEventListener('unauthorized', handler)
+    return () => window.removeEventListener('unauthorized', handler)
   }, [])
 
   const login = (token: string, _expiresAt: string) => {
     localStorage.setItem('token', token)
     setState((prev) => ({ ...prev, token, loading: true }))
-    me().then((res) => {
-      setState({ token, userId: res.user_id, email: res.email, name: res.name ?? null, loading: false })
-    })
+    me()
+      .then((res) => {
+        setState((prev) => ({ ...prev, token, userId: res.user_id, name: res.name ?? null, loading: false }))
+      })
+      .catch(() => {
+        setState((prev) => ({ ...prev, loading: false }))
+      })
   }
 
   const logout = async () => {

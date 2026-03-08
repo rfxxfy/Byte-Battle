@@ -15,6 +15,7 @@ type LangSettings struct {
 	SourceFile  string   `json:"source_file"`
 	CompileCmd  []string `json:"compile_cmd,omitempty"`
 	RunCmd      []string `json:"run_cmd"`
+	WarmupCmd   string   `json:"warmup_cmd,omitempty"`
 	MemoryLimit int64    `json:"memory_limit"`
 	TimeLimit   int64    `json:"time_limit"`
 }
@@ -37,29 +38,35 @@ func DefaultConfig() *Config {
 	return &Config{
 		Languages: map[Language]LangSettings{
 			"python": {
-				Image:      "python:3.14-slim",
-				SourceFile: "main.py",
-				RunCmd:     []string{"python", "main.py"},
+				Image:       "python:3.14-slim",
+				SourceFile:  "main.py",
+				RunCmd:      []string{"python", "main.py"},
+				MemoryLimit: 256 * 1024 * 1024,
+				TimeLimit:   10,
 			},
 			"go": {
 				Image:       "golang:1.26-alpine",
 				SourceFile:  "main.go",
-				CompileCmd:  []string{"go", "build", "-o", "solution", "main.go"},
-				RunCmd:      []string{"./solution"},
+				RunCmd:      []string{"go", "run", "main.go"},
+				WarmupCmd:   `printf 'package main\nimport ("fmt";"bufio";"os";"sort";"strconv";"strings";"math")\nfunc main(){fmt.Sprint();bufio.NewReader(os.Stdin);sort.Ints(nil);strconv.Itoa(0);strings.Contains("","");math.Abs(0)}\n' > /tmp/w.go && go run /tmp/w.go && rm /tmp/w.go`,
 				MemoryLimit: 512 * 1024 * 1024,
 				TimeLimit:   30,
 			},
 			"cpp": {
-				Image:      "gcc:15",
-				SourceFile: "main.cpp",
-				CompileCmd: []string{"g++", "-O2", "-o", "solution", "main.cpp"},
-				RunCmd:     []string{"./solution"},
+				Image:       "gcc:15",
+				SourceFile:  "main.cpp",
+				CompileCmd:  []string{"g++", "-O2", "-o", "solution", "main.cpp"},
+				RunCmd:      []string{"./solution"},
+				MemoryLimit: 512 * 1024 * 1024,
+				TimeLimit:   30,
 			},
 			"java": {
-				Image:      "eclipse-temurin:21-jdk-alpine",
-				SourceFile: "Main.java",
-				CompileCmd: []string{"javac", "Main.java"},
-				RunCmd:     []string{"java", "Main"},
+				Image:       "eclipse-temurin:21-jdk-alpine",
+				SourceFile:  "Main.java",
+				CompileCmd:  []string{"javac", "Main.java"},
+				RunCmd:      []string{"java", "Main"},
+				MemoryLimit: 512 * 1024 * 1024,
+				TimeLimit:   30,
 			},
 		},
 	}

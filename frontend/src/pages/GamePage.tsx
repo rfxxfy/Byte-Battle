@@ -8,14 +8,12 @@ import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { ProblemDescription } from '@/components/ProblemDescription'
 
 const LANGUAGES = [
   { value: 'python', label: 'Python', monaco: 'python' },
   { value: 'go', label: 'Go', monaco: 'go' },
   { value: 'cpp', label: 'C++', monaco: 'cpp' },
-  { value: 'javascript', label: 'JavaScript', monaco: 'javascript' },
+  { value: 'java', label: 'Java', monaco: 'java' },
 ] as const
 
 type LangValue = (typeof LANGUAGES)[number]['value']
@@ -24,11 +22,9 @@ const DEFAULT_CODE: Record<LangValue, string> = {
   python: '\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\t\n}\n',
   cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n\t\n\treturn 0;\n}\n',
-  javascript: '\n',
+  java: 'public class Main {\n    public static void main(String[] args) {\n        \n    }\n}\n',
 }
 
-const starterCode = (problem: Problem | null, lang: LangValue): string =>
-  problem?.starter_code?.[lang] ?? DEFAULT_CODE[lang]
 
 interface SubmissionResult {
   accepted: boolean
@@ -120,10 +116,10 @@ export function GamePage() {
       setProblem((prev) => {
         if (prev !== null && prev.id !== pRes.problem.id) {
           const fresh = {
-            python: starterCode(pRes.problem, 'python'),
-            go: starterCode(pRes.problem, 'go'),
-            cpp: starterCode(pRes.problem, 'cpp'),
-            javascript: starterCode(pRes.problem, 'javascript'),
+            python: DEFAULT_CODE['python'],
+            go: DEFAULT_CODE['go'],
+            cpp: DEFAULT_CODE['cpp'],
+            java: DEFAULT_CODE['java'],
           }
           try { localStorage.removeItem(storageKey) } catch {}
           setCodePerLang(fresh)
@@ -189,7 +185,7 @@ export function GamePage() {
                     python: starterCode(res.problem, 'python'),
                     go: starterCode(res.problem, 'go'),
                     cpp: starterCode(res.problem, 'cpp'),
-                    javascript: starterCode(res.problem, 'javascript'),
+                    java: starterCode(res.problem, 'java'),
                   }
                   try { localStorage.removeItem(storageKey) } catch {}
                   setCodePerLang(fresh)
@@ -472,7 +468,7 @@ export function GamePage() {
                 {problem.memory_limit_mb} МБ
               </span>
             </div>
-            <ProblemDescription content={problem.description} />
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{problem.description}</p>
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 flex-shrink-0 shadow-sm">
@@ -513,24 +509,18 @@ export function GamePage() {
         <div className="flex-1 flex flex-col gap-2 min-h-0">
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Select
+            <select
               value={editorLanguage}
-              onValueChange={(val) => handleLangChange(val as LangValue)}
+              onChange={(e) => handleLangChange(e.target.value as LangValue)}
               disabled={isFinished}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             >
-              <SelectTrigger size="sm">
-                <span className="flex flex-1 text-left text-sm">
-                  {LANGUAGES.find((l) => l.value === editorLanguage)?.label}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {LANGUAGES.map((l) => (
-                  <SelectItem key={l.value} value={l.value}>
-                    {l.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {LANGUAGES.map((l) => (
+                <option key={l.value} value={l.value} className="bg-background">
+                  {l.label}
+                </option>
+              ))}
+            </select>
             {isFinished && (
               <span className="text-xs text-muted-foreground bg-muted/40 border border-border/40 px-2 py-1 rounded-md">
                 {viewingUserId

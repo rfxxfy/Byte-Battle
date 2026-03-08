@@ -40,12 +40,25 @@ DB_NAME=bytebattle
 # HTTP
 HTTP_PORT=8080
 
+# Email verification via Resend
+RESEND_API_KEY=re_ВАШ_КЛЮЧ
+FROM_EMAIL=Byte Battle <noreply@yourdomain.com>
+
 # Задаётся автоматически при деплое (не менять вручную)
 IMAGE=ghcr.io/OWNER/byte-battle
 EOF
 ```
 
-> ⚠️ Пароль `DB_PASSWORD` должен быть уникальным. Сгенерировать: `openssl rand -base64 24`
+Пароль `DB_PASSWORD` должен быть уникальным. Сгенерировать: `openssl rand -base64 24`
+
+Для отправки писем домен в `FROM_EMAIL` должен быть подтвержден в Resend.
+
+### Настроить Resend
+
+1. Зарегистрируйте аккаунт на Resend.
+2. Добавьте и верифицируйте домен отправителя.
+3. Создайте API key.
+4. Добавьте ключ в `/opt/bytebattle/.env`.
 
 ## 2. Настройка GitHub
 
@@ -53,14 +66,14 @@ EOF
 
 Нужен чтобы VPS мог pull'ить Docker-образ из GitHub Container Registry.
 
-1. GitHub → Settings → Developer Settings → Personal Access Tokens → Tokens (classic)
+1. GitHub --> Settings --> Developer Settings --> Personal Access Tokens --> Tokens (classic)
 2. Generate new token
-3. Scope: **`read:packages`**
+3. Scope: `read:packages`
 4. Скопировать токен
 
 ### Добавить Secrets в репозиторий
 
-GitHub → Repo → Settings → Secrets and variables → Actions → New repository secret
+GitHub --> Repo --> Settings --> Secrets and variables --> Actions --> New repository secret
 
 | Secret | Значение |
 |---|---|
@@ -72,20 +85,20 @@ GitHub → Repo → Settings → Secrets and variables → Actions → New repos
 ### Настроить SSH-доступ
 
 ```bash
-# На локальной машине — сгенерировать ключ для деплоя
+# На локальной машине: сгенерировать ключ для деплоя
 ssh-keygen -t ed25519 -f ~/.ssh/bytebattle-deploy -C "github-actions-deploy"
 
 # Скопировать публичный ключ на VPS
 ssh-copy-id -i ~/.ssh/bytebattle-deploy.pub USER@VPS_IP
 
-# Содержимое приватного ключа → в secret SSH_PRIVATE_KEY
+# Содержимое приватного ключа - кладём в secret SSH_PRIVATE_KEY
 cat ~/.ssh/bytebattle-deploy
 ```
 
 ## 3. Первый деплой
 
 1. Убедиться, что VPS подготовлен (Docker, `/opt/bytebattle/.env`, compose-файл)
-2. GitHub → Actions → **Deploy** → **Run workflow**
+2. GitHub --> Actions --> Deploy --> Run workflow
 3. Дождаться выполнения
 
 ### Проверить что работает
@@ -103,14 +116,14 @@ curl http://VPS_IP:8080/
 
 ```
 Run workflow (кнопка в GitHub)
-    │
-    ▼
+    |
+    v
 GitHub Actions runner:
     1. Собирает Docker-образ из Dockerfile
     2. Пушит образ в ghcr.io
     3. Заходит на VPS по SSH
-    │
-    ▼
+    |
+    v
 VPS:
     4. docker login ghcr.io (через CR_PAT)
     5. docker compose pull (стягивает новый образ)

@@ -20,10 +20,15 @@ import (
 )
 
 type mockDockerClient struct {
-	imageInspectFn    func(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
-	imagePullFn       func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
-	containerListFn   func(ctx context.Context, opts container.ListOptions) ([]container.Summary, error)
-	containerRemoveFn func(ctx context.Context, id string, opts container.RemoveOptions) error
+	imageInspectFn         func(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
+	imagePullFn            func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+	containerListFn        func(ctx context.Context, opts container.ListOptions) ([]container.Summary, error)
+	containerRemoveFn      func(ctx context.Context, id string, opts container.RemoveOptions) error
+	containerCreateFn      func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, net *network.NetworkingConfig, platform *ocispec.Platform, name string) (container.CreateResponse, error)
+	containerStartFn       func(ctx context.Context, id string, opts container.StartOptions) error
+	containerExecCreateFn  func(ctx context.Context, id string, config container.ExecOptions) (container.ExecCreateResponse, error)
+	containerExecAttachFn  func(ctx context.Context, execID string, config container.ExecStartOptions) (dockertypes.HijackedResponse, error)
+	containerExecInspectFn func(ctx context.Context, execID string) (container.ExecInspect, error)
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error) {
@@ -40,10 +45,16 @@ func (m *mockDockerClient) ContainerList(ctx context.Context, opts container.Lis
 	}
 	return nil, nil
 }
-func (m *mockDockerClient) ContainerCreate(_ context.Context, _ *container.Config, _ *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
-	return container.CreateResponse{}, nil
+func (m *mockDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, net *network.NetworkingConfig, platform *ocispec.Platform, name string) (container.CreateResponse, error) {
+	if m.containerCreateFn != nil {
+		return m.containerCreateFn(ctx, config, hostConfig, net, platform, name)
+	}
+	return container.CreateResponse{ID: "test-container-id"}, nil
 }
-func (m *mockDockerClient) ContainerStart(_ context.Context, _ string, _ container.StartOptions) error {
+func (m *mockDockerClient) ContainerStart(ctx context.Context, id string, opts container.StartOptions) error {
+	if m.containerStartFn != nil {
+		return m.containerStartFn(ctx, id, opts)
+	}
 	return nil
 }
 func (m *mockDockerClient) ContainerRemove(ctx context.Context, id string, opts container.RemoveOptions) error {
@@ -52,14 +63,23 @@ func (m *mockDockerClient) ContainerRemove(ctx context.Context, id string, opts 
 	}
 	return nil
 }
-func (m *mockDockerClient) ContainerExecCreate(_ context.Context, _ string, _ container.ExecOptions) (container.ExecCreateResponse, error) {
-	return container.ExecCreateResponse{}, nil
+func (m *mockDockerClient) ContainerExecCreate(ctx context.Context, id string, config container.ExecOptions) (container.ExecCreateResponse, error) {
+	if m.containerExecCreateFn != nil {
+		return m.containerExecCreateFn(ctx, id, config)
+	}
+	return container.ExecCreateResponse{ID: "test-exec-id"}, nil
 }
-func (m *mockDockerClient) ContainerExecAttach(_ context.Context, _ string, _ container.ExecStartOptions) (dockertypes.HijackedResponse, error) {
+func (m *mockDockerClient) ContainerExecAttach(ctx context.Context, execID string, config container.ExecStartOptions) (dockertypes.HijackedResponse, error) {
+	if m.containerExecAttachFn != nil {
+		return m.containerExecAttachFn(ctx, execID, config)
+	}
 	return dockertypes.HijackedResponse{}, nil
 }
-func (m *mockDockerClient) ContainerExecInspect(_ context.Context, _ string) (container.ExecInspect, error) {
-	return container.ExecInspect{}, nil
+func (m *mockDockerClient) ContainerExecInspect(ctx context.Context, execID string) (container.ExecInspect, error) {
+	if m.containerExecInspectFn != nil {
+		return m.containerExecInspectFn(ctx, execID)
+	}
+	return container.ExecInspect{ExitCode: 0}, nil
 }
 func (m *mockDockerClient) CopyToContainer(_ context.Context, _, _ string, _ io.Reader, _ container.CopyToContainerOptions) error {
 	return nil
