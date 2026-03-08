@@ -361,18 +361,7 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	s.hub.Broadcast(int32(gameID), joinedMsg)
 
 	// Send initial problem state to the connecting player.
-	if playerIdx, err := s.gameService.GetParticipantProblemIndex(r.Context(), gameID, session.UserID); err == nil {
-		if problemID, err := s.gameService.GetGameProblemIDByIndex(r.Context(), int32(gameID), playerIdx); err == nil {
-			progress, _ := s.gameService.GetAllParticipantsProblemIndices(r.Context(), gameID)
-			stateMsg, _ := json.Marshal(ws.ServerMessage{
-				Type:       ws.TypePlayerState,
-				ProblemID:  problemID,
-				ProblemIdx: int(playerIdx),
-				Progress:   progress,
-			})
-			client.Send(stateMsg)
-		}
-	}
+	s.sendPlayerState(r.Context(), gameID, session.UserID, client)
 
 	connCtx, connCancel := context.WithCancel(context.Background())
 	defer connCancel()
@@ -458,6 +447,25 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		})
 		s.hub.Broadcast(gameID, advMsg)
 	}
+}
+
+func (s *HTTPServer) sendPlayerState(ctx context.Context, gameID int, userID uuid.UUID, client *ws.Client) {
+	playerIdx, err := s.gameService.GetParticipantProblemIndex(ctx, gameID, userID)
+	if err != nil {
+		return
+	}
+	problemID, err := s.gameService.GetGameProblemIDByIndex(ctx, int32(gameID), playerIdx)
+	if err != nil {
+		return
+	}
+	progress, _ := s.gameService.GetAllParticipantsProblemIndices(ctx, gameID)
+	stateMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:       ws.TypePlayerState,
+		ProblemID:  problemID,
+		ProblemIdx: int(playerIdx),
+		Progress:   progress,
+	})
+	client.Send(stateMsg)
 }
 
 func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {
