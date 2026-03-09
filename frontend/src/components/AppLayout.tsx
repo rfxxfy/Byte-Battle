@@ -16,7 +16,7 @@ export function AppLayout() {
       <header className="sticky top-0 z-40 border-b border-border/60 bg-card/60 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link to="/games" className="text-base font-semibold tracking-tight flex items-center gap-2">
+            <Link to="/games" className="text-base font-semibold tracking-tight flex items-center gap-1">
               <span className="text-primary">Byte</span>
               <span className="text-foreground">Battle</span>
               {window.location.hostname.startsWith('staging.') && (
