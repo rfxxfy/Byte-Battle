@@ -193,10 +193,11 @@ export function GamePage() {
                 ...prev,
                 [msg.winner_id]: { code: msg.code!, language: msg.language as LangValue },
               }))
+              setViewingUserId(msg.winner_id)
             }
             setWinner({ winner_id: msg.winner_id })
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
-            setViewingUserId(msg.winner_id)
+            setSubmitting(false)
           }
         } catch {
           // ignore malformed messages
