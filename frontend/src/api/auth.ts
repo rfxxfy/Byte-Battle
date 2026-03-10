@@ -9,6 +9,7 @@ export interface TokenResponse {
 export interface MeResponse {
   user_id: string
   name?: string
+  email?: string
 }
 
 export const enter = (email: string) =>
