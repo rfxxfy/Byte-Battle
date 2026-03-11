@@ -32,7 +32,7 @@ Byte-Battle — это не просто кодинг, а азартные и п
    cd Byte-Battle
    ```
 
-2. Поднимите базу данных:
+2. Поднимите инфраструктуру (PostgreSQL + Swagger UI):
    ```bash
    docker compose up -d --wait
    ```
@@ -55,6 +55,8 @@ make build    # собрать бинарник в bin/bytebattle
 ```bash
 curl http://localhost:8080/
 ```
+
+Swagger UI доступен на [http://localhost:8081](http://localhost:8081).
 
 ## Тесты
 
