@@ -97,10 +97,10 @@ internal/
   db/
     queries/             # SQL-запросы для sqlc
     sqlc/                # Сгенерированный sqlc-код
+  migrations/            # SQL-миграции (embed в binary, golang-migrate)
   server/                # HTTP-сервер, роуты, хендлеры
   service/               # Бизнес-логика
 api/                     # OpenAPI-спецификация
-migrations/              # SQL-миграции (golang-migrate)
 scripts/                 # Вспомогательные скрипты
 .env.example             # Пример переменных окружения
 sqlc.yaml                # Конфиг генератора sqlc
