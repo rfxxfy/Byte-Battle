@@ -28,9 +28,9 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - ./api/openapi.yaml:/usr/share/nginx/html/openapi.yaml:ro
+      - ./api/openapi.yaml:/app/openapi.yaml:ro
     environment:
-      SWAGGER_JSON: /usr/share/nginx/html/openapi.yaml
+      SWAGGER_JSON: /app/openapi.yaml
 
 volumes:
   postgres_data:
