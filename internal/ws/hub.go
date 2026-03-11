@@ -50,7 +50,6 @@ func (h *Hub) Leave(gameID int32, c *Client) {
 	}
 }
 
-// Broadcast sends msg to all clients in the given game room.
 func (h *Hub) Broadcast(gameID int32, msg []byte) {
 	h.mu.RLock()
 	r, ok := h.rooms[gameID]

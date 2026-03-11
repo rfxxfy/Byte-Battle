@@ -7,7 +7,6 @@ const (
 	TypeError            = "error"
 )
 
-// ClientMessage is a message sent from the client to the server.
 type ClientMessage struct {
 	Type     string `json:"type"`
 	Code     string `json:"code,omitempty"`
@@ -15,7 +14,6 @@ type ClientMessage struct {
 	Input    string `json:"input,omitempty"`
 }
 
-// ServerMessage is a message broadcast from the server to all clients in a room.
 type ServerMessage struct {
 	Type     string `json:"type"`
 	UserID   int32  `json:"user_id,omitempty"`

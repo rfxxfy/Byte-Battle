@@ -12,7 +12,6 @@ const (
 	pingPeriod = (PongWait * 9) / 10
 )
 
-// Client represents a single WebSocket connection to a game room.
 type Client struct {
 	send chan []byte
 	conn *websocket.Conn
