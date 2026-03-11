@@ -494,17 +494,25 @@ func wsURL(path string) string {
 	return "ws" + strings.TrimPrefix(testSrv.URL, "http") + path
 }
 
-func wsConnect(t *testing.T, path string) *websocket.Conn {
+func wsDialer(token string) *websocket.Dialer {
+	d := *websocket.DefaultDialer
+	if token != "" {
+		d.Subprotocols = []string{token}
+	}
+	return &d
+}
+
+func wsConnect(t *testing.T, path, token string) *websocket.Conn {
 	t.Helper()
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL(path), nil)
+	conn, _, err := wsDialer(token).Dial(wsURL(path), nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
 	return conn
 }
 
-func wsDial(t *testing.T, path string) (*websocket.Conn, *http.Response) {
+func wsDial(t *testing.T, path, token string) (*websocket.Conn, *http.Response) {
 	t.Helper()
-	conn, resp, _ := websocket.DefaultDialer.Dial(wsURL(path), nil)
+	conn, resp, _ := wsDialer(token).Dial(wsURL(path), nil)
 	if conn != nil {
 		t.Cleanup(func() { conn.Close() })
 	}
@@ -519,25 +527,30 @@ func wsRead(t *testing.T, conn *websocket.Conn) ws.ServerMessage {
 	return msg
 }
 
+func sessionToken(t *testing.T, userID int) string {
+	t.Helper()
+	return createSession(t, userID).Session.Token
+}
+
 // --- websocket tests ---
 
 func TestGameWS_InvalidParams(t *testing.T) {
-	t.Run("missing user_id", func(t *testing.T) {
+	t.Run("missing token", func(t *testing.T) {
 		g := createActiveGame(t)
-		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID))
+		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), "")
 		require.NotNil(t, resp)
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
-	t.Run("invalid user_id", func(t *testing.T) {
+	t.Run("invalid token", func(t *testing.T) {
 		g := createActiveGame(t)
-		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws?user_id=abc", g.Game.ID))
+		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), "badtoken")
 		require.NotNil(t, resp)
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 
 	t.Run("nonexistent game", func(t *testing.T) {
-		_, resp := wsDial(t, "/games/999999/ws?user_id=1")
+		_, resp := wsDial(t, "/games/999999/ws", sessionToken(t, user1ID))
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
@@ -545,7 +558,7 @@ func TestGameWS_InvalidParams(t *testing.T) {
 
 func TestGameWS_PendingGame(t *testing.T) {
 	g := createGame(t) // pending, not started
-	_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws?user_id=%d", g.Game.ID, user1ID))
+	_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), sessionToken(t, user1ID))
 	require.NotNil(t, resp)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -554,8 +567,8 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 	g := createActiveGame(t)
 	wsPath := fmt.Sprintf("/games/%d/ws", g.Game.ID)
 
-	conn1 := wsConnect(t, wsPath+fmt.Sprintf("?user_id=%d", user1ID))
-	conn2 := wsConnect(t, wsPath+fmt.Sprintf("?user_id=%d", user2ID))
+	conn1 := wsConnect(t, wsPath, sessionToken(t, user1ID))
+	conn2 := wsConnect(t, wsPath, sessionToken(t, user2ID))
 
 	require.NoError(t, conn1.WriteJSON(ws.ClientMessage{
 		Type:     ws.TypeSubmit,
@@ -611,7 +624,8 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	require.Equal(t, http.StatusOK, r.StatusCode)
 	r.Body.Close()
 
-	conn, _, err := websocket.DefaultDialer.Dial(wsURLFailing(fmt.Sprintf("/games/%d/ws?user_id=%d", g.Game.ID, user1ID)), nil)
+	token := sessionToken(t, user1ID)
+	conn, _, err := wsDialer(token).Dial(wsURLFailing(fmt.Sprintf("/games/%d/ws", g.Game.ID)), nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
 
@@ -636,7 +650,7 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 
 func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 	g := createActiveGame(t)
-	conn := wsConnect(t, fmt.Sprintf("/games/%d/ws?user_id=%d", g.Game.ID, user1ID))
+	conn := wsConnect(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), sessionToken(t, user1ID))
 
 	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
 		Type:     ws.TypeSubmit,

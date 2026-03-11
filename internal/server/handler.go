@@ -262,9 +262,17 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := strconv.Atoi(r.URL.Query().Get("user_id"))
-	if err != nil || userID < 1 {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
+	// Token is passed as the first Sec-WebSocket-Protocol value.
+	// Browsers cannot set custom headers on WS connections, so this is
+	// the standard workaround: new WebSocket(url, [token])
+	token := ""
+	if protocols := gorillaws.Subprotocols(r); len(protocols) > 0 {
+		token = protocols[0]
+	}
+
+	session, err := s.sessionService.ValidateToken(r.Context(), token)
+	if err != nil {
+		writeHTTPError(w, err)
 		return
 	}
 
@@ -278,7 +286,10 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// Echo the subprotocol back — required by browser WS spec
+	conn, err := upgrader.Upgrade(w, r, http.Header{
+		"Sec-WebSocket-Protocol": {token},
+	})
 	if err != nil {
 		log.Printf("ws upgrade error: %v", err)
 		return
@@ -311,7 +322,7 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		s.processSubmit(r.Context(), int32(gameID), int32(userID), msg)
+		s.processSubmit(r.Context(), int32(gameID), session.UserID, msg)
 	}
 }
 

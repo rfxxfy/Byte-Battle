@@ -64,6 +64,15 @@ func requestErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
 	})
 }
 
+func writeHTTPError(w http.ResponseWriter, err error) {
+	var ae *apierr.AppError
+	if errors.As(err, &ae) {
+		http.Error(w, ae.Message, ae.HTTPStatus)
+		return
+	}
+	http.Error(w, "internal error", http.StatusInternalServerError)
+}
+
 func responseErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	var ae *apierr.AppError
