@@ -319,6 +319,7 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, ms
 	result, execErr := s.executionService.Execute(ctx, executor.ExecutionRequest{
 		Code:     msg.Code,
 		Language: executor.Language(msg.Language),
+		Stdin:    msg.Input,
 	})
 
 	accepted := execErr == nil && result.ExitCode == 0

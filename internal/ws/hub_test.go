@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,4 +57,22 @@ func TestHub_BroadcastFullBufferDoesNotBlock(t *testing.T) {
 		t.Fatal("second message should have been dropped")
 	default:
 	}
+}
+
+func TestHub_ConcurrentJoinLeave(t *testing.T) {
+	h := NewHub()
+	var wg sync.WaitGroup
+
+	for i := range 20 {
+		wg.Add(1)
+		go func(id int32) {
+			defer wg.Done()
+			c := &Client{send: make(chan []byte, 64)}
+			h.Join(id, c)
+			h.Broadcast(id, []byte("msg"))
+			h.Leave(id, c)
+		}(int32(i))
+	}
+
+	wg.Wait()
 }

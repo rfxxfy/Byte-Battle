@@ -34,8 +34,15 @@ func (noOpExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executo
 	return executor.ExecutionResult{}, nil
 }
 
+type failingExecutor struct{}
+
+func (failingExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
+	return executor.ExecutionResult{ExitCode: 1, Stderr: "wrong answer"}, nil
+}
+
 var (
 	testSrv   *httptest.Server
+	testPool  *pgxpool.Pool
 	user1ID   int
 	user2ID   int
 	problemID int
@@ -123,6 +130,7 @@ func TestMain(m *testing.M) {
 	}
 	problemID = int(pid)
 
+	testPool = pool
 	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, noOpExecutor{}))
 
 	code := m.Run()
@@ -565,6 +573,65 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 	assert.Equal(t, ws.TypeSubmissionResult, r2.Type)
 	assert.Equal(t, int32(user1ID), r2.UserID)
 	assert.True(t, r2.Accepted)
+}
+
+func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
+	// failingExecutor always returns ExitCode=1, so no game_finished should be sent
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}))
+	t.Cleanup(srv.Close)
+
+	wsURLFailing := func(path string) string {
+		return "ws" + strings.TrimPrefix(srv.URL, "http") + path
+	}
+	doFailing := func(method, path string, body any) *http.Response {
+		var buf bytes.Buffer
+		if body != nil {
+			require.NoError(t, json.NewEncoder(&buf).Encode(body))
+		}
+		req, err := http.NewRequest(method, srv.URL+path, &buf)
+		require.NoError(t, err)
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		resp, err := srv.Client().Do(req)
+		require.NoError(t, err)
+		return resp
+	}
+
+	// create and start a game via the failing server
+	r := doFailing(http.MethodPost, "/games", map[string]any{
+		"player_ids": []int{user1ID, user2ID},
+		"problem_id": problemID,
+	})
+	require.Equal(t, http.StatusCreated, r.StatusCode)
+	var g gameResp
+	decodeJSON(t, r, &g)
+
+	r = doFailing(http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil)
+	require.Equal(t, http.StatusOK, r.StatusCode)
+	r.Body.Close()
+
+	conn, _, err := websocket.DefaultDialer.Dial(wsURLFailing(fmt.Sprintf("/games/%d/ws?user_id=%d", g.Game.ID, user1ID)), nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "wrong solution",
+		Language: "go",
+	}))
+
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper, error not actionable
+	var result ws.ServerMessage
+	require.NoError(t, conn.ReadJSON(&result))
+	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
+	assert.False(t, result.Accepted)
+
+	// no game_finished should arrive
+	conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond)) //nolint:errcheck // test helper, error not actionable
+	var unexpected ws.ServerMessage
+	err = conn.ReadJSON(&unexpected)
+	assert.Error(t, err, "expected timeout, not a game_finished message")
 }
 
 func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {

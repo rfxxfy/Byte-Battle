@@ -12,6 +12,7 @@ type ClientMessage struct {
 	Type     string `json:"type"`
 	Code     string `json:"code,omitempty"`
 	Language string `json:"language,omitempty"`
+	Input    string `json:"input,omitempty"`
 }
 
 // ServerMessage is a message broadcast from the server to all clients in a room.
