@@ -23,7 +23,7 @@ linters:
 
   exclusions:
     paths:
-      - internal/database/models
+      - internal/db/sqlc
     rules:
       - path: _test\.go
         linters:
@@ -38,6 +38,9 @@ linters:
       # directory/file permission checks
       - linters: [gosec]
         text: "G30[1246]"
+      # integer overflow int->int32 for DB SERIAL IDs
+      - linters: [gosec]
+        text: "G115"
       # db.Close() error is unactionable in error paths
       - linters: [gosec]
         text: "G104"
@@ -47,6 +50,7 @@ linters:
       exclude-functions:
         - (*database/sql.Tx).Rollback
         - (*database/sql.DB).Close
+        - (github.com/jackc/pgx/v5.Tx).Rollback
 
     gocritic:
       enabled-tags:
@@ -71,4 +75,4 @@ formatters:
         - bytebattle
   exclusions:
     paths:
-      - internal/database/models
+      - internal/db/sqlc

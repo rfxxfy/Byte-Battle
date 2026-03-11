@@ -4,22 +4,27 @@ import (
 	"context"
 	"errors"
 
-	"bytebattle/internal/database"
-	"bytebattle/internal/database/models"
+	sqlcdb "bytebattle/internal/db/sqlc"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type UserService struct {
-	repo database.IUserRepo
+	q *sqlcdb.Queries
 }
 
-func NewUserService(repo database.IUserRepo) *UserService {
-	return &UserService{repo: repo}
+func NewUserService(q *sqlcdb.Queries) *UserService {
+	return &UserService{q: q}
 }
 
-func (s *UserService) GetOrCreateTestUser(ctx context.Context) (*models.User, error) {
-	user, err := s.repo.GetByUsername(ctx, "testuser")
-	if errors.Is(err, database.ErrNotFound) {
-		return s.repo.Create(ctx, "testuser", "test@example.com", "hashedpassword")
+func (s *UserService) GetOrCreateTestUser(ctx context.Context) (sqlcdb.User, error) {
+	user, err := s.q.GetUserByUsername(ctx, "testuser")
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s.q.CreateUser(ctx, sqlcdb.CreateUserParams{
+			Username:     "testuser",
+			Email:        "test@example.com",
+			PasswordHash: "hashedpassword",
+		})
 	}
 	return user, err
 }

@@ -5,47 +5,79 @@ import (
 	"errors"
 
 	"bytebattle/internal/apierr"
-	"bytebattle/internal/database"
-	"bytebattle/internal/database/models"
+	sqlcdb "bytebattle/internal/db/sqlc"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const (
+	gameStatusPending   = "pending"
+	gameStatusActive    = "active"
+	gameStatusFinished  = "finished"
+	gameStatusCancelled = "cancelled"
 )
 
 type GameService struct {
-	repo database.IGameRepo
+	q    *sqlcdb.Queries
+	pool *pgxpool.Pool
 }
 
-func NewGameService(repo database.IGameRepo) *GameService {
-	return &GameService{repo: repo}
+func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool) *GameService {
+	return &GameService{q: q, pool: pool}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID int) (*models.Game, error) {
+func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID int) (sqlcdb.Game, error) {
 	if len(playerIDs) < 2 {
-		return nil, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players are required")
+		return sqlcdb.Game{}, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players are required")
 	}
 	seen := make(map[int]struct{})
 	for _, id := range playerIDs {
 		if _, exists := seen[id]; exists {
-			return nil, apierr.New(apierr.ErrDuplicatePlayers, "players must be different")
+			return sqlcdb.Game{}, apierr.New(apierr.ErrDuplicatePlayers, "players must be different")
 		}
 		seen[id] = struct{}{}
 	}
 
-	players := make([]database.Player, len(playerIDs))
-	for i, id := range playerIDs {
-		players[i] = database.Player{ID: id}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	game, err := qtx.CreateGame(ctx, int32(problemID))
+	if err != nil {
+		return sqlcdb.Game{}, err
 	}
 
-	return s.repo.Create(ctx, players, problemID)
+	for _, pid := range playerIDs {
+		if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
+			GameID: game.ID,
+			UserID: int32(pid),
+		}); err != nil {
+			return sqlcdb.Game{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	return game, nil
 }
 
-func (s *GameService) GetGame(ctx context.Context, id int) (*models.Game, error) {
-	game, err := s.repo.GetByID(ctx, id)
-	if errors.Is(err, database.ErrNotFound) {
-		return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
+func (s *GameService) GetGame(ctx context.Context, id int) (sqlcdb.Game, error) {
+	game, err := s.q.GetGameByID(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
 	}
 	return game, err
 }
 
-func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.GameSlice, int64, error) {
+func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcdb.Game, int64, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -56,12 +88,15 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.
 		offset = 0
 	}
 
-	total, err := s.repo.Count(ctx)
+	total, err := s.q.CountGames(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	games, err := s.repo.GetAll(ctx, limit, offset)
+	games, err := s.q.ListGames(ctx, sqlcdb.ListGamesParams{
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -69,56 +104,129 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) (models.
 	return games, total, nil
 }
 
-func (s *GameService) StartGame(ctx context.Context, id int) (*models.Game, error) {
-	game, err := s.repo.StartGame(ctx, id)
+func (s *GameService) StartGame(ctx context.Context, id int) (sqlcdb.Game, error) {
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		switch {
-		case errors.Is(err, database.ErrNotFound):
-			return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
-		case errors.Is(err, database.ErrGameNotPending):
-			return nil, apierr.New(apierr.ErrGameAlreadyStarted, "game already started or completed")
-		}
-		return nil, err
+		return sqlcdb.Game{}, err
 	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	game, err := qtx.GetGameForUpdate(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if game.Status != gameStatusPending {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "game already started or completed")
+	}
+
+	game, err = qtx.StartGame(ctx, game.ID)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, err
+	}
+
 	return game, nil
 }
 
-func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (*models.Game, error) {
-	game, err := s.repo.CompleteGame(ctx, id, winnerID)
+func (s *GameService) CompleteGame(ctx context.Context, id, winnerID int) (sqlcdb.Game, error) {
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		switch {
-		case errors.Is(err, database.ErrNotFound):
-			return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
-		case errors.Is(err, database.ErrGameNotActive):
-			return nil, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
-		case errors.Is(err, database.ErrNotParticipant):
-			return nil, apierr.New(apierr.ErrInvalidWinner, "winner must be one of the players")
-		}
-		return nil, err
+		return sqlcdb.Game{}, err
 	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	game, err := qtx.GetGameForUpdate(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if game.Status != gameStatusActive {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
+	}
+
+	ok, err := qtx.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
+		GameID: game.ID,
+		UserID: int32(winnerID),
+	})
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	if !ok {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrInvalidWinner, "winner must be one of the players")
+	}
+
+	game, err = qtx.CompleteGame(ctx, sqlcdb.CompleteGameParams{
+		ID:       game.ID,
+		WinnerID: pgtype.Int4{Int32: int32(winnerID), Valid: true},
+	})
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, err
+	}
+
 	return game, nil
 }
 
-func (s *GameService) CancelGame(ctx context.Context, id int) (*models.Game, error) {
-	game, err := s.repo.CancelGame(ctx, id)
+func (s *GameService) CancelGame(ctx context.Context, id int) (sqlcdb.Game, error) {
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		switch {
-		case errors.Is(err, database.ErrNotFound):
-			return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
-		case errors.Is(err, database.ErrGameFinished):
-			return nil, apierr.New(apierr.ErrCannotCancelFinished, "cannot cancel finished game")
-		case errors.Is(err, database.ErrGameAlreadyCancelled):
-			return nil, apierr.New(apierr.ErrGameAlreadyCancelled, "game is already cancelled")
-		}
-		return nil, err
+		return sqlcdb.Game{}, err
 	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	game, err := qtx.GetGameForUpdate(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if game.Status == gameStatusFinished {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrCannotCancelFinished, "cannot cancel finished game")
+	}
+	if game.Status == gameStatusCancelled {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyCancelled, "game is already cancelled")
+	}
+
+	game, err = qtx.CancelGame(ctx, game.ID)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, err
+	}
+
 	return game, nil
 }
 
 func (s *GameService) DeleteGame(ctx context.Context, id int) error {
-	err := s.repo.Delete(ctx, id)
-	if errors.Is(err, database.ErrNotFound) {
+	rowsAff, err := s.q.DeleteGame(ctx, int32(id))
+	if err != nil {
+		return err
+	}
+	if rowsAff == 0 {
 		return apierr.New(apierr.ErrGameNotFound, "game not found")
 	}
-	return err
+	return nil
 }

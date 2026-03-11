@@ -1,17 +1,18 @@
 package app
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 
-	"bytebattle/internal/database"
+	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 	"bytebattle/internal/server"
 	"bytebattle/internal/service"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewRouter(db *sql.DB) http.Handler {
+func NewRouter(pool *pgxpool.Pool) http.Handler {
 	execCfg := executor.DefaultConfig()
 	if cfg, err := executor.LoadConfig("executor_config.json"); err == nil {
 		execCfg = cfg
@@ -23,14 +24,11 @@ func NewRouter(db *sql.DB) http.Handler {
 	}
 	executionService := service.NewExecutionService(dockerExecutor)
 
-	userRepo := database.NewUserRepository(db)
-	userService := service.NewUserService(userRepo)
+	q := sqlcdb.New(pool)
 
-	gameRepo := database.NewGameRepository(db)
-	gameService := service.NewGameService(gameRepo)
-
-	sessionRepo := database.NewSessionRepository(db)
-	sessionService := service.NewSessionService(sessionRepo)
+	userService := service.NewUserService(q)
+	gameService := service.NewGameService(q, pool)
+	sessionService := service.NewSessionService(q)
 
 	return server.New(userService, gameService, sessionService, executionService)
 }
