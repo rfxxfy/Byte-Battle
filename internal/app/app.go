@@ -22,13 +22,17 @@ func NewRouter(pool *pgxpool.Pool) http.Handler {
 	if err != nil {
 		log.Fatalf("failed to create executor: %v", err)
 	}
-	executionService := service.NewExecutionService(dockerExecutor)
 
+	return NewRouterWithExecutor(pool, dockerExecutor)
+}
+
+func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor) http.Handler {
 	q := sqlcdb.New(pool)
 
 	userService := service.NewUserService(q)
 	gameService := service.NewGameService(q, pool)
 	sessionService := service.NewSessionService(q)
+	executionService := service.NewExecutionService(exec)
 
 	return server.New(userService, gameService, sessionService, executionService)
 }
