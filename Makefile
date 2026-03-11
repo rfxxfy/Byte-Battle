@@ -18,11 +18,10 @@ tidy:
 # Code generation
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Install all dev tools (codegen, sqlc, golang-migrate)
+# Install dev tools (oapi-codegen, sqlc)
 tools:
-	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.6.0
 	@command -v sqlc >/dev/null 2>&1 || go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
-	@test -f $(MIGRATE) || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 
 # Generate API types and server interface from openapi.yaml (no DB required)
 generate-api:

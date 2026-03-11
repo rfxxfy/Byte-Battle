@@ -19,6 +19,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Cache Go tool binaries
+        uses: actions/cache@v5
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-go-tools-${{ hashFiles('Makefile', '.github/workflows/go-ci.yml') }}
+
       - name: Install tools
         run: |
           make tools
