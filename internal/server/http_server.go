@@ -8,24 +8,32 @@ import (
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
 	"bytebattle/internal/service"
+	"bytebattle/internal/ws"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	gorillaws "github.com/gorilla/websocket"
 )
+
+var upgrader = gorillaws.Upgrader{
+	CheckOrigin: func(_ *http.Request) bool { return true }, //nolint:gosec // origin check intentionally disabled; restrict in production
+}
 
 type HTTPServer struct {
 	users            *service.UserService
 	gameService      *service.GameService
 	sessionService   *service.SessionService
 	executionService *service.ExecutionService
+	hub              *ws.Hub
 }
 
-func New(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService, executionService *service.ExecutionService) http.Handler {
+func New(users *service.UserService, gameService *service.GameService, sessionService *service.SessionService, executionService *service.ExecutionService, hub *ws.Hub) http.Handler {
 	s := &HTTPServer{
 		users:            users,
 		gameService:      gameService,
 		sessionService:   sessionService,
 		executionService: executionService,
+		hub:              hub,
 	}
 
 	r := chi.NewRouter()
@@ -35,6 +43,7 @@ func New(users *service.UserService, gameService *service.GameService, sessionSe
 	r.Get("/", s.handleRoot)
 	r.Get("/internal/hello_world", s.handleHello)
 	r.Post("/execute", s.handleExecute)
+	r.Get("/games/{id}/ws", s.handleGameWS)
 
 	strictOpts := api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestErrorHandler,

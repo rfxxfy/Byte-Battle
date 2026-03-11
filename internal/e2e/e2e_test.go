@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -21,6 +23,7 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 	"bytebattle/internal/migrations"
+	"bytebattle/internal/ws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -198,6 +201,16 @@ func createGame(t *testing.T) gameResp {
 	var g gameResp
 	decodeJSON(t, resp, &g)
 	return g
+}
+
+func createActiveGame(t *testing.T) gameResp {
+	t.Helper()
+	g := createGame(t)
+	resp := do(t, http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var started gameResp
+	decodeJSON(t, resp, &started)
+	return started
 }
 
 // --- game tests ---
@@ -465,4 +478,110 @@ func TestSession_GetUserSessions(t *testing.T) {
 	}
 	decodeJSON(t, resp, &body)
 	assert.GreaterOrEqual(t, len(body.Sessions), 2)
+}
+
+// --- websocket helpers ---
+
+func wsURL(path string) string {
+	return "ws" + strings.TrimPrefix(testSrv.URL, "http") + path
+}
+
+func wsConnect(t *testing.T, path string) *websocket.Conn {
+	t.Helper()
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL(path), nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+	return conn
+}
+
+func wsDial(t *testing.T, path string) (*websocket.Conn, *http.Response) {
+	t.Helper()
+	conn, resp, _ := websocket.DefaultDialer.Dial(wsURL(path), nil)
+	if conn != nil {
+		t.Cleanup(func() { conn.Close() })
+	}
+	return conn, resp
+}
+
+func wsRead(t *testing.T, conn *websocket.Conn) ws.ServerMessage {
+	t.Helper()
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper
+	var msg ws.ServerMessage
+	require.NoError(t, conn.ReadJSON(&msg))
+	return msg
+}
+
+// --- websocket tests ---
+
+func TestGameWS_InvalidParams(t *testing.T) {
+	t.Run("missing user_id", func(t *testing.T) {
+		g := createActiveGame(t)
+		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws", g.Game.ID))
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("invalid user_id", func(t *testing.T) {
+		g := createActiveGame(t)
+		_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws?user_id=abc", g.Game.ID))
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("nonexistent game", func(t *testing.T) {
+		_, resp := wsDial(t, "/games/999999/ws?user_id=1")
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+}
+
+func TestGameWS_PendingGame(t *testing.T) {
+	g := createGame(t) // pending, not started
+	_, resp := wsDial(t, fmt.Sprintf("/games/%d/ws?user_id=%d", g.Game.ID, user1ID))
+	require.NotNil(t, resp)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
+	g := createActiveGame(t)
+	wsPath := fmt.Sprintf("/games/%d/ws", g.Game.ID)
+
+	conn1 := wsConnect(t, wsPath+fmt.Sprintf("?user_id=%d", user1ID))
+	conn2 := wsConnect(t, wsPath+fmt.Sprintf("?user_id=%d", user2ID))
+
+	require.NoError(t, conn1.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "print('hello')",
+		Language: "python",
+	}))
+
+	// оба клиента должны получить submission_result
+	r1 := wsRead(t, conn1)
+	assert.Equal(t, ws.TypeSubmissionResult, r1.Type)
+	assert.Equal(t, int32(user1ID), r1.UserID)
+	assert.True(t, r1.Accepted)
+
+	r2 := wsRead(t, conn2)
+	assert.Equal(t, ws.TypeSubmissionResult, r2.Type)
+	assert.Equal(t, int32(user1ID), r2.UserID)
+	assert.True(t, r2.Accepted)
+}
+
+func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
+	g := createActiveGame(t)
+	conn := wsConnect(t, fmt.Sprintf("/games/%d/ws?user_id=%d", g.Game.ID, user1ID))
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "solution",
+		Language: "go",
+	}))
+
+	result := wsRead(t, conn)
+	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
+	assert.True(t, result.Accepted)
+
+	finished := wsRead(t, conn)
+	assert.Equal(t, ws.TypeGameFinished, finished.Type)
+	assert.Equal(t, int32(user1ID), finished.WinnerID)
 }

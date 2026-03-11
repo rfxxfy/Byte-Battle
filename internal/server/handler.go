@@ -3,12 +3,19 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
+	"bytebattle/internal/ws"
+
+	"github.com/go-chi/chi/v5"
+	gorillaws "github.com/gorilla/websocket"
 )
 
 func (s *HTTPServer) handleRoot(w http.ResponseWriter, _ *http.Request) {
@@ -246,4 +253,97 @@ func toAPISession(s sqlcdb.Session) api.Session {
 		ExpiresAt: s.ExpiresAt.Time,
 		CreatedAt: s.CreatedAt.Time,
 	}
+}
+
+func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
+	gameID, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid game id", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(r.URL.Query().Get("user_id"))
+	if err != nil || userID < 1 {
+		http.Error(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	game, err := s.gameService.GetGame(r.Context(), gameID)
+	if err != nil {
+		http.Error(w, "game not found", http.StatusNotFound)
+		return
+	}
+	if game.Status != "active" {
+		http.Error(w, "game is not active", http.StatusBadRequest)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("ws upgrade error: %v", err)
+		return
+	}
+
+	client := ws.NewClient(conn)
+	s.hub.Join(int32(gameID), client)
+	defer s.hub.Leave(int32(gameID), client)
+
+	go client.WritePump()
+
+	conn.SetReadLimit(32 * 1024)
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second)) //nolint:errcheck // not actionable
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	})
+
+	for {
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			if gorillaws.IsUnexpectedCloseError(err, gorillaws.CloseGoingAway, gorillaws.CloseNormalClosure) {
+				log.Printf("ws read error: %v", err)
+			}
+			return
+		}
+
+		var msg ws.ClientMessage
+		if err := json.Unmarshal(data, &msg); err != nil || msg.Type != ws.TypeSubmit {
+			continue
+		}
+
+		s.processSubmit(r.Context(), int32(gameID), int32(userID), msg)
+	}
+}
+
+func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, msg ws.ClientMessage) {
+	result, execErr := s.executionService.Execute(ctx, executor.ExecutionRequest{
+		Code:     msg.Code,
+		Language: executor.Language(msg.Language),
+	})
+
+	accepted := execErr == nil && result.ExitCode == 0
+
+	resultMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:     ws.TypeSubmissionResult,
+		UserID:   userID,
+		Accepted: accepted,
+		Stdout:   result.Stdout,
+		Stderr:   result.Stderr,
+	})
+	s.hub.Broadcast(gameID, resultMsg)
+
+	if !accepted {
+		return
+	}
+
+	completed, err := s.gameService.CompleteGame(ctx, int(gameID), int(userID))
+	if err != nil {
+		// another player already won — ignore
+		return
+	}
+
+	finMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:     ws.TypeGameFinished,
+		WinnerID: completed.WinnerID.Int32,
+	})
+	s.hub.Broadcast(gameID, finMsg)
 }
