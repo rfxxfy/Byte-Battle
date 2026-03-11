@@ -45,6 +45,7 @@ linters:
       # integer overflow from strconv.Atoi to int32 for DB IDs is safe (IDs are small)
       - linters: [gosec]
         text: "G109"
+        path: "internal/server/handler\\.go"
       # db.Close() error is unactionable in error paths
       - linters: [gosec]
         text: "G104"

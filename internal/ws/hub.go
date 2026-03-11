@@ -32,16 +32,22 @@ func (h *Hub) Join(gameID int32, c *Client) {
 }
 
 func (h *Hub) Leave(gameID int32, c *Client) {
-	h.mu.RLock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	r, ok := h.rooms[gameID]
-	h.mu.RUnlock()
 	if !ok {
 		return
 	}
 
 	r.mu.Lock()
 	delete(r.clients, c)
+	empty := len(r.clients) == 0
 	r.mu.Unlock()
+
+	if empty {
+		delete(h.rooms, gameID)
+	}
 }
 
 // Broadcast sends msg to all clients in the given game room.

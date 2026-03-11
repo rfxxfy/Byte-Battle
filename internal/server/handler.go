@@ -287,13 +287,14 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	client := ws.NewClient(conn)
 	s.hub.Join(int32(gameID), client)
 	defer s.hub.Leave(int32(gameID), client)
+	defer client.Close() // signals WritePump to exit cleanly
 
 	go client.WritePump()
 
 	conn.SetReadLimit(32 * 1024)
-	conn.SetReadDeadline(time.Now().Add(60 * time.Second)) //nolint:errcheck // not actionable
+	conn.SetReadDeadline(time.Now().Add(ws.PongWait)) //nolint:errcheck // not actionable
 	conn.SetPongHandler(func(string) error {
-		return conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 	})
 
 	for {

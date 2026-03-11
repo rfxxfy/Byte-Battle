@@ -8,8 +8,8 @@ import (
 
 const (
 	writeWait  = 10 * time.Second
-	pongWait   = 60 * time.Second
-	pingPeriod = (pongWait * 9) / 10
+	PongWait   = 60 * time.Second
+	pingPeriod = (PongWait * 9) / 10
 )
 
 // Client represents a single WebSocket connection to a game room.
@@ -24,6 +24,9 @@ func NewClient(conn *websocket.Conn) *Client {
 		send: make(chan []byte, 64),
 	}
 }
+
+// Close signals WritePump to exit cleanly by closing the send channel.
+func (c *Client) Close() { close(c.send) }
 
 // WritePump pumps messages from the send channel to the WebSocket connection.
 // Run in a separate goroutine; closes the connection when done.
