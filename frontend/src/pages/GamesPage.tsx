@@ -121,33 +121,7 @@ export function GamesPage() {
       )
     }
 
-    if ((game.status === 'pending' || game.status === 'active') && isParticipant) {
-      return (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/games/${game.id}`)
-          }}
-        >
-          Открыть
-        </Button>
-      )
-    }
-
-    return (
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={(e) => {
-          e.stopPropagation()
-          navigate(`/games/${game.id}`)
-        }}
-      >
-        Просмотр
-      </Button>
-    )
+    return null
   }
 
   const toggleProblem = (problemId: string, checked: boolean) => {
