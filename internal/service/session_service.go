@@ -69,7 +69,7 @@ func (s *SessionService) createSession(ctx context.Context, userID int, duration
 	return s.q.CreateSession(ctx, sqlcdb.CreateSessionParams{
 		UserID:    int32(userID),
 		Token:     token,
-		ExpiresAt: pgtype.Timestamp{Time: expiresAt, Valid: true},
+		ExpiresAt: pgtype.Timestamptz{Time: expiresAt.UTC(), Valid: true},
 	})
 }
 
@@ -110,7 +110,7 @@ func (s *SessionService) RefreshSession(ctx context.Context, id int) (sqlcdb.Ses
 
 	session, err := s.q.UpdateSessionExpiry(ctx, sqlcdb.UpdateSessionExpiryParams{
 		ID:        int32(id),
-		ExpiresAt: pgtype.Timestamp{Time: newExpiry, Valid: true},
+		ExpiresAt: pgtype.Timestamptz{Time: newExpiry.UTC(), Valid: true},
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return sqlcdb.Session{}, apierr.New(apierr.ErrSessionNotFound, "session not found")
