@@ -113,7 +113,7 @@ export function GamePage() {
     try {
       const res = await getGame(gameId)
       setGame(res.game)
-      const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
+      const pRes = await getProblem(res.game.problem_ids[0])
       setProblem((prev) => {
         if (prev !== null && prev.id !== pRes.problem.id) {
           const fresh = { ...DEFAULT_CODE }
