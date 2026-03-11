@@ -333,6 +333,9 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, ms
 		Stdin:    msg.Input,
 	})
 
+	if execErr != nil {
+		log.Printf("executor error game=%d user=%d: %v", gameID, userID, execErr)
+	}
 	accepted := execErr == nil && result.ExitCode == 0
 
 	resultMsg, _ := json.Marshal(ws.ServerMessage{
@@ -354,9 +357,13 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, ms
 		return
 	}
 
+	winnerID := int32(0)
+	if completed.WinnerID.Valid {
+		winnerID = completed.WinnerID.Int32
+	}
 	finMsg, _ := json.Marshal(ws.ServerMessage{
 		Type:     ws.TypeGameFinished,
-		WinnerID: completed.WinnerID.Int32,
+		WinnerID: winnerID,
 	})
 	s.hub.Broadcast(gameID, finMsg)
 }
