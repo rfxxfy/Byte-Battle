@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
@@ -13,13 +14,25 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	gorillaws "github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var upgrader = gorillaws.Upgrader{
-	CheckOrigin: func(_ *http.Request) bool { return true }, //nolint:gosec // origin check intentionally disabled; restrict in production
+func newUpgrader() gorillaws.Upgrader {
+	allowed := os.Getenv("ALLOWED_ORIGIN")
+	return gorillaws.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			if allowed == "" {
+				return true // dev mode — allow all
+			}
+			return r.Header.Get("Origin") == allowed
+		},
+	}
 }
 
+var upgrader = newUpgrader() //nolint:gochecknoglobals // package-level for performance, initialized once at startup
+
 type HTTPServer struct {
+	pool             *pgxpool.Pool
 	users            *service.UserService
 	gameService      *service.GameService
 	problemService   *service.ProblemService
@@ -28,8 +41,9 @@ type HTTPServer struct {
 	hub              *ws.Hub
 }
 
-func New(users *service.UserService, gameService *service.GameService, problemService *service.ProblemService, sessionService *service.SessionService, executionService *service.ExecutionService, hub *ws.Hub) http.Handler {
+func New(pool *pgxpool.Pool, users *service.UserService, gameService *service.GameService, problemService *service.ProblemService, sessionService *service.SessionService, executionService *service.ExecutionService, hub *ws.Hub) http.Handler {
 	s := &HTTPServer{
+		pool:             pool,
 		users:            users,
 		gameService:      gameService,
 		problemService:   problemService,
@@ -42,6 +56,7 @@ func New(users *service.UserService, gameService *service.GameService, problemSe
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	r.Get("/health", s.handleHealth)
 	r.Get("/", s.handleRoot)
 	r.Get("/internal/hello_world", s.handleHello)
 	r.Post("/execute", s.handleExecute)

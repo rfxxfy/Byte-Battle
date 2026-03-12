@@ -2,6 +2,10 @@ name: Deploy
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
 
 env:
   REGISTRY: ghcr.io
@@ -11,6 +15,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    # when triggered by workflow_run, only deploy if CI passed
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
