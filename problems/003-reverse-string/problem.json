@@ -1,0 +1,7 @@
+{
+  "title": "Reverse String",
+  "description": "Given a string, print it reversed.",
+  "difficulty": "easy",
+  "time_limit_ms": 1000,
+  "memory_limit_mb": 256
+}

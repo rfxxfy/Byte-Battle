@@ -7,13 +7,13 @@ import (
 )
 
 type ExecutionService struct {
-	exec executor.Executor
+	executor executor.Executor
 }
 
 func NewExecutionService(exec executor.Executor) *ExecutionService {
-	return &ExecutionService{exec: exec}
+	return &ExecutionService{executor: exec}
 }
 
 func (s *ExecutionService) Execute(ctx context.Context, req executor.ExecutionRequest) (executor.ExecutionResult, error) {
-	return s.exec.Run(ctx, req)
+	return s.executor.Run(ctx, req)
 }

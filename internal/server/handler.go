@@ -12,6 +12,7 @@ import (
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
+	"bytebattle/internal/problems"
 	"bytebattle/internal/ws"
 
 	"github.com/go-chi/chi/v5"
@@ -57,6 +58,26 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	}
 
 	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
+}
+
+func (s *HTTPServer) ListProblems(_ context.Context, _ api.ListProblemsRequestObject) (api.ListProblemsResponseObject, error) {
+	problemsList := s.problemService.ListProblems()
+
+	apiProblems := make([]api.Problem, len(problemsList))
+	for i := range problemsList {
+		apiProblems[i] = toAPIProblem(problemsList[i])
+	}
+
+	return api.ListProblems200JSONResponse{Problems: apiProblems}, nil
+}
+
+func (s *HTTPServer) GetProblem(_ context.Context, req api.GetProblemRequestObject) (api.GetProblemResponseObject, error) {
+	p, err := s.problemService.GetProblem(req.ProblemId)
+	if err != nil {
+		return nil, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+	}
+
+	return api.GetProblem200JSONResponse{Problem: toAPIProblem(p)}, nil
 }
 
 func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestObject) (api.CreateGameResponseObject, error) {
@@ -233,7 +254,7 @@ func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 func toAPIGame(g sqlcdb.Game) api.Game {
 	result := api.Game{
 		Id:        int(g.ID),
-		ProblemId: int(g.ProblemID),
+		ProblemId: g.ProblemID,
 		Status:    api.GameStatus(g.Status),
 		CreatedAt: g.CreatedAt.Time,
 		UpdatedAt: g.UpdatedAt.Time,
@@ -243,6 +264,19 @@ func toAPIGame(g sqlcdb.Game) api.Game {
 		result.WinnerId = &id
 	}
 	return result
+}
+
+func toAPIProblem(p *problems.Problem) api.Problem {
+	testCount := len(p.TestCases)
+	return api.Problem{
+		Id:            p.ID,
+		Title:         p.Meta.Title,
+		Description:   p.Meta.Description,
+		Difficulty:    api.ProblemDifficulty(p.Meta.Difficulty),
+		TimeLimitMs:   p.Meta.TimeLimitMs,
+		MemoryLimitMb: p.Meta.MemoryLimitMb,
+		TestCount:     &testCount,
+	}
 }
 
 func toAPISession(s sqlcdb.Session) api.Session {
@@ -334,7 +368,7 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, ms
 	})
 
 	if execErr != nil {
-		log.Printf("executor error game=%d user=%d: %v", gameID, userID, execErr)
+		log.Print("executor error during submission")
 	}
 	accepted := execErr == nil && result.ExitCode == 0
 

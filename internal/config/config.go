@@ -6,8 +6,9 @@ import (
 )
 
 type Config struct {
-	DBDSN    string
-	HTTPAddr string
+	DBDSN       string
+	HTTPAddr    string
+	ProblemsDir string
 }
 
 func Load() Config {
@@ -17,6 +18,7 @@ func Load() Config {
 			getEnv("HTTP_HOST", "0.0.0.0"),
 			getEnv("HTTP_PORT", "8080"),
 		),
+		ProblemsDir: getEnv("PROBLEMS_DIR", "./problems"),
 	}
 }
 

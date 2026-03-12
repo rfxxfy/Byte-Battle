@@ -4,6 +4,43 @@ info:
   version: "0.1.0"
 
 paths:
+  /problems:
+    get:
+      operationId: ListProblems
+      summary: List all available problems
+      responses:
+        "200":
+          description: List of problems
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProblemsResponse"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /problems/{problem_id}:
+    get:
+      operationId: GetProblem
+      summary: Get problem by ID
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "001-two-sum"
+      responses:
+        "200":
+          description: Problem found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
   /games:
     post:
       operationId: CreateGame
@@ -370,6 +407,52 @@ components:
           type: integer
           format: int64
 
+    Problem:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - difficulty
+        - time_limit_ms
+        - memory_limit_mb
+      properties:
+        id:
+          type: string
+          example: "001-two-sum"
+        title:
+          type: string
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        time_limit_ms:
+          type: integer
+        memory_limit_mb:
+          type: integer
+        test_count:
+          type: integer
+          description: Number of test cases
+
+    ProblemResponse:
+      type: object
+      required:
+        - problem
+      properties:
+        problem:
+          $ref: "#/components/schemas/Problem"
+
+    ListProblemsResponse:
+      type: object
+      required:
+        - problems
+      properties:
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/Problem"
+
     Game:
       type: object
       required:
@@ -382,7 +465,8 @@ components:
         id:
           type: integer
         problem_id:
-          type: integer
+          type: string
+          example: "001-two-sum"
         winner_id:
           type: integer
           nullable: true
@@ -430,7 +514,8 @@ components:
             type: integer
           minItems: 2
         problem_id:
-          type: integer
+          type: string
+          example: "001-two-sum"
 
     CompleteGameRequest:
       type: object

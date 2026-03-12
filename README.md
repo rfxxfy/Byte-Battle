@@ -102,9 +102,11 @@ internal/
     queries/             # SQL-запросы для sqlc
     sqlc/                # Сгенерированный sqlc-код
   migrations/            # SQL-миграции (embed в binary, golang-migrate)
+  problems/              # Загрузка задач и тест-кейсов из файловой системы
   server/                # HTTP-сервер, роуты, хендлеры
   service/               # Бизнес-логика
 api/                     # OpenAPI-спецификация
+problems/                # Файловый банк задач (problem.json + tests/*.in/*.out)
 .env.example             # Пример переменных окружения
 sqlc.yaml                # Конфиг генератора sqlc
 ```
@@ -116,7 +118,9 @@ sqlc.yaml                # Конфиг генератора sqlc
 | Переменная | По умолчанию | Описание |
 |---|---|---|
 | `DB_DSN` | `postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable` | DSN подключения к PostgreSQL |
-| `HTTP_ADDR` | `:8080` | Адрес HTTP-сервера |
+| `HTTP_HOST` | `0.0.0.0` | Хост HTTP-сервера |
+| `HTTP_PORT` | `8080` | Порт HTTP-сервера |
+| `PROBLEMS_DIR` | `./problems` | Путь к каталогу задач |
 
 Для dev-окружения значения по умолчанию совпадают с `docker-compose.yaml` — никаких `.env` не нужно.
 Для задания кастомных значений создайте `.env` на основе `.env.example` — он загружается автоматически.
