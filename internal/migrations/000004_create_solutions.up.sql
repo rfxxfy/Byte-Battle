@@ -1,7 +1,7 @@
 CREATE TABLE solutions (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    problem_id INTEGER NOT NULL REFERENCES problems(id),
+    problem_id TEXT NOT NULL,
     game_id INTEGER REFERENCES games(id) ON DELETE SET NULL,
     code TEXT NOT NULL,
     language VARCHAR(20) NOT NULL,

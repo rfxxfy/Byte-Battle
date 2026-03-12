@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
+	"bytebattle/internal/problems"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -20,18 +22,24 @@ const (
 )
 
 type GameService struct {
-	q    *sqlcdb.Queries
-	pool *pgxpool.Pool
+	q        *sqlcdb.Queries
+	pool     *pgxpool.Pool
+	problems *problems.Loader
 }
 
-func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool) *GameService {
-	return &GameService{q: q, pool: pool}
+func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, problems *problems.Loader) *GameService {
+	return &GameService{q: q, pool: pool, problems: problems}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID int) (sqlcdb.Game, error) {
+func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID string) (sqlcdb.Game, error) {
 	if len(playerIDs) < 2 {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players are required")
 	}
+
+	if _, err := s.problems.Get(problemID); err != nil {
+		return sqlcdb.Game{}, fmt.Errorf("problem not found: %s", problemID)
+	}
+
 	seen := make(map[int]struct{})
 	for _, id := range playerIDs {
 		if _, exists := seen[id]; exists {
@@ -48,7 +56,7 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 
 	qtx := s.q.WithTx(tx)
 
-	game, err := qtx.CreateGame(ctx, int32(problemID))
+	game, err := qtx.CreateGame(ctx, problemID)
 	if err != nil {
 		return sqlcdb.Game{}, err
 	}

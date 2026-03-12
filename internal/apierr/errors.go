@@ -17,6 +17,7 @@ const (
 	ErrSessionNotFound = "SESSION_NOT_FOUND"
 	ErrSessionExpired  = "SESSION_EXPIRED"
 	ErrInvalidToken    = "INVALID_TOKEN"
+	ErrProblemNotFound = "PROBLEM_NOT_FOUND"
 
 	ErrValidation = "VALIDATION_ERROR"
 )
@@ -38,7 +39,7 @@ func httpStatusCode(code string) int {
 		return http.StatusConflict
 	case ErrInvalidToken, ErrSessionExpired:
 		return http.StatusUnauthorized
-	case ErrGameNotFound, ErrSessionNotFound:
+	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound:
 		return http.StatusNotFound
 	default:
 		return http.StatusInternalServerError

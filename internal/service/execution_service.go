@@ -2,18 +2,36 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"bytebattle/internal/executor"
+	"bytebattle/internal/problems"
 )
 
 type ExecutionService struct {
-	exec executor.Executor
+	executor executor.Executor
+	problems *problems.Loader
 }
 
-func NewExecutionService(exec executor.Executor) *ExecutionService {
-	return &ExecutionService{exec: exec}
+func NewExecutionService(exec executor.Executor, problems *problems.Loader) *ExecutionService {
+	return &ExecutionService{executor: exec, problems: problems}
 }
 
 func (s *ExecutionService) Execute(ctx context.Context, req executor.ExecutionRequest) (executor.ExecutionResult, error) {
-	return s.exec.Run(ctx, req)
+	return s.executor.Run(ctx, req)
 }
+
+func (s *ExecutionService) ListProblems() ([]*problems.Problem, error) {
+	if s.problems == nil {
+		return nil, fmt.Errorf("problems loader is not configured")
+	}
+	return s.problems.List(), nil
+}
+
+func (s *ExecutionService) GetProblem(id string) (*problems.Problem, error) {
+	if s.problems == nil {
+		return nil, fmt.Errorf("problems loader is not configured")
+	}
+	return s.problems.Get(id)
+}
+
