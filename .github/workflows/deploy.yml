@@ -1,11 +1,9 @@
 name: Deploy
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
-  workflow_run:
-    workflows: ["CI"]
-    branches: [main]
-    types: [completed]
 
 env:
   REGISTRY: ghcr.io
