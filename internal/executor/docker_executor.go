@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
+	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -60,7 +60,7 @@ func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
 func (e *DockerExecutor) logPoolErrors() {
 	for err := range e.errChan {
 		if err != nil {
-			_ = err
+			log.Printf("executor pool error: %v", err)
 		}
 	}
 }
@@ -151,6 +151,7 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 		},
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
+		SecurityOpt: []string{"no-new-privileges:true"},
 		Tmpfs: map[string]string{
 			"/tmp": "",
 			"/run": "",
@@ -312,6 +313,7 @@ func (e *DockerExecutor) createContainerWithLimits(ctx context.Context, langConf
 		},
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
+		SecurityOpt: []string{"no-new-privileges:true"},
 		Tmpfs: map[string]string{
 			"/tmp": "",
 			"/run": "",
