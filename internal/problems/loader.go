@@ -2,7 +2,9 @@ package problems
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -67,17 +69,6 @@ func NewLoader(dir string) (*Loader, error) {
 		return nil, fmt.Errorf("no problems found in %q", dir)
 	}
 
-	hasTests := false
-	for _, p := range l.problems {
-		if len(p.TestCases) > 0 {
-			hasTests = true
-			break
-		}
-	}
-	if !hasTests {
-		return nil, fmt.Errorf("no problem in %q contains test cases", dir)
-	}
-
 	sort.Strings(l.order)
 	return l, nil
 }
@@ -123,12 +114,17 @@ func loadProblem(id, dir string) (*Problem, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading tests: %w", err)
 	}
+	if len(tests) == 0 {
+		return nil, fmt.Errorf("problem has no test cases")
+	}
 	return &Problem{ID: id, Meta: meta, TestCases: tests}, nil
 }
 
 func loadTestCases(dir string) ([]TestCase, error) {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
+	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
+	} else if err != nil {
+		return nil, err
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -150,10 +146,9 @@ func loadTestCases(dir string) ([]TestCase, error) {
 		if err != nil {
 			return nil, err
 		}
-		var expectedData []byte
-		outPath := filepath.Join(dir, base+".out")
-		if _, serr := os.Stat(outPath); serr == nil {
-			expectedData, _ = os.ReadFile(outPath)
+		expectedData, err := readOptionalFile(filepath.Join(dir, base+".out"))
+		if err != nil {
+			return nil, err
 		}
 		cases = append(cases, TestCase{
 			Name:     base,
@@ -162,4 +157,15 @@ func loadTestCases(dir string) ([]TestCase, error) {
 		})
 	}
 	return cases, nil
+}
+
+func readOptionalFile(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		return data, nil
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return nil, err
 }

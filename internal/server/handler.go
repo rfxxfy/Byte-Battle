@@ -61,10 +61,7 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 }
 
 func (s *HTTPServer) ListProblems(_ context.Context, _ api.ListProblemsRequestObject) (api.ListProblemsResponseObject, error) {
-	problemsList, err := s.executionService.ListProblems()
-	if err != nil {
-		return nil, err
-	}
+	problemsList := s.problemService.ListProblems()
 
 	apiProblems := make([]api.Problem, len(problemsList))
 	for i := range problemsList {
@@ -75,7 +72,7 @@ func (s *HTTPServer) ListProblems(_ context.Context, _ api.ListProblemsRequestOb
 }
 
 func (s *HTTPServer) GetProblem(_ context.Context, req api.GetProblemRequestObject) (api.GetProblemResponseObject, error) {
-	p, err := s.executionService.GetProblem(req.ProblemId)
+	p, err := s.problemService.GetProblem(req.ProblemId)
 	if err != nil {
 		return nil, apierr.New(apierr.ErrProblemNotFound, "problem not found")
 	}

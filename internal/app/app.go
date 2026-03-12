@@ -38,9 +38,10 @@ func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, loader *p
 
 	userService := service.NewUserService(q)
 	gameService := service.NewGameService(q, pool, loader)
+	problemService := service.NewProblemService(loader)
 	sessionService := service.NewSessionService(q)
-	executionService := service.NewExecutionService(exec, loader)
+	executionService := service.NewExecutionService(exec)
 
 	hub := ws.NewHub()
-	return server.New(userService, gameService, sessionService, executionService, hub)
+	return server.New(userService, gameService, problemService, sessionService, executionService, hub)
 }

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
@@ -37,7 +36,7 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 	}
 
 	if _, err := s.problems.Get(problemID); err != nil {
-		return sqlcdb.Game{}, fmt.Errorf("problem not found: %s", problemID)
+		return sqlcdb.Game{}, apierr.New(apierr.ErrProblemNotFound, "problem not found")
 	}
 
 	seen := make(map[int]struct{})

@@ -74,6 +74,24 @@ func TestNewLoader_NoTests(t *testing.T) {
 	}
 }
 
+func TestNewLoader_FailsIfAnyProblemHasNoTests(t *testing.T) {
+	dir := t.TempDir()
+	writeTestProblem(t, dir, "001-ok", sampleMeta, map[string][2]string{"01": {"1\n", "1\n"}})
+
+	d := filepath.Join(dir, "002-empty")
+	if err := os.MkdirAll(d, 0o755); err != nil {
+		t.Fatalf("mkdir problem dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(d, "problem.json"), []byte(sampleMeta), 0o644); err != nil {
+		t.Fatalf("write problem.json: %v", err)
+	}
+
+	_, err := NewLoader(dir)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestGet_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	writeTestProblem(t, dir, "001-y", sampleMeta, map[string][2]string{"01": {"1\n", "1\n"}})
