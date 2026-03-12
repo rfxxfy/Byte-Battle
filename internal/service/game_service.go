@@ -27,8 +27,8 @@ type GameService struct {
 	problems *problems.Loader
 }
 
-func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, problems *problems.Loader) *GameService {
-	return &GameService{q: q, pool: pool, problems: problems}
+func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Loader) *GameService {
+	return &GameService{q: q, pool: pool, problems: loader}
 }
 
 func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID string) (sqlcdb.Game, error) {

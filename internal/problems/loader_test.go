@@ -9,11 +9,19 @@ import (
 func writeTestProblem(t *testing.T, base, id, meta string, tests map[string][2]string) {
 	t.Helper()
 	dir := filepath.Join(base, id)
-	os.MkdirAll(filepath.Join(dir, "tests"), 0o755)
-	os.WriteFile(filepath.Join(dir, "problem.json"), []byte(meta), 0o644)
+	if err := os.MkdirAll(filepath.Join(dir, "tests"), 0o755); err != nil {
+		t.Fatalf("mkdir tests dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "problem.json"), []byte(meta), 0o644); err != nil {
+		t.Fatalf("write problem.json: %v", err)
+	}
 	for name, pair := range tests {
-		os.WriteFile(filepath.Join(dir, "tests", name+".in"), []byte(pair[0]), 0o644)
-		os.WriteFile(filepath.Join(dir, "tests", name+".out"), []byte(pair[1]), 0o644)
+		if err := os.WriteFile(filepath.Join(dir, "tests", name+".in"), []byte(pair[0]), 0o644); err != nil {
+			t.Fatalf("write %s.in: %v", name, err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "tests", name+".out"), []byte(pair[1]), 0o644); err != nil {
+			t.Fatalf("write %s.out: %v", name, err)
+		}
 	}
 }
 
@@ -32,7 +40,10 @@ func TestNewLoader_OK(t *testing.T) {
 	if len(l.List()) != 1 {
 		t.Fatalf("expected 1 problem, got %d", len(l.List()))
 	}
-	p, _ := l.Get("001-add")
+	p, err := l.Get("001-add")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
 	if p.Meta.Title != "Add" {
 		t.Errorf("title = %q", p.Meta.Title)
 	}
@@ -51,8 +62,12 @@ func TestNewLoader_EmptyDir(t *testing.T) {
 func TestNewLoader_NoTests(t *testing.T) {
 	dir := t.TempDir()
 	d := filepath.Join(dir, "001-x")
-	os.MkdirAll(d, 0o755)
-	os.WriteFile(filepath.Join(d, "problem.json"), []byte(sampleMeta), 0o644)
+	if err := os.MkdirAll(d, 0o755); err != nil {
+		t.Fatalf("mkdir problem dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(d, "problem.json"), []byte(sampleMeta), 0o644); err != nil {
+		t.Fatalf("write problem.json: %v", err)
+	}
 	_, err := NewLoader(dir)
 	if err == nil {
 		t.Fatal("expected error")
@@ -62,8 +77,11 @@ func TestNewLoader_NoTests(t *testing.T) {
 func TestGet_NotFound(t *testing.T) {
 	dir := t.TempDir()
 	writeTestProblem(t, dir, "001-y", sampleMeta, map[string][2]string{"01": {"1\n", "1\n"}})
-	l, _ := NewLoader(dir)
-	_, err := l.Get("nope")
+	l, err := NewLoader(dir)
+	if err != nil {
+		t.Fatalf("NewLoader: %v", err)
+	}
+	_, err = l.Get("nope")
 	if err == nil {
 		t.Fatal("expected error")
 	}

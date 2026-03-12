@@ -371,7 +371,7 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, ms
 	})
 
 	if execErr != nil {
-		log.Printf("executor error game=%d user=%d: %v", gameID, userID, execErr)
+		log.Print("executor error during submission")
 	}
 	accepted := execErr == nil && result.ExitCode == 0
 

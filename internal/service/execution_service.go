@@ -13,8 +13,8 @@ type ExecutionService struct {
 	problems *problems.Loader
 }
 
-func NewExecutionService(exec executor.Executor, problems *problems.Loader) *ExecutionService {
-	return &ExecutionService{executor: exec, problems: problems}
+func NewExecutionService(exec executor.Executor, loader *problems.Loader) *ExecutionService {
+	return &ExecutionService{executor: exec, problems: loader}
 }
 
 func (s *ExecutionService) Execute(ctx context.Context, req executor.ExecutionRequest) (executor.ExecutionResult, error) {
@@ -34,4 +34,3 @@ func (s *ExecutionService) GetProblem(id string) (*problems.Problem, error) {
 	}
 	return s.problems.Get(id)
 }
-
