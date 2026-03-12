@@ -9,6 +9,7 @@ services:
     image: ${IMAGE}:latest
     container_name: bytebattle-app
     restart: unless-stopped
+    user: root
     depends_on:
       postgres:
         condition: service_healthy
