@@ -1,8 +1,6 @@
 name: Deploy
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       target:
@@ -34,17 +32,16 @@ jobs:
         run: |
           TARGET="${{ inputs.target || 'production' }}"
           if [ "$TARGET" = "production" ] && [ "${{ github.ref_name }}" != "main" ]; then
-            echo "ERROR: production deploys are only allowed from main (got ${{ github.ref_name }})"
+            echo "ERROR: production deploys are only allowed from the main branch"
             exit 1
           fi
+          echo "COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           if [ "$TARGET" = "staging" ]; then
             echo "DEPLOY_DIR=/opt/bytebattle-staging" >> $GITHUB_ENV
             echo "COMPOSE_FILE=docker-compose.staging.yaml" >> $GITHUB_ENV
-            echo "IMAGE_TAG=staging" >> $GITHUB_ENV
           else
             echo "DEPLOY_DIR=/opt/bytebattle" >> $GITHUB_ENV
             echo "COMPOSE_FILE=docker-compose.prod.yaml" >> $GITHUB_ENV
-            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
           fi
 
       # ─── Build & push Docker image ──────────────────────────────────────
@@ -72,9 +69,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: |
-            ${{ env.IMAGE_LC }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_LC }}:${{ github.sha }}
+          tags: ${{ env.IMAGE_LC }}:${{ env.COMMIT_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -89,7 +84,7 @@ jobs:
       - name: Build frontend
         run: cd frontend && npm ci && npm run build
         env:
-          VITE_COMMIT_SHA: ${{ github.sha }}
+          VITE_COMMIT_SHA: ${{ env.COMMIT_SHA }}
 
       # ─── Deploy to VPS ─────────────────────────────────────────────────
       - name: Copy compose and Caddyfile to prod dir
@@ -120,11 +115,9 @@ jobs:
             # Login to GitHub Container Registry
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            IMAGE=${{ env.IMAGE_LC }}
-
-            # Update image in target .env
-            sed -i "s|^IMAGE=.*|IMAGE=${IMAGE}|" ${{ env.DEPLOY_DIR }}/.env \
-              || echo "IMAGE=${IMAGE}" >> ${{ env.DEPLOY_DIR }}/.env
+            # Update full image reference (with sha) in target .env
+            sed -i "s|^IMAGE=.*|IMAGE=${{ env.IMAGE_LC }}:${{ env.COMMIT_SHA }}|" ${{ env.DEPLOY_DIR }}/.env \
+              || echo "IMAGE=${{ env.IMAGE_LC }}:${{ env.COMMIT_SHA }}" >> ${{ env.DEPLOY_DIR }}/.env
 
             # Pull new image and restart stack
             docker compose --env-file ${{ env.DEPLOY_DIR }}/.env -f /opt/bytebattle/${{ env.COMPOSE_FILE }} pull app
