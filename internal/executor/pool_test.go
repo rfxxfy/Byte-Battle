@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -109,4 +110,54 @@ func TestIsContainerRunning_NilState(t *testing.T) {
 	}
 	e := newTestExecutor(mock)
 	require.False(t, e.isContainerRunning(context.Background(), "any"))
+}
+
+func TestIsReady_FalseBeforePrimed(t *testing.T) {
+	e := newTestExecutor(&mockDockerClient{})
+	e.pools["python"] = make(chan string, 3)
+	assert.False(t, e.IsReady())
+}
+
+func TestIsReady_TrueAfterAllPoolsPrimed(t *testing.T) {
+	e := newTestExecutor(&mockDockerClient{})
+	e.pools["python"] = make(chan string, 3)
+	e.notifyPoolPrimed("python")
+	assert.True(t, e.IsReady())
+}
+
+func TestIsReady_FalseWithEmptyPools(t *testing.T) {
+	e := newTestExecutor(&mockDockerClient{})
+	// pools not initialized — no languages
+	e.pools = make(map[Language]chan string)
+	e.primedPerLang = make(map[Language]*atomic.Bool)
+	e.config = &Config{Languages: map[Language]LangSettings{}}
+	assert.False(t, e.IsReady())
+}
+
+func TestIsReady_NotFlapWhenPoolDrained(t *testing.T) {
+	e := newTestExecutor(&mockDockerClient{})
+	e.pools["python"] = make(chan string, 3)
+	e.notifyPoolPrimed("python")
+	require.True(t, e.IsReady())
+
+	// drain the pool — should stay ready
+	e.pools["python"] <- "c1"
+	<-e.pools["python"]
+	assert.True(t, e.IsReady(), "should not flap when pool is temporarily empty")
+}
+
+func TestIsReady_MultiLang_NotReadyUntilAllPrimed(t *testing.T) {
+	langs := map[Language]LangSettings{
+		"python": {Image: "python:3.14-slim"},
+		"go":     {Image: "golang:1.26-alpine"},
+	}
+	e := newTestExecutorWithLangs(&mockDockerClient{}, langs)
+	e.pools["python"] = make(chan string, 3)
+	e.pools["go"] = make(chan string, 3)
+
+	e.notifyPoolPrimed("python")
+	assert.False(t, e.IsReady(), "should not be ready until all languages primed")
+
+	e.notifyPoolPrimed("go")
+	assert.True(t, e.IsReady())
 }

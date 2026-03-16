@@ -23,11 +23,11 @@ func (stubExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executo
 	return executor.ExecutionResult{Stdout: "ok"}, nil
 }
 
+func (stubExecutor) IsReady() bool { return true }
+
 func newTestService(r rate.Limit, burst int) *ExecutionService {
 	return NewExecutionService(stubExecutor{}, RateLimitConfig{Rate: r, Burst: burst})
 }
-
-// --- CheckRateLimit ---
 
 func TestExecutionService_CheckRateLimit_AllowsWithinBurst(t *testing.T) {
 	svc := newTestService(rate.Every(time.Hour), 3)
@@ -60,8 +60,6 @@ func TestExecutionService_CheckRateLimit_IndependentPerUser(t *testing.T) {
 	require.Error(t, svc.CheckRateLimit(user1))
 	require.NoError(t, svc.CheckRateLimit(user2), "user2 should have its own bucket")
 }
-
-// --- TryAcquireSlot / ReleaseSlot ---
 
 func TestExecutionService_TryAcquireSlot_OnlyOneAtATime(t *testing.T) {
 	svc := newTestService(rate.Inf, 100)
@@ -108,7 +106,6 @@ func TestExecutionService_SlotConcurrency(t *testing.T) {
 				return
 			}
 			cur := concurrent.Add(1)
-			// record peak
 			for {
 				old := maxConcurrent.Load()
 				if cur <= old || maxConcurrent.CompareAndSwap(old, cur) {
@@ -125,8 +122,6 @@ func TestExecutionService_SlotConcurrency(t *testing.T) {
 	assert.Equal(t, int32(1), maxConcurrent.Load(), "at most one goroutine must hold the slot at any time")
 }
 
-// --- Execute ---
-
 func TestExecutionService_Execute(t *testing.T) {
 	svc := newTestService(rate.Inf, 1)
 	result, err := svc.Execute(context.Background(), executor.ExecutionRequest{
@@ -136,8 +131,6 @@ func TestExecutionService_Execute(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ok", result.Stdout)
 }
-
-// --- runCleanup ---
 
 func TestExecutionService_Cleanup_RemovesIdleEntriesWhenLimiterReplenished(t *testing.T) {
 	svc := &ExecutionService{
@@ -178,9 +171,6 @@ func TestExecutionService_Cleanup_PreservesSlotWhenExecutionInFlight(t *testing.
 	assert.True(t, slotExists, "slot must be preserved while execution is in flight")
 }
 
-// TestExecutionService_Cleanup_RemovesOrphanedSlot covers the bug scenario:
-// limiter was removed in a prior cleanup while slot was in flight;
-// after execution finishes the slot becomes orphaned — next cleanup must collect it.
 func TestExecutionService_Cleanup_RemovesOrphanedSlot(t *testing.T) {
 	svc := &ExecutionService{
 		executor: stubExecutor{},

@@ -40,6 +40,8 @@ func (correctExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (exec
 	return executor.ExecutionResult{Stdout: "3"}, nil
 }
 
+func (correctExecutor) IsReady() bool { return true }
+
 // failingExecutor returns output that does not match any test case expected output.
 type failingExecutor struct{}
 
@@ -47,10 +49,14 @@ func (failingExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (exec
 	return executor.ExecutionResult{Stdout: "wrong", Stderr: "wrong answer"}, nil
 }
 
+func (failingExecutor) IsReady() bool { return true }
+
 type secondTestFailsExecutor struct {
 	mu    sync.Mutex
 	calls int
 }
+
+func (e *secondTestFailsExecutor) IsReady() bool { return true }
 
 func (e *secondTestFailsExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
 	e.mu.Lock()
@@ -316,6 +322,8 @@ func newBlockingExecutor() *blockingExecutor {
 	}
 }
 
+func (e *blockingExecutor) IsReady() bool { return true }
+
 func (e *blockingExecutor) Run(ctx context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
 	e.once.Do(func() { close(e.started) })
 	select {
@@ -368,7 +376,8 @@ func createActiveGameOnServer(t *testing.T, srv *httptest.Server) gameResp {
 	var g gameResp
 	decodeJSON(t, r, &g)
 
-	r = doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
+	require.NotNil(t, g.Game.InviteToken)
+	r = doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token2)
 	require.Equal(t, http.StatusOK, r.StatusCode)
 	r.Body.Close()
 
