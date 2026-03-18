@@ -61,10 +61,6 @@ func (h *Hub) Broadcast(gameID int32, msg []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for c := range r.clients {
-		select {
-		case c.send <- msg:
-		default:
-			// client buffer full — drop message to avoid blocking
-		}
+		c.Send(msg)
 	}
 }
