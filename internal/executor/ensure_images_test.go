@@ -103,12 +103,15 @@ func newTestExecutorWithLangs(mock dockerClient, langs map[Language]LangSettings
 	for lang := range langs {
 		primedPerLang[lang] = new(atomic.Bool)
 	}
+	shutdownCtx, shutdown := context.WithCancel(context.Background())
 	return &DockerExecutor{
 		cli:           mock,
 		config:        &Config{Languages: langs},
-		pools:         make(map[Language]chan string),
+		pools:         make(map[Language]*langPool),
 		errChan:       make(chan error, 16),
 		primedPerLang: primedPerLang,
+		shutdownCtx:   shutdownCtx,
+		shutdown:      shutdown,
 	}
 }
 
