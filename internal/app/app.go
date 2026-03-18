@@ -18,7 +18,12 @@ import (
 func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	execCfg := executor.DefaultConfig()
 	if c, err := executor.LoadConfig("executor_config.json"); err == nil {
-		execCfg = c
+		if c.DockerHost != "" {
+			execCfg.DockerHost = c.DockerHost
+		}
+		if len(c.Languages) > 0 {
+			execCfg.Languages = c.Languages
+		}
 	}
 
 	dockerExecutor, err := executor.NewDockerExecutor(execCfg)
@@ -42,7 +47,7 @@ func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, loader *p
 	problemService := service.NewProblemService(loader)
 	sessionService := service.NewSessionService(q, service.WithSessionDuration(cfg.Entrance.SessionTTL))
 	executionService := service.NewExecutionService(exec, rlCfg...)
-	submissionService := service.NewSubmissionService(executionService, gameService, loader)
+	submissionService := service.NewSubmissionService(executionService, gameService, loader, q)
 
 	mailer := service.NewMailer(cfg.Entrance.ResendAPIKey, cfg.Entrance.FromEmail)
 	entranceService := service.NewEntranceService(q, sessionService, mailer, cfg.Entrance)

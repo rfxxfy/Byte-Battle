@@ -8,6 +8,7 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -34,6 +35,7 @@ type Querier interface {
 	GetGameProblemIDByIndex(ctx context.Context, arg GetGameProblemIDByIndexParams) (string, error)
 	GetGameProblemIDs(ctx context.Context, gameID int32) ([]string, error)
 	GetGameProblemIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetGameProblemIDsByGameIDsRow, error)
+	GetGameSolutions(ctx context.Context, gameID pgtype.Int4) ([]GetGameSolutionsRow, error)
 	GetParticipantProblemIndex(ctx context.Context, arg GetParticipantProblemIndexParams) (int32, error)
 	GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error)
 	GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error)
@@ -45,6 +47,7 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetVerificationCode(ctx context.Context, email string) (VerificationCode, error)
 	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error)
+	InsertSolution(ctx context.Context, arg InsertSolutionParams) error
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error)
 	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)

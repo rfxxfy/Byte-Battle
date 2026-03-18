@@ -357,6 +357,28 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
 
+  /games/{id}/solutions:
+    get:
+      operationId: GetGameSolutions
+      summary: Get passed solutions for a game
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: List of solutions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSolutionsResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
   /games/{id}/cancel:
     post:
       operationId: CancelGame
@@ -448,12 +470,18 @@ components:
       required:
         - token
         - expires_at
+        - user_id
       properties:
         token:
           type: string
         expires_at:
           type: string
           format: date-time
+        user_id:
+          type: string
+        email:
+          type: string
+          nullable: true
         name:
           type: string
           nullable: true
@@ -673,3 +701,38 @@ components:
           type: integer
         time_used_ms:
           type: integer
+
+    GameSolution:
+      type: object
+      required:
+        - user_id
+        - problem_id
+        - code
+        - language
+        - solved_at
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          nullable: true
+        problem_id:
+          type: string
+        code:
+          type: string
+        language:
+          type: string
+        solved_at:
+          type: string
+          format: date-time
+
+    GameSolutionsResponse:
+      type: object
+      required:
+        - solutions
+      properties:
+        solutions:
+          type: array
+          items:
+            $ref: "#/components/schemas/GameSolution"

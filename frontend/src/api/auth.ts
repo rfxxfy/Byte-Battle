@@ -3,7 +3,9 @@ import { apiFetch } from './client'
 export interface TokenResponse {
   token: string
   expires_at: string
-  name?: string
+  user_id: string
+  email?: string | null
+  name?: string | null
 }
 
 export interface MeResponse {
@@ -24,10 +26,11 @@ export const confirm = (email: string, code: string) =>
     body: JSON.stringify({ email, code }),
   })
 
-export const updateMe = (name: string) =>
+export const updateMe = (name: string, token?: string) =>
   apiFetch<MeResponse>('/auth/me', {
     method: 'PATCH',
     body: JSON.stringify({ name }),
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
 
 export const me = () => apiFetch<MeResponse>('/auth/me')

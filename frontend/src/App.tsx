@@ -8,6 +8,7 @@ import { ProblemPage } from './pages/ProblemPage'
 import { GamesPage } from './pages/GamesPage'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
+import { GameResultsPage } from './pages/GameResultsPage'
 
 function RootRedirect() {
   const { token, loading } = useAuth()
@@ -40,6 +41,7 @@ export default function App() {
             <Route path="/problems/:id" element={<ProblemPage />} />
             <Route path="/games" element={<GamesPage />} />
             <Route path="/games/:id" element={<GamePage />} />
+            <Route path="/games/:id/results" element={<GameResultsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Routes>

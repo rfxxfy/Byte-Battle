@@ -276,6 +276,32 @@ func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteReq
 	}, nil
 }
 
+func (s *HTTPServer) GetGameSolutions(ctx context.Context, req api.GetGameSolutionsRequestObject) (api.GetGameSolutionsResponseObject, error) {
+	rows, err := s.gameService.GetGameSolutions(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	solutions := make([]api.GameSolution, len(rows))
+	for i := range rows {
+		r := &rows[i]
+		var name *string
+		if r.Name.Valid {
+			name = &r.Name.String
+		}
+		solutions[i] = api.GameSolution{
+			UserId:    r.UserID,
+			Name:      name,
+			ProblemId: r.ProblemID,
+			Code:      r.Code,
+			Language:  r.Language,
+			SolvedAt:  r.CreatedAt.Time,
+		}
+	}
+
+	return api.GetGameSolutions200JSONResponse{Solutions: solutions}, nil
+}
+
 func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []string) api.Game {
 	apiParticipants := make([]api.GameParticipant, len(participants))
 	for i, p := range participants {

@@ -36,10 +36,20 @@ export function ProblemDescription({ content }: Props) {
             </pre>
           </InsidePre.Provider>
         ),
+        h2: ({ children }) => (
+          <h2 className="text-sm font-semibold text-foreground mt-4 mb-2 first:mt-0">{children}</h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-sm font-semibold text-foreground/80 mt-3 mb-1.5">{children}</h3>
+        ),
         ul: ({ children }) => (
           <ul className="list-disc list-inside text-sm text-foreground/90 space-y-1 mb-3">{children}</ul>
         ),
+        ol: ({ children }) => (
+          <ol className="list-decimal list-inside text-sm text-foreground/90 space-y-1 mb-3">{children}</ol>
+        ),
         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+        em: ({ children }) => <em className="italic text-foreground/70">{children}</em>,
       }}
     >
       {content}
