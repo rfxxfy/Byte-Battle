@@ -24,7 +24,7 @@ export function ProblemsPage() {
   if (error) return <p className="text-sm text-destructive">{error}</p>
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 py-8">
       <h1 className="text-2xl font-semibold">Задачи</h1>
 
       <div className="rounded-lg border border-border/60 overflow-hidden">

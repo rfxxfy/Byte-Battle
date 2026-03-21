@@ -46,7 +46,7 @@ export function ProblemPage() {
   if (!problem) return null
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl">
+    <div className="flex flex-col gap-6 max-w-3xl py-8">
       <Link
         to="/problems"
         className="text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
