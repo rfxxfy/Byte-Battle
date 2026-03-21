@@ -77,6 +77,7 @@ export function GamesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [problems, setProblems] = useState<Problem[]>([])
   const [selectedProblemIds, setSelectedProblemIds] = useState<string[]>([])
+  const [isPublic, setIsPublic] = useState(true)
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -113,9 +114,9 @@ export function GamesPage() {
     setCreating(true)
     setActionError('')
     try {
-      const res = await createGame(selectedProblemIds)
+      const res = await createGame(selectedProblemIds, isPublic)
       setModalOpen(false)
-      navigate(`/games/${res.game.id}`)
+      navigate(`/games/join/${res.game.invite_token}`)
     } catch (err) {
       setActionError(
         err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err),
@@ -168,7 +169,11 @@ export function GamesPage() {
               games.map((g) => (
                   <tr
                     key={g.id}
-                    onClick={() => navigate(g.status === 'finished' ? `/games/${g.id}/results` : `/games/${g.id}`)}
+                    onClick={() => {
+                      if (g.status === 'finished') navigate(`/games/${g.id}/results`)
+                      else if (g.status === 'pending' && g.invite_token) navigate(`/games/join/${g.invite_token}`)
+                      else navigate(`/games/${g.id}`)
+                    }}
                     className="border-b border-border/40 last:border-0 hover:bg-muted/10 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40">{g.id}</td>
@@ -252,6 +257,18 @@ export function GamesPage() {
               )}
             </div>
 
+            <label className="flex items-center gap-2 text-sm mt-4 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+              />
+              <span>Публичная игра</span>
+              {!isPublic && (
+                <span className="text-xs text-muted-foreground">(только по ссылке)</span>
+              )}
+            </label>
+
             {actionError && <p className="text-sm text-destructive mt-3">{actionError}</p>}
 
             <div className="flex gap-2 mt-6">
@@ -261,6 +278,7 @@ export function GamesPage() {
                 onClick={() => {
                   setModalOpen(false)
                   setActionError('')
+                  setIsPublic(true)
                 }}
               >
                 Отмена

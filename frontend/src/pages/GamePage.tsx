@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { getGame, startGame, cancelGame, leaveGame, joinGame, type Game, type GameParticipant } from '@/api/games'
+import { getGame, type Game, type GameParticipant } from '@/api/games'
 import { getProblem, type Problem } from '@/api/problems'
 import { runCode } from '@/api/execute'
 import { ApiError } from '@/api/client'
@@ -26,7 +26,6 @@ const DEFAULT_CODE: Record<LangValue, string> = {
   java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, ByteBattle!");\n    }\n}\n',
 }
 
-
 interface SubmissionResult {
   accepted: boolean
   stdout: string
@@ -37,8 +36,6 @@ interface SubmissionResult {
 
 interface GameFinished {
   winner_id: string
-  code?: string
-  language?: string
 }
 
 interface PlayerAdvanced {
@@ -96,52 +93,34 @@ export function GamePage() {
   const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({})
   const [solvedTransition, setSolvedTransition] = useState(false)
   const [notification, setNotification] = useState<string | null>(null)
-  const [linkCopied, setLinkCopied] = useState(false)
-  const [countdown, setCountdown] = useState<3 | 2 | 1 | 0 | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
   const userIdRef = useRef<string | null>(userId)
   const gameRef = useRef<Game | null>(null)
   const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevStatusRef = useRef<string | undefined>(undefined)
 
-  useEffect(() => {
-    languageRef.current = language
-  }, [language])
-
-  useEffect(() => {
-    userIdRef.current = userId
-  }, [userId])
-
-  useEffect(() => {
-    gameRef.current = game
-  }, [game])
-
-  useEffect(() => {
-    if (prevStatusRef.current === 'pending' && game?.status === 'active') {
-      setCountdown(3)
-      setTimeout(() => setCountdown(2), 1000)
-      setTimeout(() => setCountdown(1), 2000)
-      setTimeout(() => setCountdown(0), 3000)
-      setTimeout(() => setCountdown(null), 4000)
-    }
-    prevStatusRef.current = game?.status
-  }, [game?.status])
+  useEffect(() => { languageRef.current = language }, [language])
+  useEffect(() => { userIdRef.current = userId }, [userId])
+  useEffect(() => { gameRef.current = game }, [game])
 
   const fetchGame = useCallback(async () => {
     try {
       const res = await getGame(gameId)
-      if (res.game.status === 'finished') {
-        navigate(`/games/${gameId}/results`)
+      const g = res.game
+      if (g.status === 'pending') {
+        navigate(`/games/join/${g.invite_token}`, { replace: true })
         return
       }
-      setGame(res.game)
-      const pRes = await getProblem(res.game.problem_ids[0])
+      if (g.status === 'finished') {
+        navigate(`/games/${gameId}/results`, { replace: true })
+        return
+      }
+      setGame(g)
+      const pRes = await getProblem(g.problem_ids[0])
       setProblem((prev) => {
         if (prev !== null && prev.id !== pRes.problem.id) {
-          const fresh = { ...DEFAULT_CODE }
           try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
-          setCodePerLang(fresh)
+          setCodePerLang({ ...DEFAULT_CODE })
         }
         return pRes.problem
       })
@@ -156,14 +135,6 @@ export function GamePage() {
     fetchGame()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll while pending so we catch participant joins and game start
-  useEffect(() => {
-    if (game?.status !== 'pending') return
-    const timer = setInterval(fetchGame, 2000)
-    return () => clearInterval(timer)
-  }, [game?.status, fetchGame])
-
-  // Connect WebSocket when game is active, reconnect on unexpected close
   useEffect(() => {
     if (game?.status !== 'active' || !token) return
 
@@ -185,9 +156,7 @@ export function GamePage() {
             setSubmitting(false)
           } else if (msg.type === 'player_state') {
             setPlayerProgress(msg.progress ?? {})
-            getProblem(msg.problem_id).then((res) => {
-              setProblem(res.problem)
-            }).catch(() => {})
+            getProblem(msg.problem_id).then((res) => setProblem(res.problem)).catch(() => {})
           } else if (msg.type === 'player_advanced') {
             setPlayerProgress(msg.progress ?? {})
             if (msg.user_id !== userIdRef.current) {
@@ -207,9 +176,8 @@ export function GamePage() {
                     getProblem(msg.problem_id),
                   ])
                   setProblem(res.problem)
-                  const fresh = { ...DEFAULT_CODE }
                   try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
-                  setCodePerLang(fresh)
+                  setCodePerLang({ ...DEFAULT_CODE })
                   setSubmissionResult(null)
                 } catch {
                   setActionError('Не удалось загрузить следующую задачу')
@@ -223,9 +191,7 @@ export function GamePage() {
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
             setSubmitting(false)
           }
-        } catch {
-          // ignore malformed messages
-        }
+        } catch { /* ignore malformed */ }
       }
 
       ws.onerror = () => setActionError('Ошибка WebSocket-соединения')
@@ -250,53 +216,6 @@ export function GamePage() {
       wsRef.current?.close()
     }
   }, [game?.status, token, gameId, storageKey])
-
-  const handleStart = async () => {
-    setActionError('')
-    try {
-      const res = await startGame(gameId)
-      setGame(res.game)
-    } catch (err) {
-      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
-    }
-  }
-
-  const handleCancel = async () => {
-    setActionError('')
-    try {
-      await cancelGame(gameId)
-      navigate('/games')
-    } catch (err) {
-      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
-    }
-  }
-
-  const handleLeave = async () => {
-    setActionError('')
-    try {
-      await leaveGame(gameId)
-      navigate('/games')
-    } catch (err) {
-      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
-    }
-  }
-
-  const handleJoin = async () => {
-    setActionError('')
-    try {
-      const res = await joinGame(gameId)
-      setGame(res.game)
-    } catch (err) {
-      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
-    }
-  }
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setLinkCopied(true)
-      setTimeout(() => setLinkCopied(false), 2000)
-    })
-  }
 
   const handleRun = async () => {
     setRunning(true)
@@ -324,109 +243,14 @@ export function GamePage() {
     ws.send(JSON.stringify({ type: 'submit', code, language }))
   }
 
-  const handleLangChange = (lang: LangValue) => {
-    setLanguage(lang)
-  }
-
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
   if (error) return <p className="text-sm text-destructive">{error}</p>
   if (!game || !problem) return null
 
-  const isCreator = userId != null && game.creator_id === userId
-  const isParticipant = userId != null && game.participants.some((p) => p.id === userId)
   const isActive = game.status === 'active'
   const isFinished = game.status === 'finished' || game.status === 'cancelled'
-  const canStart = isCreator && game.participants.length >= 2
   const totalProblems = game.problem_ids.length
   const myProgress = playerProgress[userId ?? ''] ?? 0
-
-  if (game.status === 'pending') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] py-8">
-        <div className="w-full max-w-md flex flex-col gap-4">
-          <Link
-            to="/games"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors self-start"
-          >
-            ← Игры
-          </Link>
-
-          <div className="rounded-lg border border-border/60 bg-card/50 p-5">
-            <h2 className="text-base font-semibold mb-1">{problem.title}</h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
-                {problem.time_limit_ms} мс
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
-                {problem.memory_limit_mb} МБ
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border/60 bg-card/50 p-5">
-            <p className="text-xs font-medium text-muted-foreground mb-3">
-              Участники · {game.participants.length}
-            </p>
-            <div className="flex flex-col gap-2">
-              {game.participants.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
-                  <span className={p.id === userId ? 'text-primary font-medium' : ''}>
-                    {participantLabel(p)}
-                    {p.id === userId && ' (ты)'}
-                    {p.id === game.creator_id && (
-                      <span className="ml-1.5 text-xs text-muted-foreground">создатель</span>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {actionError && (
-            <p className="text-sm text-destructive">{actionError}</p>
-          )}
-
-          {isCreator ? (
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleStart} disabled={!canStart} className="w-full">
-                Начать игру
-              </Button>
-              {!canStart && (
-                <p className="text-xs text-center text-muted-foreground">
-                  Нужен хотя бы 1 соперник
-                </p>
-              )}
-              <Button
-                variant="outline"
-                onClick={handleCopyLink}
-                className={`w-full transition-colors ${linkCopied ? 'border-green-500/60 text-green-400 hover:text-green-400' : ''}`}
-              >
-                {linkCopied ? '✓ Скопировано' : 'Скопировать ссылку'}
-              </Button>
-              <Button variant="outline" onClick={handleCancel} className="w-full">
-                Отменить игру
-              </Button>
-            </div>
-          ) : isParticipant ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-center text-muted-foreground">
-                Ждём пока создатель начнёт игру...
-              </p>
-              <Button variant="outline" onClick={handleLeave} className="w-full">
-                Покинуть игру
-              </Button>
-            </div>
-          ) : (
-            <Button onClick={handleJoin} className="w-full">
-              Вступить в игру
-            </Button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
   const winnerParticipant = winner
     ? game.participants.find((p) => p.id === winner.winner_id)
@@ -459,7 +283,12 @@ export function GamePage() {
           {isFinished && (
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-amber-400/90">Завершена</span>
-              <Button size="sm" variant="outline" className="border-amber-400/40 text-amber-400/90 hover:bg-amber-400/10 hover:text-amber-400" onClick={() => navigate(`/games/${gameId}/results`)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-400/40 text-amber-400/90 hover:bg-amber-400/10 hover:text-amber-400"
+                onClick={() => navigate(`/games/${gameId}/results`)}
+              >
                 Смотреть решения участников
               </Button>
             </div>
@@ -517,7 +346,7 @@ export function GamePage() {
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60 bg-card flex-shrink-0">
             <select
               value={language}
-              onChange={(e) => handleLangChange(e.target.value as LangValue)}
+              onChange={(e) => setLanguage(e.target.value as LangValue)}
               disabled={isFinished}
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             >
@@ -634,18 +463,6 @@ export function GamePage() {
         </div>
       )}
 
-      {countdown !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-hidden">
-          <span
-            key={countdown}
-            className={`animate-count-tick font-bold tracking-tight select-none ${countdown === 0 ? 'text-4xl text-primary' : 'text-8xl'}`}
-          >
-            {countdown === 0 ? 'Начали!' : countdown}
-          </span>
-        </div>
-      )}
-
-      {/* Solved transition overlay */}
       {solvedTransition && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="animate-in fade-in zoom-in-95 duration-300 flex flex-col items-center gap-4">
@@ -660,7 +477,6 @@ export function GamePage() {
         </div>
       )}
 
-      {/* Winner modal */}
       {winner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-card border border-border/60 rounded-xl p-8 w-full max-w-sm shadow-2xl shadow-black/40 mx-4 text-center">

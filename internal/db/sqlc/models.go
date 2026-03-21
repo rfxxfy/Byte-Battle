@@ -18,6 +18,8 @@ type Game struct {
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	IsPublic    bool               `json:"is_public"`
+	InviteToken uuid.UUID          `json:"invite_token"`
 }
 
 type GameParticipant struct {

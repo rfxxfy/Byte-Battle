@@ -10,6 +10,8 @@ export interface Game {
   problem_ids: string[]
   creator_id: string
   status: 'pending' | 'active' | 'finished' | 'cancelled'
+  is_public: boolean
+  invite_token?: string | null
   participants: GameParticipant[]
   winner_id?: string | null
   created_at: string
@@ -24,13 +26,20 @@ export const listGames = (limit = 10, offset = 0) =>
 export const getGame = (id: number) =>
   apiFetch<{ game: Game }>(`/games/${id}`)
 
-export const createGame = (problemIds: string[]) =>
+export const createGame = (problemIds: string[], isPublic = true) =>
   apiFetch<{ game: Game }>('/games', {
     method: 'POST',
     body: JSON.stringify({
       problem_ids: problemIds.slice(0, 20),
+      is_public: isPublic,
     }),
   })
+
+export const getGameByToken = (token: string) =>
+  apiFetch<{ game: Game }>(`/games/join/${token}`)
+
+export const joinGameByToken = (token: string) =>
+  apiFetch<{ game: Game }>(`/games/join/${token}`, { method: 'POST' })
 
 export const joinGame = (id: number) =>
   apiFetch<{ game: Game }>(`/games/${id}/join`, { method: 'POST' })
