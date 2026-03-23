@@ -17,6 +17,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
@@ -55,8 +56,10 @@ func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
 		pools:   make(map[Language]chan string),
 		errChan: make(chan error, 16),
 	}
-	if err := e.ensureImages(context.Background()); err != nil {
-		log.Printf("warning: failed to pull some executor images: %v", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := e.ensureImages(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ensure executor images: %w", err)
 	}
 	e.initPools()
 	go e.logPoolErrors()
@@ -73,6 +76,9 @@ func (e *DockerExecutor) ensureImages(ctx context.Context) error {
 			defer wg.Done()
 			if _, err := e.cli.ImageInspect(ctx, img); err == nil {
 				return // already present
+			} else if !cerrdefs.IsNotFound(err) {
+				errs <- fmt.Errorf("inspect %s: %w", img, err)
+				return
 			}
 			log.Printf("pulling executor image %s...", img)
 			rc, err := e.cli.ImagePull(ctx, img, image.PullOptions{})

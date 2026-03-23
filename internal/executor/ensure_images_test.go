@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -43,7 +44,7 @@ func (m *mockDockerClient) ContainerRemove(_ context.Context, _ string, _ contai
 func (m *mockDockerClient) ContainerExecCreate(_ context.Context, _ string, _ container.ExecOptions) (container.ExecCreateResponse, error) {
 	return container.ExecCreateResponse{}, nil
 }
-func (m *mockDockerClient) ContainerExecAttach(_ context.Context, _ string, _ container.ExecAttachOptions) (dockertypes.HijackedResponse, error) {
+func (m *mockDockerClient) ContainerExecAttach(_ context.Context, _ string, _ container.ExecStartOptions) (dockertypes.HijackedResponse, error) {
 	return dockertypes.HijackedResponse{}, nil
 }
 func (m *mockDockerClient) ContainerExecInspect(_ context.Context, _ string) (container.ExecInspect, error) {
@@ -85,7 +86,7 @@ func TestEnsureImages_PullOnMiss(t *testing.T) {
 	pullCalled := false
 	mock := &mockDockerClient{
 		imageInspectFn: func(_ context.Context, _ string, _ ...client.ImageInspectOption) (image.InspectResponse, error) {
-			return image.InspectResponse{}, errors.New("not found")
+			return image.InspectResponse{}, cerrdefs.ErrNotFound
 		},
 		imagePullFn: func(_ context.Context, _ string, _ image.PullOptions) (io.ReadCloser, error) {
 			pullCalled = true
@@ -103,7 +104,7 @@ func TestEnsureImages_PullOnMiss(t *testing.T) {
 func TestEnsureImages_PullError(t *testing.T) {
 	mock := &mockDockerClient{
 		imageInspectFn: func(_ context.Context, _ string, _ ...client.ImageInspectOption) (image.InspectResponse, error) {
-			return image.InspectResponse{}, errors.New("not found")
+			return image.InspectResponse{}, cerrdefs.ErrNotFound
 		},
 		imagePullFn: func(_ context.Context, _ string, _ image.PullOptions) (io.ReadCloser, error) {
 			return nil, errors.New("registry unavailable")
@@ -115,4 +116,24 @@ func TestEnsureImages_PullError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "registry unavailable")
+}
+
+func TestEnsureImages_InspectError(t *testing.T) {
+	pullCalled := false
+	mock := &mockDockerClient{
+		imageInspectFn: func(_ context.Context, _ string, _ ...client.ImageInspectOption) (image.InspectResponse, error) {
+			return image.InspectResponse{}, errors.New("permission denied")
+		},
+		imagePullFn: func(_ context.Context, _ string, _ image.PullOptions) (io.ReadCloser, error) {
+			pullCalled = true
+			return nil, nil
+		},
+	}
+
+	e := newTestExecutor(mock)
+	err := e.ensureImages(context.Background())
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "permission denied")
+	assert.False(t, pullCalled, "pull should not be called on non-NotFound inspect error")
 }
