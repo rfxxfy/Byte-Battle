@@ -9,7 +9,7 @@ services:
     image: ${IMAGE}:latest
     container_name: bytebattle-app
     restart: unless-stopped
-    user: root
+    user: "${DEPLOY_UID}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -22,7 +22,7 @@ services:
       ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
     volumes:
       - ./problems:/app/problems:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     cap_drop:
       - ALL
     security_opt:
