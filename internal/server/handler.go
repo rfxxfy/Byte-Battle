@@ -233,7 +233,12 @@ func (s *HTTPServer) CleanupExpiredSessions(ctx context.Context, _ api.CleanupEx
 }
 
 func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
-	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	authHeader := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		writeHTTPError(w, apierr.New(apierr.ErrInvalidToken, "missing or invalid Authorization header"))
+		return
+	}
+	token := strings.TrimPrefix(authHeader, "Bearer ")
 	if _, err := s.sessionService.ValidateToken(r.Context(), token); err != nil {
 		writeHTTPError(w, err)
 		return

@@ -82,12 +82,21 @@ func requestErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
 }
 
 func writeHTTPError(w http.ResponseWriter, err error) {
+	w.Header().Set("Content-Type", "application/json")
 	var ae *apierr.AppError
 	if errors.As(err, &ae) {
-		http.Error(w, ae.Message, ae.HTTPStatus)
+		w.WriteHeader(ae.HTTPStatus)
+		_ = json.NewEncoder(w).Encode(api.ErrorResponse{
+			ErrorCode: ae.ErrorCode,
+			Message:   ae.Message,
+		})
 		return
 	}
-	http.Error(w, "internal error", http.StatusInternalServerError)
+	w.WriteHeader(http.StatusInternalServerError)
+	_ = json.NewEncoder(w).Encode(api.ErrorResponse{
+		ErrorCode: apierr.ErrInternal,
+		Message:   "internal error",
+	})
 }
 
 func responseErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
