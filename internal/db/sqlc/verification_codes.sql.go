@@ -12,24 +12,23 @@ import (
 )
 
 const deleteVerificationCode = `-- name: DeleteVerificationCode :exec
-DELETE FROM email_verification_codes WHERE id = $1
+DELETE FROM verification_codes WHERE email = $1
 `
 
-func (q *Queries) DeleteVerificationCode(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, deleteVerificationCode, id)
+func (q *Queries) DeleteVerificationCode(ctx context.Context, email string) error {
+	_, err := q.db.Exec(ctx, deleteVerificationCode, email)
 	return err
 }
 
-const getVerificationCodeByUserID = `-- name: GetVerificationCodeByUserID :one
-SELECT id, user_id, code_hash, expires_at, attempts, created_at FROM email_verification_codes WHERE user_id = $1 LIMIT 1
+const getVerificationCode = `-- name: GetVerificationCode :one
+SELECT email, code_hash, expires_at, attempts, created_at FROM verification_codes WHERE email = $1
 `
 
-func (q *Queries) GetVerificationCodeByUserID(ctx context.Context, userID int32) (EmailVerificationCode, error) {
-	row := q.db.QueryRow(ctx, getVerificationCodeByUserID, userID)
-	var i EmailVerificationCode
+func (q *Queries) GetVerificationCode(ctx context.Context, email string) (VerificationCode, error) {
+	row := q.db.QueryRow(ctx, getVerificationCode, email)
+	var i VerificationCode
 	err := row.Scan(
-		&i.ID,
-		&i.UserID,
+		&i.Email,
 		&i.CodeHash,
 		&i.ExpiresAt,
 		&i.Attempts,
@@ -39,23 +38,22 @@ func (q *Queries) GetVerificationCodeByUserID(ctx context.Context, userID int32)
 }
 
 const incrementAttemptsIfBelowLimit = `-- name: IncrementAttemptsIfBelowLimit :one
-UPDATE email_verification_codes
+UPDATE verification_codes
 SET attempts = attempts + 1
-WHERE id = $1 AND attempts < $2
-RETURNING id, user_id, code_hash, expires_at, attempts, created_at
+WHERE email = $1 AND attempts < $2
+RETURNING email, code_hash, expires_at, attempts, created_at
 `
 
 type IncrementAttemptsIfBelowLimitParams struct {
-	ID       int32 `json:"id"`
-	Attempts int32 `json:"attempts"`
+	Email    string `json:"email"`
+	Attempts int32  `json:"attempts"`
 }
 
-func (q *Queries) IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (EmailVerificationCode, error) {
-	row := q.db.QueryRow(ctx, incrementAttemptsIfBelowLimit, arg.ID, arg.Attempts)
-	var i EmailVerificationCode
+func (q *Queries) IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error) {
+	row := q.db.QueryRow(ctx, incrementAttemptsIfBelowLimit, arg.Email, arg.Attempts)
+	var i VerificationCode
 	err := row.Scan(
-		&i.ID,
-		&i.UserID,
+		&i.Email,
 		&i.CodeHash,
 		&i.ExpiresAt,
 		&i.Attempts,
@@ -65,27 +63,26 @@ func (q *Queries) IncrementAttemptsIfBelowLimit(ctx context.Context, arg Increme
 }
 
 const upsertVerificationCode = `-- name: UpsertVerificationCode :one
-INSERT INTO email_verification_codes (user_id, code_hash, expires_at)
+INSERT INTO verification_codes (email, code_hash, expires_at)
 VALUES ($1, $2, $3)
-ON CONFLICT (user_id) DO UPDATE
+ON CONFLICT (email) DO UPDATE
     SET code_hash  = EXCLUDED.code_hash,
         expires_at = EXCLUDED.expires_at,
         attempts   = 0
-RETURNING id, user_id, code_hash, expires_at, attempts, created_at
+RETURNING email, code_hash, expires_at, attempts, created_at
 `
 
 type UpsertVerificationCodeParams struct {
-	UserID    int32              `json:"user_id"`
+	Email     string             `json:"email"`
 	CodeHash  string             `json:"code_hash"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
-func (q *Queries) UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (EmailVerificationCode, error) {
-	row := q.db.QueryRow(ctx, upsertVerificationCode, arg.UserID, arg.CodeHash, arg.ExpiresAt)
-	var i EmailVerificationCode
+func (q *Queries) UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (VerificationCode, error) {
+	row := q.db.QueryRow(ctx, upsertVerificationCode, arg.Email, arg.CodeHash, arg.ExpiresAt)
+	var i VerificationCode
 	err := row.Scan(
-		&i.ID,
-		&i.UserID,
+		&i.Email,
 		&i.CodeHash,
 		&i.ExpiresAt,
 		&i.Attempts,

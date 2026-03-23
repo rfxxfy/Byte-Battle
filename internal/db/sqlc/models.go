@@ -8,15 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type EmailVerificationCode struct {
-	ID        int32              `json:"id"`
-	UserID    int32              `json:"user_id"`
-	CodeHash  string             `json:"code_hash"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-	Attempts  int32              `json:"attempts"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
 type Game struct {
 	ID          int32              `json:"id"`
 	ProblemID   string             `json:"problem_id"`
@@ -66,4 +57,12 @@ type User struct {
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	EmailVerified bool               `json:"email_verified"`
+}
+
+type VerificationCode struct {
+	Email     string             `json:"email"`
+	CodeHash  string             `json:"code_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	Attempts  int32              `json:"attempts"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }

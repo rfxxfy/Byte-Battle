@@ -110,14 +110,11 @@ func seedCode(t *testing.T, email, code string, ttl time.Duration) {
 	ctx := context.Background()
 	q := sqlcdb.New(testPool)
 
-	user, err := q.GetUserByEmail(ctx, email)
-	require.NoError(t, err)
-
 	hash, err := bcrypt.GenerateFromPassword([]byte(code), 4)
 	require.NoError(t, err)
 
 	_, err = q.UpsertVerificationCode(ctx, sqlcdb.UpsertVerificationCodeParams{
-		UserID:    user.ID,
+		Email:     email,
 		CodeHash:  string(hash),
 		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(ttl), Valid: true},
 	})
