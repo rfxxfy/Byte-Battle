@@ -136,28 +136,9 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 		return sqlcdb.Session{}, ErrInvalidCode
 	}
 
-	user, err := s.db.GetUserByEmail(ctx, email)
-	if errors.Is(err, pgx.ErrNoRows) {
-		username, genErr := s.generateUniqueUsername(ctx)
-		if genErr != nil {
-			return sqlcdb.Session{}, fmt.Errorf("generate username: %w", genErr)
-		}
-		user, err = s.db.CreateUserByEmail(ctx, sqlcdb.CreateUserByEmailParams{
-			Username: username,
-			Email:    email,
-		})
-		if err != nil {
-			// Concurrent registration: another request created this user first.
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				user, err = s.db.GetUserByEmail(ctx, email)
-			}
-			if err != nil {
-				return sqlcdb.Session{}, fmt.Errorf("create user: %w", err)
-			}
-		}
-	} else if err != nil {
-		return sqlcdb.Session{}, fmt.Errorf("get user: %w", err)
+	user, err := s.getOrCreateUser(ctx, email)
+	if err != nil {
+		return sqlcdb.Session{}, err
 	}
 
 	if err := s.db.SetEmailVerified(ctx, user.ID); err != nil {
@@ -176,8 +157,39 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 	return session, nil
 }
 
+func (s *entranceService) getOrCreateUser(ctx context.Context, email string) (sqlcdb.User, error) {
+	user, err := s.db.GetUserByEmail(ctx, email)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.User{}, fmt.Errorf("get user: %w", err)
+	}
+
+	username, err := s.generateUniqueUsername(ctx)
+	if err != nil {
+		return sqlcdb.User{}, fmt.Errorf("generate username: %w", err)
+	}
+
+	user, err = s.db.CreateUserByEmail(ctx, sqlcdb.CreateUserByEmailParams{
+		Username: username,
+		Email:    email,
+	})
+	if err != nil {
+		// Concurrent registration: another request created this user first.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			user, err = s.db.GetUserByEmail(ctx, email)
+		}
+		if err != nil {
+			return sqlcdb.User{}, fmt.Errorf("create user: %w", err)
+		}
+	}
+	return user, nil
+}
+
 func (s *entranceService) generateUniqueUsername(ctx context.Context) (string, error) {
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		b := make([]byte, 4)
 		if _, err := rand.Read(b); err != nil {
 			return "", err
