@@ -5,14 +5,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 )
@@ -26,7 +30,7 @@ const (
 )
 
 type DockerExecutor struct {
-	cli     *client.Client
+	cli     dockerClient
 	config  *Config
 	pools   map[Language]chan string
 	errChan chan error
@@ -52,9 +56,56 @@ func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
 		pools:   make(map[Language]chan string),
 		errChan: make(chan error, 16),
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := e.ensureImages(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ensure executor images: %w", err)
+	}
 	e.initPools()
 	go e.logPoolErrors()
 	return e, nil
+}
+
+func (e *DockerExecutor) ensureImages(ctx context.Context) error {
+	var wg sync.WaitGroup
+	errs := make(chan error, len(e.config.Languages))
+
+	for _, settings := range e.config.Languages {
+		wg.Add(1)
+		go func(img string) {
+			defer wg.Done()
+			if _, err := e.cli.ImageInspect(ctx, img); err == nil {
+				return // already present
+			} else if !cerrdefs.IsNotFound(err) {
+				errs <- fmt.Errorf("inspect %s: %w", img, err)
+				return
+			}
+			log.Printf("pulling executor image %s...", img)
+			rc, err := e.cli.ImagePull(ctx, img, image.PullOptions{})
+			if err != nil {
+				errs <- fmt.Errorf("pull %s: %w", img, err)
+				return
+			}
+			defer rc.Close()
+			if _, err := io.Copy(io.Discard, rc); err != nil {
+				errs <- fmt.Errorf("pull %s: %w", img, err)
+				return
+			}
+			log.Printf("pulled executor image %s", img)
+		}(settings.Image)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	var msgs []string
+	for err := range errs {
+		msgs = append(msgs, err.Error())
+	}
+	if len(msgs) > 0 {
+		return fmt.Errorf("%s", strings.Join(msgs, "; "))
+	}
+	return nil
 }
 
 func (e *DockerExecutor) logPoolErrors() {

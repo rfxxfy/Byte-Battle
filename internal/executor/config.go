@@ -53,7 +53,7 @@ func DefaultConfig() *Config {
 				RunCmd:     []string{"./solution"},
 			},
 			"java": {
-				Image:      "eclipse-temurin:21-jre-alpine",
+				Image:      "eclipse-temurin:21-jdk-alpine",
 				SourceFile: "Main.java",
 				CompileCmd: []string{"javac", "Main.java"},
 				RunCmd:     []string{"java", "Main"},
