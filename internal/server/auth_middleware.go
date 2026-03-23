@@ -2,36 +2,54 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
+
+	"bytebattle/internal/api"
+	"bytebattle/internal/apierr"
+	sqlcdb "bytebattle/internal/db/sqlc"
 )
 
 type contextKey string
 
-const contextKeyUserID contextKey = "userID"
+const (
+	contextKeyUserID  contextKey = "userID"
+	contextKeySession contextKey = "session"
+)
 
-func (s *HTTPServer) authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := bearerToken(r)
-		if token == "" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]string{"status": "error", "error": "unauthorized"})
-			return
+func (s *HTTPServer) strictAuthMiddleware(publicOps map[string]bool) api.StrictMiddlewareFunc {
+	return func(f api.StrictHandlerFunc, operationID string) api.StrictHandlerFunc {
+		if publicOps[operationID] {
+			return f
 		}
-
-		session, err := s.sessionService.ValidateToken(r.Context(), token)
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]string{"status": "error", "error": "unauthorized"})
-			return
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req interface{}) (interface{}, error) {
+			token := bearerToken(r)
+			session, err := s.sessionService.ValidateToken(ctx, token)
+			if err != nil {
+				return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
+			}
+			ctx = context.WithValue(ctx, contextKeyUserID, int(session.UserID))
+			ctx = context.WithValue(ctx, contextKeySession, session)
+			r = r.WithContext(ctx)
+			return f(ctx, w, r, req)
 		}
+	}
+}
 
-		ctx := context.WithValue(r.Context(), contextKeyUserID, int(session.UserID))
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+func publicOpsFromSpec() map[string]bool {
+	swagger, err := api.GetSwagger()
+	if err != nil {
+		panic("failed to load embedded swagger spec: " + err.Error())
+	}
+	public := map[string]bool{}
+	for _, pathItem := range swagger.Paths.Map() {
+		for _, op := range pathItem.Operations() {
+			if op.Security != nil && len(*op.Security) == 0 {
+				public[op.OperationID] = true
+			}
+		}
+	}
+	return public
 }
 
 func bearerToken(r *http.Request) string {
@@ -45,4 +63,9 @@ func bearerToken(r *http.Request) string {
 func userIDFromContext(ctx context.Context) (int, bool) {
 	id, ok := ctx.Value(contextKeyUserID).(int)
 	return id, ok
+}
+
+func sessionFromContext(ctx context.Context) (sqlcdb.Session, bool) {
+	s, ok := ctx.Value(contextKeySession).(sqlcdb.Session)
+	return s, ok
 }

@@ -147,91 +147,6 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 	return api.CancelGame200JSONResponse{Game: toAPIGame(game)}, nil
 }
 
-func (s *HTTPServer) CreateSession(ctx context.Context, req api.CreateSessionRequestObject) (api.CreateSessionResponseObject, error) {
-	if req.Body.UserId < 1 {
-		return nil, apierr.New(apierr.ErrValidation, "user_id must be a positive integer")
-	}
-
-	session, err := s.sessionService.CreateSession(ctx, req.Body.UserId)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.CreateSession201JSONResponse{Session: toAPISession(session)}, nil
-}
-
-func (s *HTTPServer) GetSession(ctx context.Context, req api.GetSessionRequestObject) (api.GetSessionResponseObject, error) {
-	session, err := s.sessionService.GetSession(ctx, req.Id)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.GetSession200JSONResponse{Session: toAPISession(session)}, nil
-}
-
-func (s *HTTPServer) ValidateSession(ctx context.Context, req api.ValidateSessionRequestObject) (api.ValidateSessionResponseObject, error) {
-	token := ""
-	if req.Params.Token != nil {
-		token = *req.Params.Token
-	}
-
-	session, err := s.sessionService.ValidateToken(ctx, token)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.ValidateSession200JSONResponse{Valid: true, Session: toAPISession(session)}, nil
-}
-
-func (s *HTTPServer) RefreshSession(ctx context.Context, req api.RefreshSessionRequestObject) (api.RefreshSessionResponseObject, error) {
-	session, err := s.sessionService.RefreshSession(ctx, req.Id)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.RefreshSession200JSONResponse{Session: toAPISession(session)}, nil
-}
-
-func (s *HTTPServer) EndSession(ctx context.Context, req api.EndSessionRequestObject) (api.EndSessionResponseObject, error) {
-	if err := s.sessionService.EndSession(ctx, req.Id); err != nil {
-		return nil, err
-	}
-
-	return api.EndSession200JSONResponse{Ended: true}, nil
-}
-
-func (s *HTTPServer) GetUserSessions(ctx context.Context, req api.GetUserSessionsRequestObject) (api.GetUserSessionsResponseObject, error) {
-	sessions, err := s.sessionService.GetUserSessions(ctx, req.UserId)
-	if err != nil {
-		return nil, err
-	}
-
-	apiSessions := make([]api.Session, len(sessions))
-	for i, s := range sessions {
-		apiSessions[i] = toAPISession(s)
-	}
-
-	return api.GetUserSessions200JSONResponse{Sessions: apiSessions}, nil
-}
-
-func (s *HTTPServer) EndAllUserSessions(ctx context.Context, req api.EndAllUserSessionsRequestObject) (api.EndAllUserSessionsResponseObject, error) {
-	count, err := s.sessionService.EndAllUserSessions(ctx, req.UserId)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.EndAllUserSessions200JSONResponse{Count: count}, nil
-}
-
-func (s *HTTPServer) CleanupExpiredSessions(ctx context.Context, _ api.CleanupExpiredSessionsRequestObject) (api.CleanupExpiredSessionsResponseObject, error) {
-	count, err := s.sessionService.CleanupExpired(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.CleanupExpiredSessions200JSONResponse{Count: count}, nil
-}
-
 func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if !strings.HasPrefix(authHeader, "Bearer ") {
@@ -297,16 +212,6 @@ func toAPIProblem(p *problems.Problem) api.Problem {
 		TimeLimitMs:   p.Meta.TimeLimitMs,
 		MemoryLimitMb: p.Meta.MemoryLimitMb,
 		TestCount:     &testCount,
-	}
-}
-
-func toAPISession(s sqlcdb.Session) api.Session {
-	return api.Session{
-		Id:        int(s.ID),
-		UserId:    int(s.UserID),
-		Token:     s.Token,
-		ExpiresAt: s.ExpiresAt.Time,
-		CreatedAt: s.CreatedAt.Time,
 	}
 }
 
