@@ -29,7 +29,7 @@ const (
 )
 
 type DockerExecutor struct {
-	cli     *client.Client
+	cli     dockerClient
 	config  *Config
 	pools   map[Language]chan string
 	errChan chan error
