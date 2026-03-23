@@ -88,7 +88,7 @@ func (s *SessionService) ValidateToken(ctx context.Context, token string) (sqlcd
 
 	session, err := s.q.GetSessionByToken(ctx, token)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlcdb.Session{}, apierr.New(apierr.ErrSessionNotFound, "session not found")
+		return sqlcdb.Session{}, apierr.New(apierr.ErrInvalidToken, "token not found")
 	}
 	if err != nil {
 		return sqlcdb.Session{}, err
