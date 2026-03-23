@@ -8,12 +8,9 @@ import (
 	"net/http"
 )
 
-// Mailer is the interface for sending verification codes via email.
 type Mailer interface {
 	SendVerificationCode(to, code string) error
 }
-
-// --- Resend mailer (production) ---
 
 type resendMailer struct {
 	apiKey    string
@@ -62,8 +59,6 @@ func (m *resendMailer) SendVerificationCode(to, code string) error {
 	return nil
 }
 
-// --- Dev mailer (development) ---
-
 type devMailer struct{}
 
 func NewDevMailer() Mailer {
@@ -75,11 +70,8 @@ func (m *devMailer) SendVerificationCode(to, code string) error {
 	return nil
 }
 
-// --- Factory ---
-
 func NewMailer(apiKey, fromEmail string) Mailer {
 	if apiKey != "" {
-		log.Println("[MAILER] using Resend")
 		return NewResendMailer(apiKey, fromEmail)
 	}
 	log.Println("[MAILER] RESEND_API_KEY not set, codes will be printed to stdout")

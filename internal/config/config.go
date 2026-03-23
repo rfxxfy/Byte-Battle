@@ -15,14 +15,14 @@ type Config struct {
 }
 
 type EntranceConfig struct {
-	ResendAPIKey    string
-	FromEmail       string
-	CodeTTL         time.Duration
-	MaxAttempts     int
-	BcryptCost      int
-	SessionTTL      time.Duration
-	CookieName      string
-	CookieSecure    bool
+	ResendAPIKey string
+	FromEmail    string
+	CodeTTL      time.Duration
+	MaxAttempts  int
+	BcryptCost   int
+	SessionTTL   time.Duration
+	CookieName   string
+	CookieSecure bool
 }
 
 func Load() Config {

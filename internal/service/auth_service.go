@@ -17,7 +17,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Sentinel errors.
 var (
 	ErrInvalidEmail    = errors.New("invalid email format")
 	ErrUserNotFound    = errors.New("user not found")
@@ -25,21 +24,13 @@ var (
 	ErrTooManyAttempts = errors.New("too many verification attempts")
 )
 
-// EntranceService handles the single email-based entrance flow.
-// It transparently registers new users and authenticates existing ones —
-// the caller never needs to know which case occurred.
+// EntranceService handles both registration and login through a single email-code flow.
+// The caller never needs to know which case occurred.
 type EntranceService interface {
-	// SendCode creates the user if they don't exist yet, then sends a
-	// 6-digit verification code to the provided email.
 	SendCode(ctx context.Context, email string) error
-
-	// VerifyCode checks the code, marks the email as verified, and returns
-	// a session token ready to be stored in a cookie.
 	VerifyCode(ctx context.Context, email, code string) (sessionToken string, err error)
 }
 
-// entranceDB is the narrow DB interface used by entranceService.
-// *sqlcdb.Queries satisfies it automatically.
 type entranceDB interface {
 	GetUserByEmail(ctx context.Context, email string) (sqlcdb.User, error)
 	GetUserByUsername(ctx context.Context, username string) (sqlcdb.User, error)
@@ -51,13 +42,10 @@ type entranceDB interface {
 	SetEmailVerified(ctx context.Context, id int32) error
 }
 
-// sessionCreator is the narrow session interface used by entranceService.
-// *SessionService satisfies it automatically.
 type sessionCreator interface {
 	CreateSession(ctx context.Context, userID int) (sqlcdb.Session, error)
 }
 
-// entranceService is the concrete implementation of EntranceService.
 type entranceService struct {
 	db      entranceDB
 	session sessionCreator
@@ -79,7 +67,6 @@ func NewEntranceService(
 	}
 }
 
-// SendCode implements EntranceService.
 func (s *entranceService) SendCode(ctx context.Context, email string) error {
 	if !isValidEmail(email) {
 		return ErrInvalidEmail
@@ -87,7 +74,6 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 
 	user, err := s.db.GetUserByEmail(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
-		// New user — create with auto-generated username.
 		username, genErr := s.generateUniqueUsername(ctx)
 		if genErr != nil {
 			return fmt.Errorf("generate username: %w", genErr)
@@ -106,7 +92,6 @@ func (s *entranceService) SendCode(ctx context.Context, email string) error {
 	return s.sendCode(ctx, user)
 }
 
-// VerifyCode implements EntranceService.
 func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (string, error) {
 	user, err := s.db.GetUserByEmail(ctx, email)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -150,8 +135,6 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 
 	return session.Token, nil
 }
-
-// --- helpers ---
 
 func (s *entranceService) sendCode(ctx context.Context, user sqlcdb.User) error {
 	code, err := generateVerificationCode()
