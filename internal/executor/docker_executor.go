@@ -14,10 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
-	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
