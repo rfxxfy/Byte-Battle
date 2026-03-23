@@ -340,6 +340,53 @@ func TestVerifyCode_ExpiredCode(t *testing.T) {
 	}
 }
 
+func TestSendCode_RateLimitsRecentCode(t *testing.T) {
+	cfg := testEntranceConfig() // CodeTTL = 15min
+	db := &mockDB{
+		getVerification: func(_ context.Context, _ string) (sqlcdb.VerificationCode, error) {
+			// Code expires in 14.5 min → sent 30s ago, within 60s cooldown
+			return sqlcdb.VerificationCode{
+				Email:     "user@example.com",
+				ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(cfg.CodeTTL - 30*time.Second), Valid: true},
+			}, nil
+		},
+	}
+	svc := NewEntranceService(db, &mockSession{}, &mockMailer{}, cfg)
+
+	err := svc.SendCode(context.Background(), "user@example.com")
+
+	if !errors.Is(err, ErrCodeRecentlySent) {
+		t.Errorf("expected ErrCodeRecentlySent, got %v", err)
+	}
+	if db.upsertCalled {
+		t.Error("should not upsert when rate-limited")
+	}
+}
+
+func TestSendCode_AllowsAfterCooldown(t *testing.T) {
+	cfg := testEntranceConfig() // CodeTTL = 15min
+	db := &mockDB{
+		getVerification: func(_ context.Context, _ string) (sqlcdb.VerificationCode, error) {
+			// Code expires in 13 min → sent 2min ago, past 60s cooldown
+			return sqlcdb.VerificationCode{
+				Email:     "user@example.com",
+				ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(cfg.CodeTTL - 2*time.Minute), Valid: true},
+			}, nil
+		},
+	}
+	mailer := &mockMailer{}
+	svc := NewEntranceService(db, &mockSession{}, mailer, cfg)
+
+	err := svc.SendCode(context.Background(), "user@example.com")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !db.upsertCalled {
+		t.Error("expected UpsertVerificationCode to be called after cooldown")
+	}
+}
+
 func TestVerifyCode_NoCode_ReturnsInvalidCode(t *testing.T) {
 	db := &mockDB{} // GetVerificationCode returns pgx.ErrNoRows by default
 	svc := newEntrance(db, &mockSession{}, &mockMailer{})
