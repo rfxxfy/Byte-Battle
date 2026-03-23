@@ -37,29 +37,28 @@ func (s *HTTPServer) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := s.entrance.VerifyCode(r.Context(), req.Email, req.Code)
+	session, err := s.entrance.VerifyCode(r.Context(), req.Email, req.Code)
 	if err != nil {
 		s.handleEntranceError(w, err)
 		return
 	}
 
-	setSessionCookie(w, token, s.cfg.CookieName, s.cfg.CookieSecure, s.cfg.SessionTTL)
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"token":      session.Token,
+		"expires_at": session.ExpiresAt.Time,
+	})
 }
 
 func (s *HTTPServer) handleLogout(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie(s.cfg.CookieName)
-	if err == nil && cookie.Value != "" {
-		session, err := s.sessionService.ValidateToken(r.Context(), cookie.Value)
+	token := bearerToken(r)
+	if token != "" {
+		session, err := s.sessionService.ValidateToken(r.Context(), token)
 		if err == nil {
 			_ = s.sessionService.EndSession(r.Context(), int(session.ID))
 		}
 	}
-
-	clearSessionCookie(w, s.cfg.CookieName, s.cfg.CookieSecure)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
