@@ -37,23 +37,23 @@ func DefaultConfig() *Config {
 	return &Config{
 		Languages: map[Language]LangSettings{
 			"python": {
-				Image:      "python:3.10-slim",
+				Image:      "python:3.14-slim",
 				SourceFile: "main.py",
 				RunCmd:     []string{"python", "main.py"},
 			},
 			"go": {
-				Image:      "golang:1.21-alpine",
+				Image:      "golang:1.26-alpine",
 				SourceFile: "main.go",
 				RunCmd:     []string{"go", "run", "main.go"},
 			},
 			"cpp": {
-				Image:      "gcc:latest",
+				Image:      "gcc:15",
 				SourceFile: "main.cpp",
 				CompileCmd: []string{"g++", "-O2", "-o", "solution", "main.cpp"},
 				RunCmd:     []string{"./solution"},
 			},
 			"java": {
-				Image:      "openjdk:17-slim",
+				Image:      "eclipse-temurin:21-jre-alpine",
 				SourceFile: "Main.java",
 				CompileCmd: []string{"javac", "Main.java"},
 				RunCmd:     []string{"java", "Main"},
