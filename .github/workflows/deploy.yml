@@ -42,6 +42,15 @@ jobs:
             ${{ env.IMAGE_LC }}:${{ github.sha }}
 
       # ─── Deploy to VPS ─────────────────────────────────────────────────
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: docker-compose.prod.yaml
+          target: /opt/bytebattle/
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
