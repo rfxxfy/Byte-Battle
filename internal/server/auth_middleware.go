@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"time"
+	"strings"
 )
 
 type contextKey string
@@ -13,15 +13,15 @@ const contextKeyUserID contextKey = "userID"
 
 func (s *HTTPServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(s.cfg.CookieName)
-		if err != nil || cookie.Value == "" {
+		token := bearerToken(r)
+		if token == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]string{"status": "error", "error": "unauthorized"})
 			return
 		}
 
-		session, err := s.sessionService.ValidateToken(r.Context(), cookie.Value)
+		session, err := s.sessionService.ValidateToken(r.Context(), token)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -34,31 +34,15 @@ func (s *HTTPServer) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func bearerToken(r *http.Request) string {
+	h := r.Header.Get("Authorization")
+	if after, ok := strings.CutPrefix(h, "Bearer "); ok {
+		return after
+	}
+	return ""
+}
+
 func userIDFromContext(ctx context.Context) (int, bool) {
 	id, ok := ctx.Value(contextKeyUserID).(int)
 	return id, ok
-}
-
-func setSessionCookie(w http.ResponseWriter, token, name string, secure bool, ttl time.Duration) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     name,
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(ttl.Seconds()),
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func clearSessionCookie(w http.ResponseWriter, name string, secure bool) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     name,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
-	})
 }

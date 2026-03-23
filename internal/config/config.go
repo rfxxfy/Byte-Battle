@@ -21,8 +21,6 @@ type EntranceConfig struct {
 	MaxAttempts  int
 	BcryptCost   int
 	SessionTTL   time.Duration
-	CookieName   string
-	CookieSecure bool
 }
 
 func Load() Config {
@@ -40,8 +38,6 @@ func Load() Config {
 			MaxAttempts:  getIntEnv("ENTRANCE_MAX_ATTEMPTS", 5),
 			BcryptCost:   getIntEnv("ENTRANCE_BCRYPT_COST", 10),
 			SessionTTL:   getDurationEnv("SESSION_TTL", 24*time.Hour),
-			CookieName:   getEnv("SESSION_COOKIE_NAME", "bb_session"),
-			CookieSecure: getEnv("COOKIE_SECURE", "false") == "true",
 		},
 	}
 }
