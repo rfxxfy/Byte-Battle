@@ -8,7 +8,6 @@ import (
 
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
-	"bytebattle/internal/config"
 	"bytebattle/internal/service"
 	"bytebattle/internal/ws"
 
@@ -41,7 +40,6 @@ type HTTPServer struct {
 	executionService *service.ExecutionService
 	hub              *ws.Hub
 	entrance         service.EntranceService
-	cfg              config.EntranceConfig
 }
 
 func New(
@@ -53,7 +51,6 @@ func New(
 	executionService *service.ExecutionService,
 	hub *ws.Hub,
 	entrance service.EntranceService,
-	cfg config.EntranceConfig,
 ) http.Handler {
 	s := &HTTPServer{
 		pool:             pool,
@@ -64,7 +61,6 @@ func New(
 		executionService: executionService,
 		hub:              hub,
 		entrance:         entrance,
-		cfg:              cfg,
 	}
 
 	r := chi.NewRouter()
