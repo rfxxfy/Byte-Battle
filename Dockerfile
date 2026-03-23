@@ -24,7 +24,7 @@ WORKDIR /app
 
 COPY --from=builder /app/bytebattle .
 COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
-COPY migrations/ ./migrations/
+COPY internal/migrations/ ./migrations/
 COPY --from=builder /src/problems/ ./problems/
 
 RUN addgroup -S app && adduser -S -G app app && chown -R app:app /app

@@ -554,6 +554,48 @@ func TestGame_CreateWithUnknownProblemID(t *testing.T) {
 	assert.Equal(t, "PROBLEM_NOT_FOUND", errCode(t, resp))
 }
 
+// --- execute tests ---
+
+func TestExecute_Auth(t *testing.T) {
+	execute := func(auth string) *http.Response {
+		req, err := http.NewRequest(http.MethodPost, testSrv.URL+"/execute",
+			strings.NewReader(`{"code":"x","language":"go","input":""}`))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		if auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
+		resp, err := testSrv.Client().Do(req)
+		require.NoError(t, err)
+		return resp
+	}
+
+	t.Run("no auth header", func(t *testing.T) {
+		resp := execute("")
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.Equal(t, "INVALID_TOKEN", errCode(t, resp))
+	})
+
+	t.Run("invalid scheme", func(t *testing.T) {
+		resp := execute("Token abc123")
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.Equal(t, "INVALID_TOKEN", errCode(t, resp))
+	})
+
+	t.Run("nonexistent bearer token", func(t *testing.T) {
+		resp := execute("Bearer doesnotexist")
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, "SESSION_NOT_FOUND", errCode(t, resp))
+	})
+
+	t.Run("valid token", func(t *testing.T) {
+		token := sessionToken(t, user1ID)
+		resp := execute("Bearer " + token)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	})
+}
+
 // --- websocket helpers ---
 
 func wsURL(path string) string {

@@ -29,16 +29,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase image name
+        run: echo "IMAGE_LC=${REGISTRY}/${IMAGE_NAME,,}" >> $GITHUB_ENV
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_LC }}:latest
+            ${{ env.IMAGE_LC }}:${{ github.sha }}
 
       # ─── Deploy to VPS ─────────────────────────────────────────────────
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: docker-compose.prod.yaml
+          target: /opt/bytebattle/
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
@@ -52,7 +64,7 @@ jobs:
             echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Update image reference in .env
-            IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            IMAGE=${{ env.IMAGE_LC }}
             sed -i "s|^IMAGE=.*|IMAGE=${IMAGE}|" .env || echo "IMAGE=${IMAGE}" >> .env
 
             # Pull new image
