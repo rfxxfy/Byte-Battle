@@ -3,11 +3,100 @@ info:
   title: Byte Battle API
   version: "0.1.0"
 
+security: []  # default: no auth required; individual operations opt-in via BearerAuth
+
 paths:
+  /auth/enter:
+    post:
+      operationId: PostAuthEnter
+      summary: Request a magic code via email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnterRequest"
+      responses:
+        "200":
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/confirm:
+    post:
+      operationId: PostAuthConfirm
+      summary: Verify magic code and get session token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmRequest"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/me:
+    get:
+      operationId: GetAuthMe
+      summary: Get current authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /auth/logout:
+    post:
+      operationId: PostAuthLogout
+      summary: End current session
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
   /problems:
     get:
       operationId: ListProblems
       summary: List all available problems
+      security: []
       responses:
         "200":
           description: List of problems
@@ -22,6 +111,7 @@ paths:
     get:
       operationId: GetProblem
       summary: Get problem by ID
+      security: []
       parameters:
         - name: problem_id
           in: path
@@ -45,6 +135,8 @@ paths:
     post:
       operationId: CreateGame
       summary: Create a new game
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -60,12 +152,16 @@ paths:
                 $ref: "#/components/schemas/GameResponse"
         "400":
           $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
         "500":
           $ref: "#/components/responses/Error"
 
     get:
       operationId: ListGames
       summary: List games with pagination
+      security:
+        - BearerAuth: []
       parameters:
         - name: limit
           in: query
@@ -86,6 +182,8 @@ paths:
                 $ref: "#/components/schemas/ListGamesResponse"
         "400":
           $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
         "500":
           $ref: "#/components/responses/Error"
 
@@ -93,6 +191,8 @@ paths:
     get:
       operationId: GetGame
       summary: Get game by ID
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/GameID"
       responses:
@@ -102,6 +202,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GameResponse"
+        "401":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
         "500":
@@ -110,6 +212,8 @@ paths:
     delete:
       operationId: DeleteGame
       summary: Delete game by ID
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/GameID"
       responses:
@@ -119,6 +223,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeletedResponse"
+        "401":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
         "500":
@@ -128,6 +234,8 @@ paths:
     post:
       operationId: StartGame
       summary: Start a pending game
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/GameID"
       responses:
@@ -139,6 +247,8 @@ paths:
                 $ref: "#/components/schemas/GameResponse"
         "400":
           $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
         "500":
@@ -148,6 +258,8 @@ paths:
     post:
       operationId: CompleteGame
       summary: Complete a game with a winner
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/GameID"
       requestBody:
@@ -165,6 +277,8 @@ paths:
                 $ref: "#/components/schemas/GameResponse"
         "400":
           $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
         "500":
@@ -174,6 +288,8 @@ paths:
     post:
       operationId: CancelGame
       summary: Cancel a game
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/GameID"
       responses:
@@ -185,176 +301,22 @@ paths:
                 $ref: "#/components/schemas/GameResponse"
         "400":
           $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
-
-  /sessions:
-    post:
-      operationId: CreateSession
-      summary: Create a new session
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateSessionRequest"
-      responses:
-        "201":
-          description: Session created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SessionResponse"
-        "400":
-          $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
-
-  /sessions/validate:
-    get:
-      operationId: ValidateSession
-      summary: Validate a session token
-      parameters:
-        - name: token
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Session is valid
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidateSessionResponse"
-        "401":
-          $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
-
-  /sessions/cleanup:
-    post:
-      operationId: CleanupExpiredSessions
-      summary: Remove all expired sessions
-      responses:
-        "200":
-          description: Cleanup result
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CountResponse"
-        "500":
-          $ref: "#/components/responses/Error"
-
-  /sessions/{id}:
-    get:
-      operationId: GetSession
-      summary: Get session by ID
-      parameters:
-        - $ref: "#/components/parameters/SessionID"
-      responses:
-        "200":
-          description: Session found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SessionResponse"
-        "404":
-          $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
-
-    delete:
-      operationId: EndSession
-      summary: End (delete) a session
-      parameters:
-        - $ref: "#/components/parameters/SessionID"
-      responses:
-        "200":
-          description: Session ended
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EndedResponse"
-        "404":
-          $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
-
-  /sessions/{id}/refresh:
-    post:
-      operationId: RefreshSession
-      summary: Refresh session expiry
-      parameters:
-        - $ref: "#/components/parameters/SessionID"
-      responses:
-        "200":
-          description: Session refreshed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SessionResponse"
         "401":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
-
-  /users/{user_id}/sessions:
-    get:
-      operationId: GetUserSessions
-      summary: List all sessions for a user
-      parameters:
-        - $ref: "#/components/parameters/UserID"
-      responses:
-        "200":
-          description: User sessions
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserSessionsResponse"
-        "400":
-          $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
-
-    delete:
-      operationId: EndAllUserSessions
-      summary: End all sessions for a user
-      parameters:
-        - $ref: "#/components/parameters/UserID"
-      responses:
-        "200":
-          description: Sessions ended
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CountResponse"
-        "400":
           $ref: "#/components/responses/Error"
         "500":
           $ref: "#/components/responses/Error"
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
   parameters:
     GameID:
       name: id
-      in: path
-      required: true
-      schema:
-        type: integer
-
-    SessionID:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: integer
-
-    UserID:
-      name: user_id
       in: path
       required: true
       schema:
@@ -382,20 +344,60 @@ components:
           type: string
           example: game not found
 
+    StatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: ok
+
+    EnterRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+
+    ConfirmRequest:
+      type: object
+      required:
+        - email
+        - code
+      properties:
+        email:
+          type: string
+        code:
+          type: string
+
+    TokenResponse:
+      type: object
+      required:
+        - token
+        - expires_at
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    MeResponse:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+
     DeletedResponse:
       type: object
       required:
         - deleted
       properties:
         deleted:
-          type: boolean
-
-    EndedResponse:
-      type: object
-      required:
-        - ended
-      properties:
-        ended:
           type: boolean
 
     CountResponse:
@@ -523,65 +525,5 @@ components:
         - winner_id
       properties:
         winner_id:
-          type: integer
-          minimum: 1
-
-    Session:
-      type: object
-      required:
-        - id
-        - user_id
-        - token
-        - expires_at
-        - created_at
-      properties:
-        id:
-          type: integer
-        user_id:
-          type: integer
-        token:
-          type: string
-        expires_at:
-          type: string
-          format: date-time
-        created_at:
-          type: string
-          format: date-time
-
-    SessionResponse:
-      type: object
-      required:
-        - session
-      properties:
-        session:
-          $ref: "#/components/schemas/Session"
-
-    ValidateSessionResponse:
-      type: object
-      required:
-        - valid
-        - session
-      properties:
-        valid:
-          type: boolean
-        session:
-          $ref: "#/components/schemas/Session"
-
-    UserSessionsResponse:
-      type: object
-      required:
-        - sessions
-      properties:
-        sessions:
-          type: array
-          items:
-            $ref: "#/components/schemas/Session"
-
-    CreateSessionRequest:
-      type: object
-      required:
-        - user_id
-      properties:
-        user_id:
           type: integer
           minimum: 1

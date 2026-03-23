@@ -1,99 +1,58 @@
 package server
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"net/http"
 
+	"bytebattle/internal/api"
+	"bytebattle/internal/apierr"
 	"bytebattle/internal/service"
 )
 
-func (s *HTTPServer) handleSendCode(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email string `json:"email"`
+func (s *HTTPServer) PostAuthEnter(ctx context.Context, req api.PostAuthEnterRequestObject) (api.PostAuthEnterResponseObject, error) {
+	if err := s.entrance.SendCode(ctx, req.Body.Email); err != nil {
+		return nil, entranceAppErr(err)
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
-		writeAuthError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if err := s.entrance.SendCode(r.Context(), req.Email); err != nil {
-		s.handleEntranceError(w, err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	return api.PostAuthEnter200JSONResponse{Status: "ok"}, nil
 }
 
-func (s *HTTPServer) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email string `json:"email"`
-		Code  string `json:"code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" || req.Code == "" {
-		writeAuthError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	session, err := s.entrance.VerifyCode(r.Context(), req.Email, req.Code)
+func (s *HTTPServer) PostAuthConfirm(ctx context.Context, req api.PostAuthConfirmRequestObject) (api.PostAuthConfirmResponseObject, error) {
+	session, err := s.entrance.VerifyCode(ctx, req.Body.Email, req.Body.Code)
 	if err != nil {
-		s.handleEntranceError(w, err)
-		return
+		return nil, entranceAppErr(err)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"token":      session.Token,
-		"expires_at": session.ExpiresAt.Time,
-	})
+	return api.PostAuthConfirm200JSONResponse{
+		Token:     session.Token,
+		ExpiresAt: session.ExpiresAt.Time,
+	}, nil
 }
 
-func (s *HTTPServer) handleLogout(w http.ResponseWriter, r *http.Request) {
-	token := bearerToken(r)
-	if token != "" {
-		session, err := s.sessionService.ValidateToken(r.Context(), token)
-		if err == nil {
-			_ = s.sessionService.EndSession(r.Context(), int(session.ID))
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
-
-func (s *HTTPServer) handleAuthMe(w http.ResponseWriter, r *http.Request) {
-	userID, ok := userIDFromContext(r.Context())
+func (s *HTTPServer) GetAuthMe(ctx context.Context, _ api.GetAuthMeRequestObject) (api.GetAuthMeResponseObject, error) {
+	userID, ok := userIDFromContext(ctx)
 	if !ok {
-		writeAuthError(w, http.StatusUnauthorized, "unauthorized")
-		return
+		return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "user_id": userID})
+	return api.GetAuthMe200JSONResponse{UserId: userID}, nil
 }
 
-func (s *HTTPServer) handleEntranceError(w http.ResponseWriter, err error) {
+func (s *HTTPServer) PostAuthLogout(ctx context.Context, _ api.PostAuthLogoutRequestObject) (api.PostAuthLogoutResponseObject, error) {
+	if session, ok := sessionFromContext(ctx); ok {
+		_ = s.sessionService.EndSession(ctx, int(session.ID))
+	}
+	return api.PostAuthLogout200JSONResponse{Status: "ok"}, nil
+}
+
+func entranceAppErr(err error) *apierr.AppError {
 	switch {
 	case errors.Is(err, service.ErrInvalidEmail):
-		writeAuthError(w, http.StatusBadRequest, err.Error())
+		return apierr.New(apierr.ErrInvalidEmail, err.Error())
 	case errors.Is(err, service.ErrInvalidCode):
-		writeAuthError(w, http.StatusBadRequest, err.Error())
+		return apierr.New(apierr.ErrInvalidCode, err.Error())
 	case errors.Is(err, service.ErrTooManyAttempts):
-		writeAuthError(w, http.StatusTooManyRequests, err.Error())
+		return apierr.New(apierr.ErrTooManyAttempts, err.Error())
 	case errors.Is(err, service.ErrUserNotFound):
-		writeAuthError(w, http.StatusNotFound, err.Error())
+		return apierr.New(apierr.ErrUserNotFound, err.Error())
 	default:
-		writeAuthError(w, http.StatusInternalServerError, "internal server error")
+		return apierr.New(apierr.ErrInternal, "internal server error")
 	}
-}
-
-func writeAuthError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "error", "error": message})
 }

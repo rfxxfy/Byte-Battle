@@ -19,6 +19,11 @@ const (
 	ErrInvalidToken    = "INVALID_TOKEN"
 	ErrProblemNotFound = "PROBLEM_NOT_FOUND"
 
+	ErrInvalidEmail    = "INVALID_EMAIL"
+	ErrInvalidCode     = "INVALID_CODE"
+	ErrTooManyAttempts = "TOO_MANY_ATTEMPTS"
+	ErrUserNotFound    = "USER_NOT_FOUND"
+
 	ErrValidation = "VALIDATION_ERROR"
 )
 
@@ -39,8 +44,12 @@ func httpStatusCode(code string) int {
 		return http.StatusConflict
 	case ErrInvalidToken, ErrSessionExpired:
 		return http.StatusUnauthorized
-	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound:
+	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound, ErrUserNotFound:
 		return http.StatusNotFound
+	case ErrTooManyAttempts:
+		return http.StatusTooManyRequests
+	case ErrInvalidEmail, ErrInvalidCode:
+		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
 	}
