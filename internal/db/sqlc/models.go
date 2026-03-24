@@ -49,11 +49,20 @@ type Solution struct {
 }
 
 type User struct {
-	ID           int32              `json:"id"`
-	Username     string             `json:"username"`
-	Email        string             `json:"email"`
-	PasswordHash string             `json:"password_hash"`
-	Rating       pgtype.Int4        `json:"rating"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	ID            int32              `json:"id"`
+	Username      string             `json:"username"`
+	Email         string             `json:"email"`
+	PasswordHash  pgtype.Text        `json:"password_hash"`
+	Rating        pgtype.Int4        `json:"rating"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	EmailVerified bool               `json:"email_verified"`
+}
+
+type VerificationCode struct {
+	Email     string             `json:"email"`
+	CodeHash  string             `json:"code_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	Attempts  int32              `json:"attempts"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
