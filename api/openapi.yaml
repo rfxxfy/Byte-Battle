@@ -287,32 +287,6 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
 
-  /games/{id}/join:
-    post:
-      operationId: JoinGame
-      summary: Join a pending game as a participant
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/GameID"
-      responses:
-        "200":
-          description: Joined game
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/GameResponse"
-        "400":
-          $ref: "#/components/responses/Error"
-        "401":
-          $ref: "#/components/responses/Error"
-        "403":
-          $ref: "#/components/responses/Error"
-        "404":
-          $ref: "#/components/responses/Error"
-        "409":
-          $ref: "#/components/responses/Error"
-
   /games/join/{invite_token}:
     get:
       operationId: GetGameByToken
@@ -423,6 +397,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GameSolutionsResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /games/{id}/timeout:
+    post:
+      operationId: TimeoutGame
+      summary: Finish a solo game when the timer expires
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: Game finished by timeout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "400":
+          $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
         "403":
@@ -645,6 +643,7 @@ components:
         - creator_id
         - status
         - is_public
+        - is_solo
         - participants
         - created_at
         - updated_at
@@ -653,10 +652,17 @@ components:
           type: integer
         is_public:
           type: boolean
+        is_solo:
+          type: boolean
         invite_token:
           type: string
           format: uuid
           nullable: true
+        time_limit_minutes:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 300
         problem_ids:
           type: array
           minItems: 1
@@ -678,6 +684,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GameParticipant"
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -722,6 +732,14 @@ components:
         is_public:
           type: boolean
           default: true
+        is_solo:
+          type: boolean
+          default: false
+        time_limit_minutes:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 300
 
     CompleteGameRequest:
       type: object

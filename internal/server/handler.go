@@ -40,20 +40,6 @@ func (s *HTTPServer) handleRoot(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte("Добро пожаловать в Byte-Battle!"))
 }
 
-func (s *HTTPServer) handleHello(w http.ResponseWriter, r *http.Request) {
-	user, err := s.users.GetOrCreateTestUser(r.Context())
-	if err != nil {
-		responseErrorHandler(w, r, err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"message": "Привет, Byte-Battle!",
-		"user":    user,
-	})
-}
-
 func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObject) (api.ListGamesResponseObject, error) {
 	userID, _ := userIDFromContext(ctx)
 	limit, offset := 10, 0
@@ -115,47 +101,25 @@ func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestOb
 	userID, _ := userIDFromContext(ctx)
 
 	isPublic := req.Body.IsPublic == nil || *req.Body.IsPublic
-	game, err := s.gameService.CreateGame(ctx, userID, req.Body.ProblemIds, isPublic)
+	isSolo := req.Body.IsSolo != nil && *req.Body.IsSolo
+	if isSolo {
+		isPublic = false
+	}
+	var timeLimitMinutes *int16
+	if req.Body.TimeLimitMinutes != nil {
+		v := int16(*req.Body.TimeLimitMinutes)
+		timeLimitMinutes = &v
+	}
+	game, err := s.gameService.CreateGame(ctx, userID, req.Body.ProblemIds, isPublic, isSolo, timeLimitMinutes)
 	if err != nil {
 		return nil, err
 	}
 
-	participantIDs, err := s.gameService.GetParticipants(ctx, int(game.ID))
+	g, err := s.enrichGame(ctx, game, true)
 	if err != nil {
 		return nil, err
 	}
-	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.CreateGame201JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, true)}, nil
-}
-
-func (s *HTTPServer) JoinGame(ctx context.Context, req api.JoinGameRequestObject) (api.JoinGameResponseObject, error) {
-	userID, _ := userIDFromContext(ctx)
-	existing, err := s.gameService.GetGame(ctx, req.Id)
-	if err != nil {
-		return nil, err
-	}
-	if !existing.IsPublic {
-		return nil, apierr.New(apierr.ErrPrivateGame, "this is a private game; use the invite link to join")
-	}
-	game, err := s.gameService.JoinGame(ctx, req.Id, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	participantIDs, err := s.gameService.GetParticipants(ctx, int(game.ID))
-	if err != nil {
-		return nil, err
-	}
-	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.JoinGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, true)}, nil
+	return api.CreateGame201JSONResponse{Game: g}, nil
 }
 
 func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) (api.GetGameResponseObject, error) {
@@ -168,16 +132,11 @@ func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) 
 		return nil, err
 	}
 
-	participantIDs, err := s.gameService.GetParticipants(ctx, req.Id)
+	g, err := s.enrichGame(ctx, game, true)
 	if err != nil {
 		return nil, err
 	}
-	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.GetGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, game.IsPublic || isParticipantOf(userID, participantIDs))}, nil
+	return api.GetGame200JSONResponse{Game: g}, nil
 }
 
 func (s *HTTPServer) DeleteGame(ctx context.Context, req api.DeleteGameRequestObject) (api.DeleteGameResponseObject, error) {
@@ -196,16 +155,11 @@ func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObje
 		return nil, err
 	}
 
-	participantIDs, err := s.gameService.GetParticipants(ctx, req.Id)
+	g, err := s.enrichGame(ctx, game, true)
 	if err != nil {
 		return nil, err
 	}
-	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.StartGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, true)}, nil
+	return api.StartGame200JSONResponse{Game: g}, nil
 }
 
 func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameRequestObject) (api.CompleteGameResponseObject, error) {
@@ -215,16 +169,11 @@ func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameReque
 		return nil, err
 	}
 
-	participantIDs, err := s.gameService.GetParticipants(ctx, req.Id)
+	g, err := s.enrichGame(ctx, game, true)
 	if err != nil {
 		return nil, err
 	}
-	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.CompleteGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, true)}, nil
+	return api.CompleteGame200JSONResponse{Game: g}, nil
 }
 
 func (s *HTTPServer) LeaveGame(ctx context.Context, req api.LeaveGameRequestObject) (api.LeaveGameResponseObject, error) {
@@ -234,16 +183,11 @@ func (s *HTTPServer) LeaveGame(ctx context.Context, req api.LeaveGameRequestObje
 		return nil, err
 	}
 
-	participantIDs, err := s.gameService.GetParticipants(ctx, req.Id)
+	g, err := s.enrichGame(ctx, game, game.IsPublic)
 	if err != nil {
 		return nil, err
 	}
-	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.LeaveGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, game.IsPublic)}, nil
+	return api.LeaveGame200JSONResponse{Game: g}, nil
 }
 
 func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestObject) (api.CancelGameResponseObject, error) {
@@ -253,16 +197,11 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 		return nil, err
 	}
 
-	participantIDs, err := s.gameService.GetParticipants(ctx, req.Id)
+	g, err := s.enrichGame(ctx, game, true)
 	if err != nil {
 		return nil, err
 	}
-	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.CancelGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, true)}, nil
+	return api.CancelGame200JSONResponse{Game: g}, nil
 }
 
 func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteRequestObject) (api.PostExecuteResponseObject, error) {
@@ -330,15 +269,11 @@ func (s *HTTPServer) GetGameByToken(ctx context.Context, req api.GetGameByTokenR
 	if err != nil {
 		return nil, err
 	}
-	participants, err := s.gameService.GetParticipants(ctx, int(game.ID))
+	g, err := s.enrichGame(ctx, game, game.IsPublic)
 	if err != nil {
 		return nil, err
 	}
-	problemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
-	if err != nil {
-		return nil, err
-	}
-	return api.GetGameByToken200JSONResponse{Game: toAPIGame(game, participants, problemIDs, game.IsPublic)}, nil
+	return api.GetGameByToken200JSONResponse{Game: g}, nil
 }
 
 func (s *HTTPServer) JoinGameByToken(ctx context.Context, req api.JoinGameByTokenRequestObject) (api.JoinGameByTokenResponseObject, error) {
@@ -347,15 +282,23 @@ func (s *HTTPServer) JoinGameByToken(ctx context.Context, req api.JoinGameByToke
 	if err != nil {
 		return nil, err
 	}
-	participants, err := s.gameService.GetParticipants(ctx, int(game.ID))
+	g, err := s.enrichGame(ctx, game, true)
 	if err != nil {
 		return nil, err
+	}
+	return api.JoinGameByToken200JSONResponse{Game: g}, nil
+}
+
+func (s *HTTPServer) enrichGame(ctx context.Context, game sqlcdb.Game, showToken bool) (api.Game, error) {
+	participants, err := s.gameService.GetParticipants(ctx, int(game.ID))
+	if err != nil {
+		return api.Game{}, err
 	}
 	problemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
 	if err != nil {
-		return nil, err
+		return api.Game{}, err
 	}
-	return api.JoinGameByToken200JSONResponse{Game: toAPIGame(game, participants, problemIDs, true)}, nil
+	return toAPIGame(game, participants, problemIDs, showToken), nil
 }
 
 func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []string, showToken bool) api.Game {
@@ -366,12 +309,17 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 	result := api.Game{
 		Id:           int(g.ID),
 		IsPublic:     g.IsPublic,
+		IsSolo:       g.IsSolo,
 		ProblemIds:   problemIDs,
 		CreatorId:    g.CreatorID,
 		Status:       api.GameStatus(g.Status),
 		Participants: apiParticipants,
 		CreatedAt:    g.CreatedAt.Time,
 		UpdatedAt:    g.UpdatedAt.Time,
+	}
+	if g.StartedAt.Valid {
+		t := g.StartedAt.Time
+		result.StartedAt = &t
 	}
 	if g.WinnerID.Valid {
 		id := g.WinnerID.UUID
@@ -380,7 +328,24 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 	if showToken {
 		result.InviteToken = &g.InviteToken
 	}
+	if g.TimeLimitMinutes.Valid {
+		v := int(g.TimeLimitMinutes.Int16)
+		result.TimeLimitMinutes = &v
+	}
 	return result
+}
+
+func (s *HTTPServer) TimeoutGame(ctx context.Context, req api.TimeoutGameRequestObject) (api.TimeoutGameResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.TimeoutGame(ctx, req.Id, userID)
+	if err != nil {
+		return nil, err
+	}
+	g, err := s.enrichGame(ctx, game, false)
+	if err != nil {
+		return nil, err
+	}
+	return api.TimeoutGame200JSONResponse{Game: g}, nil
 }
 
 func isParticipantOf(userID uuid.UUID, participants []service.Participant) bool {
@@ -446,7 +411,7 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Echo the subprotocol back — required by browser WS spec
+	// Echo the subprotocol back, required by browser WS spec
 	conn, err := upgrader.Upgrade(w, r, http.Header{
 		"Sec-WebSocket-Protocol": {token},
 	})
@@ -471,7 +436,7 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	// Send initial problem state to the connecting player.
 	s.sendPlayerState(r.Context(), gameID, session.UserID, client)
 
-	connCtx, connCancel := context.WithCancel(context.Background())
+	connCtx, connCancel := context.WithCancel(r.Context())
 	defer connCancel()
 
 	conn.SetReadLimit(32 * 1024)

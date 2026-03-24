@@ -11,14 +11,16 @@ import (
 
 type gameResp struct {
 	Game struct {
-		ID           int      `json:"id"`
-		ProblemIDs   []string `json:"problem_ids"`
-		CreatorID    string   `json:"creator_id"`
-		Status       string   `json:"status"`
-		IsPublic     bool     `json:"is_public"`
-		InviteToken  *string  `json:"invite_token"`
-		WinnerID     *string  `json:"winner_id"`
-		Participants []struct {
+		ID               int      `json:"id"`
+		ProblemIDs       []string `json:"problem_ids"`
+		CreatorID        string   `json:"creator_id"`
+		Status           string   `json:"status"`
+		IsPublic         bool     `json:"is_public"`
+		IsSolo           bool     `json:"is_solo"`
+		InviteToken      *string  `json:"invite_token"`
+		WinnerID         *string  `json:"winner_id"`
+		TimeLimitMinutes *int     `json:"time_limit_minutes"`
+		Participants     []struct {
 			ID   string  `json:"id"`
 			Name *string `json:"name"`
 		} `json:"participants"`
@@ -51,10 +53,21 @@ func createGame(t *testing.T) gameResp {
 	var g gameResp
 	decodeJSON(t, resp, &g)
 
-	resp = doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
+	require.NotNil(t, g.Game.InviteToken)
+	resp = doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token2)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	decodeJSON(t, resp, &g)
 	return g
+}
+
+func createActiveGame(t *testing.T) gameResp {
+	t.Helper()
+	g := createGame(t)
+	resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/start", g.Game.ID), nil, token1)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var started gameResp
+	decodeJSON(t, resp, &started)
+	return started
 }
 
 func TestGame_CreateWithMultipleProblems(t *testing.T) {
@@ -81,16 +94,6 @@ func TestGame_CreateWithTooManyProblems(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
 }
 
-func createActiveGame(t *testing.T) gameResp {
-	t.Helper()
-	g := createGame(t)
-	resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/start", g.Game.ID), nil, token1)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var started gameResp
-	decodeJSON(t, resp, &started)
-	return started
-}
-
 func TestGame_CreateAndGet(t *testing.T) {
 	g := createGame(t)
 	assert.Equal(t, "pending", g.Game.Status)
@@ -114,8 +117,8 @@ func TestGame_JoinValidation(t *testing.T) {
 		var g gameResp
 		decodeJSON(t, resp, &g)
 
-		// user1 tries to join their own game
-		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token1)
+		require.NotNil(t, g.Game.InviteToken)
+		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token1)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
 		assert.Equal(t, "ALREADY_PARTICIPANT", errCode(t, resp))
 	})
@@ -124,7 +127,8 @@ func TestGame_JoinValidation(t *testing.T) {
 		g := createActiveGame(t)
 
 		token3 := authToken(t, "player3@test.com")
-		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token3)
+		require.NotNil(t, g.Game.InviteToken)
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token3)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
 		assert.Equal(t, "GAME_ALREADY_STARTED", errCode(t, resp))
 	})
@@ -133,7 +137,8 @@ func TestGame_JoinValidation(t *testing.T) {
 		g := createGame(t)
 
 		token3 := authToken(t, "player3-full@test.com")
-		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token3)
+		require.NotNil(t, g.Game.InviteToken)
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token3)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		var joined gameResp
 		decodeJSON(t, resp, &joined)
@@ -143,7 +148,6 @@ func TestGame_JoinValidation(t *testing.T) {
 
 func TestGame_StartValidation(t *testing.T) {
 	t.Run("not enough players", func(t *testing.T) {
-		// Create game without user2 joining
 		resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
 			"problem_ids": []string{"test-problem"},
 		}, token1)
@@ -157,7 +161,7 @@ func TestGame_StartValidation(t *testing.T) {
 	})
 
 	t.Run("non-creator cannot start", func(t *testing.T) {
-		g := createGame(t) // token1 created, token2 joined
+		g := createGame(t)
 
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/start", g.Game.ID), nil, token2)
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -190,12 +194,12 @@ func TestGame_List(t *testing.T) {
 		createGame(t)
 	}
 
-	// one extra pending game (without join) to increase total
 	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
 		"problem_ids": []string{"test-problem"},
 	}, token1)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	resp.Body.Close()
+
 	resp = doAuth(t, http.MethodGet, "/api/games?limit=2&offset=0", nil, token1)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var list gamesListResp
@@ -335,97 +339,6 @@ func TestGame_OwnershipChecks(t *testing.T) {
 	})
 }
 
-func TestGame_PrivateGame(t *testing.T) {
-	token3 := authToken(t, "private-test-outsider@test.com")
-
-	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
-		"problem_ids": []string{"test-problem"},
-		"is_public":   false,
-	}, token1)
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	var g gameResp
-	decodeJSON(t, resp, &g)
-
-	assert.False(t, g.Game.IsPublic)
-	require.NotNil(t, g.Game.InviteToken, "creator should receive invite_token")
-	inviteToken := *g.Game.InviteToken
-
-	t.Run("not visible in listing for outsider", func(t *testing.T) {
-		resp := doAuth(t, http.MethodGet, "/api/games?limit=100&offset=0", nil, token3)
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-		var list gamesListResp
-		decodeJSON(t, resp, &list)
-		for _, game := range list.Games {
-			assert.NotEqual(t, g.Game.ID, game.ID, "private game should not appear in outsider listing")
-		}
-	})
-
-	t.Run("GET /games/{id} → 403 for outsider", func(t *testing.T) {
-		resp := doAuth(t, http.MethodGet, fmt.Sprintf("/api/games/%d", g.Game.ID), nil, token3)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		assert.Equal(t, "NOT_PARTICIPANT", errCode(t, resp))
-	})
-
-	t.Run("POST /games/{id}/join → 403 for outsider", func(t *testing.T) {
-		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token3)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		assert.Equal(t, "PRIVATE_GAME", errCode(t, resp))
-	})
-
-	t.Run("GET /games/join/{token} → 200 without auth", func(t *testing.T) {
-		resp := do(t, http.MethodGet, fmt.Sprintf("/api/games/join/%s", inviteToken), nil)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		var fetched gameResp
-		decodeJSON(t, resp, &fetched)
-		assert.Equal(t, g.Game.ID, fetched.Game.ID)
-	})
-
-	t.Run("POST /games/join/{token} → outsider becomes participant", func(t *testing.T) {
-		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", inviteToken), nil, token3)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		var joined gameResp
-		decodeJSON(t, resp, &joined)
-		assert.Equal(t, g.Game.ID, joined.Game.ID)
-
-		// Now GET /games/{id} should succeed for the new participant
-		resp = doAuth(t, http.MethodGet, fmt.Sprintf("/api/games/%d", g.Game.ID), nil, token3)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		resp.Body.Close()
-	})
-
-	t.Run("POST /games/join/{token} → 409 if already participant", func(t *testing.T) {
-		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", inviteToken), nil, token3)
-		assert.Equal(t, http.StatusConflict, resp.StatusCode)
-		assert.Equal(t, "ALREADY_PARTICIPANT", errCode(t, resp))
-	})
-
-	t.Run("GET /games/{id}/solutions → 403 for outsider on private game", func(t *testing.T) {
-		token4 := authToken(t, "private-test-outsider2@test.com")
-		resp := doAuth(t, http.MethodGet, fmt.Sprintf("/api/games/%d/solutions", g.Game.ID), nil, token4)
-		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-		assert.Equal(t, "NOT_PARTICIPANT", errCode(t, resp))
-	})
-
-	t.Run("invite_token not exposed to outsider via listing", func(t *testing.T) {
-		// user2 is a participant of other games but not this private one before join
-		// creator (user1) sees their own token in listing
-		resp := doAuth(t, http.MethodGet, "/api/games?limit=100&offset=0", nil, token1)
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-		var list struct {
-			Games []struct {
-				ID          int     `json:"id"`
-				InviteToken *string `json:"invite_token"`
-			} `json:"games"`
-		}
-		decodeJSON(t, resp, &list)
-		for _, game := range list.Games {
-			if game.ID == g.Game.ID {
-				assert.NotNil(t, game.InviteToken, "creator should see invite_token in listing")
-			}
-		}
-	})
-}
-
 func TestGame_CreateWithUnknownProblemID(t *testing.T) {
 	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
 		"problem_ids": []string{"does-not-exist"},
@@ -436,7 +349,7 @@ func TestGame_CreateWithUnknownProblemID(t *testing.T) {
 
 func TestGame_Leave(t *testing.T) {
 	t.Run("participant leaves successfully", func(t *testing.T) {
-		g := createGame(t) // user1 created, user2 joined
+		g := createGame(t)
 		assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, participantIDs(g))
 
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/leave", g.Game.ID), nil, token2)

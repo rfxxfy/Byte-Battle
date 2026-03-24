@@ -1,6 +1,6 @@
 -- name: CreateGame :one
-INSERT INTO games (creator_id, status, is_public)
-VALUES ($1, 'pending', $2)
+INSERT INTO games (creator_id, status, is_public, is_solo, time_limit_minutes)
+VALUES ($1, 'pending', $2, $3, $4)
 RETURNING *;
 
 -- name: GetGameByID :one
@@ -57,6 +57,14 @@ RETURNING *;
 
 -- name: UpdateGameWinner :exec
 UPDATE games SET winner_id = $2, updated_at = NOW() WHERE id = $1;
+
+-- name: TimeoutGame :one
+UPDATE games
+SET status = 'finished',
+    completed_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;
 
 -- name: DeleteGame :execrows
 DELETE FROM games WHERE id = $1;
