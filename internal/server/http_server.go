@@ -39,9 +39,19 @@ type HTTPServer struct {
 	sessionService   *service.SessionService
 	executionService *service.ExecutionService
 	hub              *ws.Hub
+	entrance         service.EntranceService
 }
 
-func New(pool *pgxpool.Pool, users *service.UserService, gameService *service.GameService, problemService *service.ProblemService, sessionService *service.SessionService, executionService *service.ExecutionService, hub *ws.Hub) http.Handler {
+func New(
+	pool *pgxpool.Pool,
+	users *service.UserService,
+	gameService *service.GameService,
+	problemService *service.ProblemService,
+	sessionService *service.SessionService,
+	executionService *service.ExecutionService,
+	hub *ws.Hub,
+	entrance service.EntranceService,
+) http.Handler {
 	s := &HTTPServer{
 		pool:             pool,
 		users:            users,
@@ -50,6 +60,7 @@ func New(pool *pgxpool.Pool, users *service.UserService, gameService *service.Ga
 		sessionService:   sessionService,
 		executionService: executionService,
 		hub:              hub,
+		entrance:         entrance,
 	}
 
 	r := chi.NewRouter()
@@ -66,7 +77,8 @@ func New(pool *pgxpool.Pool, users *service.UserService, gameService *service.Ga
 		RequestErrorHandlerFunc:  requestErrorHandler,
 		ResponseErrorHandlerFunc: responseErrorHandler,
 	}
-	strictHandler := api.NewStrictHandlerWithOptions(s, nil, strictOpts)
+	publicOps := publicOpsFromSpec()
+	strictHandler := api.NewStrictHandlerWithOptions(s, []api.StrictMiddlewareFunc{s.strictAuthMiddleware(publicOps)}, strictOpts)
 	api.HandlerFromMux(strictHandler, r)
 
 	return r
