@@ -10,6 +10,7 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -395,5 +396,59 @@ func TestVerifyCode_NoCode_ReturnsInvalidCode(t *testing.T) {
 
 	if !errors.Is(err, ErrInvalidCode) {
 		t.Errorf("expected ErrInvalidCode, got %v", err)
+	}
+}
+
+func TestSendCode_EmailFailure_DeletesVerificationCode(t *testing.T) {
+	deleted := false
+	db := &mockDB{
+		deleteVerification: func(_ context.Context, _ string) error {
+			deleted = true
+			return nil
+		},
+	}
+	mailer := &mockMailer{err: errors.New("smtp error")}
+	svc := newEntrance(db, &mockSession{}, mailer)
+
+	err := svc.SendCode(context.Background(), "user@example.com")
+
+	if err == nil {
+		t.Fatal("expected error from mailer")
+	}
+	if !deleted {
+		t.Error("expected DeleteVerificationCode to be called after email failure")
+	}
+}
+
+func TestVerifyCode_UsernameConflict_RetriesWithNewUsername(t *testing.T) {
+	code := validCode(t, time.Now().Add(10*time.Minute), 0)
+	attempts := 0
+	db := &mockDB{
+		getVerification: func(_ context.Context, _ string) (sqlcdb.VerificationCode, error) {
+			return code, nil
+		},
+		incrementAttempts: func(_ context.Context, _ sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.VerificationCode, error) {
+			return code, nil
+		},
+		getUserByEmail: func(_ context.Context, _ string) (sqlcdb.User, error) {
+			return sqlcdb.User{}, pgx.ErrNoRows
+		},
+		createUserByEmail: func(_ context.Context, arg sqlcdb.CreateUserByEmailParams) (sqlcdb.User, error) {
+			attempts++
+			if attempts < 3 {
+				return sqlcdb.User{}, &pgconn.PgError{Code: "23505", ConstraintName: "users_username_key"}
+			}
+			return sqlcdb.User{ID: 1, Email: arg.Email, Username: arg.Username}, nil
+		},
+	}
+	svc := newEntrance(db, &mockSession{}, &mockMailer{})
+
+	_, err := svc.VerifyCode(context.Background(), "new@example.com", "111111")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if attempts != 3 {
+		t.Errorf("expected 3 create attempts (2 conflicts + 1 success), got %d", attempts)
 	}
 }
