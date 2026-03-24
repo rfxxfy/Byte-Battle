@@ -4,16 +4,13 @@ import Editor from '@monaco-editor/react'
 import { getGame, getGameSolutions, type Game, type GameSolution } from '@/api/games'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
+import { pluralize, displayName } from '@/lib/utils'
 
 const MONACO_LANG: Record<string, string> = {
   python: 'python',
   go: 'go',
   cpp: 'cpp',
   java: 'java',
-}
-
-function participantLabel(solution: GameSolution): string {
-  return solution.name ?? solution.user_id.slice(0, 8)
 }
 
 export function GameResultsPage() {
@@ -139,7 +136,7 @@ export function GameResultsPage() {
                     ? 'Не решена'
                     : isSolo
                       ? 'Решена'
-                      : `${solvers.length} ${solvers.length === 1 ? 'решение' : solvers.length < 5 ? 'решения' : 'решений'}`}
+                      : `${solvers.length} ${pluralize(solvers.length, 'решение', 'решения', 'решений')}`}
                 </div>
               </button>
             )
@@ -172,7 +169,7 @@ export function GameResultsPage() {
                                 : 'border-border/60 hover:bg-muted/50 text-muted-foreground hover:text-foreground'
                             }`}
                           >
-                            <span className="truncate">{participantLabel(s)}</span>
+                            <span className="truncate">{displayName(s.name, s.user_id)}</span>
                             <span className="text-xs opacity-60 shrink-0">{s.language}</span>
                           </button>
                         ))}

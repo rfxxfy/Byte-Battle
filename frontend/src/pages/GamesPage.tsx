@@ -4,7 +4,7 @@ import { listGames, createGame, type Game, type GameParticipant } from '@/api/ga
 import { listProblems, type Problem } from '@/api/problems'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
-import { useAuth } from '@/context/AuthContext'
+import { formatTimer } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
 function avatarInitials(p: GameParticipant): string {
@@ -34,12 +34,6 @@ function formatDate(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function formatTimer(minutes: number | null | undefined): string {
-  if (!minutes) return 'Без таймера'
-  if (minutes < 60) return `${minutes} мин`
-  return `${minutes / 60} ч`
 }
 
 const MAX_DOTS = 6
@@ -76,7 +70,6 @@ type TimerOption = 15 | 30 | 60 | 90 | 120 | 'custom' | null
 
 export function GamesPage() {
   const navigate = useNavigate()
-  useAuth()
 
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
@@ -193,7 +186,6 @@ export function GamesPage() {
         <Button onClick={openModal}>Создать игру</Button>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-border/60">
         {(['multiplayer', 'solo'] as TabId[]).map((tab) => (
           <button
@@ -217,14 +209,12 @@ export function GamesPage() {
           <thead>
             <tr className="border-b border-border/60 bg-muted/30 text-xs font-medium text-muted-foreground">
               <th className="px-4 py-3 text-left w-12">#</th>
-              <th className="pl-3 pr-4 py-3 text-left w-24">Задачи</th>
-              <th className="pl-[26px] pr-4 py-3 text-left w-36">Статус</th>
-              {activeTab === 'multiplayer' ? (
-                <th className="px-4 py-3 text-left">Участники</th>
-              ) : (
-                <th className="px-4 py-3 text-left">Таймер</th>
-              )}
-              <th className="pl-[34px] pr-4 py-3 text-left w-40">Дата</th>
+              <th className="px-4 py-3 text-left w-24">Задачи</th>
+              <th className="px-4 py-3 text-left w-36">Статус</th>
+              <th className="px-4 py-3 text-left">
+                {activeTab === 'multiplayer' ? 'Участники' : 'Таймер'}
+              </th>
+              <th className="px-4 py-3 text-left w-40">Дата</th>
             </tr>
           </thead>
           <tbody>
@@ -235,7 +225,7 @@ export function GamesPage() {
                 </td>
               </tr>
             ) : (
-              visibleGames.map((g) => (
+              visibleGames.map((g, idx) => (
                 <tr
                   key={g.id}
                   onClick={() => {
@@ -244,9 +234,9 @@ export function GamesPage() {
                     else if (g.status === 'pending' && g.invite_token) navigate(`/games/join/${g.invite_token}`)
                     else navigate(`/games/${g.id}`)
                   }}
-                  className="border-b border-border/40 last:border-0 hover:bg-muted/10 cursor-pointer transition-colors"
+                  className="border-b border-border/40 last:border-0 even:bg-muted/20 hover:bg-muted/10 cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40">{g.id}</td>
+                  <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40">{idx + 1}</td>
                   <td className="px-4 py-4"><ProblemDots game={g} /></td>
                   <td className="px-4 py-4">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass[g.status]}`}>
@@ -291,7 +281,6 @@ export function GamesPage() {
         </table>
       </div>
 
-      {/* Create game modal */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -324,7 +313,6 @@ export function GamesPage() {
                             onChange={(e) => toggleProblem(p.id, e.target.checked)}
                           />
                           <span>{p.title}</span>
-                          <span className="text-xs text-muted-foreground">({p.id})</span>
                         </label>
                       )
                     })}

@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { getGameByToken, joinGameByToken, startGame, cancelGame, leaveGame, type Game, type GameParticipant } from '@/api/games'
+import { getGameByToken, joinGameByToken, startGame, cancelGame, leaveGame, type Game } from '@/api/games'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
+import { pluralize, displayName } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
-
-const participantLabel = (p: GameParticipant) => p.name ?? p.id.slice(0, 8)
 
 export function GameLobbyPage() {
   const { token } = useParams<{ token: string }>()
@@ -148,9 +147,7 @@ export function GameLobbyPage() {
             Игра #{game.id} · {game.is_public ? 'Публичная' : 'Приватная'}
           </p>
           <p className="text-sm font-medium">
-            {game.problem_ids.length === 1
-              ? '1 задача'
-              : `${game.problem_ids.length} задачи`}
+            {game.problem_ids.length} {pluralize(game.problem_ids.length, 'задача', 'задачи', 'задач')}
           </p>
         </div>
 
@@ -163,7 +160,7 @@ export function GameLobbyPage() {
               <div key={p.id} className="flex items-center gap-2 text-sm">
                 <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
                 <span className={p.id === userId ? 'text-primary font-medium' : ''}>
-                  {participantLabel(p)}
+                  {displayName(p.name, p.id)}
                   {p.id === userId && ' (ты)'}
                   {p.id === game.creator_id && (
                     <span className="ml-1.5 text-xs text-muted-foreground">создатель</span>

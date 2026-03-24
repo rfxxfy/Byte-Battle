@@ -3,14 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getGame, startGame, cancelGame, type Game } from '@/api/games'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
+import { pluralize, formatTimer } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
-
-function formatTimer(minutes: number | null | undefined): string {
-  if (!minutes) return 'Без таймера'
-  if (minutes < 60) return `${minutes} мин`
-  return `${minutes / 60} ч`
-}
 
 export function SoloLobbyPage() {
   const { id } = useParams<{ id: string }>()
@@ -123,7 +118,7 @@ export function SoloLobbyPage() {
         <div className="rounded-lg border border-border/60 bg-card/50 p-5">
           <p className="text-xs text-muted-foreground mb-1">Соло · Игра #{game.id}</p>
           <p className="text-sm font-medium">
-            {game.problem_ids.length === 1 ? '1 задача' : `${game.problem_ids.length} задачи`}
+            {game.problem_ids.length} {pluralize(game.problem_ids.length, 'задача', 'задачи', 'задач')}
           </p>
           <p className="text-xs text-muted-foreground mt-2">
             Таймер: <span className="text-foreground">{formatTimer(game.time_limit_minutes)}</span>
