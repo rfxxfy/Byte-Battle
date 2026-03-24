@@ -37,7 +37,12 @@ func (s *HTTPServer) GetAuthMe(ctx context.Context, _ api.GetAuthMeRequestObject
 
 func (s *HTTPServer) PostAuthLogout(ctx context.Context, _ api.PostAuthLogoutRequestObject) (api.PostAuthLogoutResponseObject, error) {
 	if session, ok := sessionFromContext(ctx); ok {
-		_ = s.sessionService.EndSession(ctx, int(session.ID))
+		if err := s.sessionService.EndSession(ctx, int(session.ID)); err != nil {
+			var appErr *apierr.AppError
+			if !errors.As(err, &appErr) || appErr.ErrorCode != apierr.ErrSessionNotFound {
+				return nil, apierr.New(apierr.ErrInternal, "internal server error")
+			}
+		}
 	}
 	return api.PostAuthLogout200JSONResponse{Status: "ok"}, nil
 }
