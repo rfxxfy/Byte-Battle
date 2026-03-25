@@ -43,6 +43,7 @@ services:
         limits:
           memory: 512m
           cpus: '1.0'
+    stop_grace_period: 25s
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 30s
