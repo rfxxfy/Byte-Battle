@@ -249,4 +249,3 @@ type wsJSONReader interface {
 	ReadJSON(v any) error
 	SetReadDeadline(t time.Time) error
 }
-
