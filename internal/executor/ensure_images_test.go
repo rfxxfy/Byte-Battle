@@ -20,8 +20,10 @@ import (
 )
 
 type mockDockerClient struct {
-	imageInspectFn func(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
-	imagePullFn    func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+	imageInspectFn    func(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error)
+	imagePullFn       func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+	containerListFn   func(ctx context.Context, opts container.ListOptions) ([]container.Summary, error)
+	containerRemoveFn func(ctx context.Context, id string, opts container.RemoveOptions) error
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error) {
@@ -32,13 +34,22 @@ func (m *mockDockerClient) ImagePull(ctx context.Context, refStr string, options
 	return m.imagePullFn(ctx, refStr, options)
 }
 
+func (m *mockDockerClient) ContainerList(ctx context.Context, opts container.ListOptions) ([]container.Summary, error) {
+	if m.containerListFn != nil {
+		return m.containerListFn(ctx, opts)
+	}
+	return nil, nil
+}
 func (m *mockDockerClient) ContainerCreate(_ context.Context, _ *container.Config, _ *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
 	return container.CreateResponse{}, nil
 }
 func (m *mockDockerClient) ContainerStart(_ context.Context, _ string, _ container.StartOptions) error {
 	return nil
 }
-func (m *mockDockerClient) ContainerRemove(_ context.Context, _ string, _ container.RemoveOptions) error {
+func (m *mockDockerClient) ContainerRemove(ctx context.Context, id string, opts container.RemoveOptions) error {
+	if m.containerRemoveFn != nil {
+		return m.containerRemoveFn(ctx, id, opts)
+	}
 	return nil
 }
 func (m *mockDockerClient) ContainerExecCreate(_ context.Context, _ string, _ container.ExecOptions) (container.ExecCreateResponse, error) {

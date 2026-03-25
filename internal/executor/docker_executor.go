@@ -16,6 +16,7 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -27,6 +28,8 @@ const (
 	pidsLimit               = int64(64)
 	defaultMemoryLimit      = 100 * 1024 * 1024
 	poolMaintainerMaxRounds = 1 << 20
+	poolLabelKey            = "bytebattle"
+	poolLabelVal            = "pool"
 )
 
 type DockerExecutor struct {
@@ -56,14 +59,35 @@ func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
 		pools:   make(map[Language]chan string),
 		errChan: make(chan error, 16),
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+
+	e.cleanupPreviousPools(ctx)
+
 	if err := e.ensureImages(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ensure executor images: %w", err)
 	}
 	e.initPools()
 	go e.logPoolErrors()
 	return e, nil
+}
+
+// cleanupPreviousPools removes any warm containers left over from a previous run
+// (graceful shutdown race or crash). Called at startup before new pools are created.
+func (e *DockerExecutor) cleanupPreviousPools(ctx context.Context) {
+	f := filters.NewArgs(filters.Arg("label", poolLabelKey+"="+poolLabelVal))
+	containers, err := e.cli.ContainerList(ctx, container.ListOptions{Filters: f, All: true})
+	if err != nil {
+		log.Printf("cleanup previous pools: %v", err)
+		return
+	}
+	for i := range containers {
+		e.cleanupContainer(ctx, containers[i].ID)
+	}
+	if len(containers) > 0 {
+		log.Printf("cleaned up %d leftover pool containers", len(containers))
+	}
 }
 
 func (e *DockerExecutor) ensureImages(ctx context.Context) error {
@@ -129,6 +153,7 @@ func (e *DockerExecutor) maintainPool(lang Language, settings *LangSettings) {
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
 	go func() {
 		<-sigChan
 		cancel()
@@ -136,6 +161,15 @@ func (e *DockerExecutor) maintainPool(lang Language, settings *LangSettings) {
 
 	for range poolMaintainerMaxRounds {
 		if e.maintainPoolIteration(ctx, lang, settings) {
+			break
+		}
+	}
+	// best-effort drain on graceful shutdown; leftover containers are cleaned on next startup
+	for {
+		select {
+		case id := <-e.pools[lang]:
+			e.cleanupContainer(context.Background(), id)
+		default:
 			return
 		}
 	}
@@ -214,6 +248,7 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 		Cmd:        []string{"tail", "-f", "/dev/null"}, // Keep running
 		Tty:        false,
 		WorkingDir: "/app",
+		Labels:     map[string]string{poolLabelKey: poolLabelVal},
 	}
 
 	resp, err := e.cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
@@ -353,7 +388,6 @@ func truncateString(s string, maxLen int) string {
 
 // Helper to create ad-hoc container with specific limits
 func (e *DockerExecutor) createContainerWithLimits(ctx context.Context, langConfig *LangSettings, memLimit int64) (string, error) {
-	// Similar to createWarmContainer but with specific memory
 	pidsLimitPtr := pidsLimit
 
 	hostConfig := &container.HostConfig{
