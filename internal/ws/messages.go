@@ -20,7 +20,7 @@ type ServerMessage struct {
 	Type       string    `json:"type"`
 	UserID     uuid.UUID `json:"user_id,omitempty"`
 	WinnerID   uuid.UUID `json:"winner_id,omitempty"`
-	Accepted   bool      `json:"accepted,omitempty"`
+	Accepted   bool      `json:"accepted"`
 	Stdout     string    `json:"stdout,omitempty"`
 	Stderr     string    `json:"stderr,omitempty"`
 	Message    string    `json:"message,omitempty"`

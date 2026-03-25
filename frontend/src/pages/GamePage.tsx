@@ -59,12 +59,14 @@ export function GamePage() {
   const [winner, setWinner] = useState<GameFinished | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
+  const problemLoadedRef = useRef(false)
 
   const fetchGame = useCallback(async () => {
     try {
       const res = await getGame(gameId)
       setGame(res.game)
-      if (!problem) {
+      if (!problemLoadedRef.current) {
+        problemLoadedRef.current = true
         const pRes = await getProblem(res.game.problem_id)
         setProblem(pRes.problem)
       }
@@ -73,7 +75,7 @@ export function GamePage() {
     } finally {
       setLoading(false)
     }
-  }, [gameId, problem])
+  }, [gameId])
 
   // Initial load
   useEffect(() => {
@@ -96,17 +98,22 @@ export function GamePage() {
     wsRef.current = ws
 
     ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished
-      if (msg.type === 'submission_result') {
-        setSubmissionResult(msg)
-        setSubmitting(false)
-      } else if (msg.type === 'game_finished') {
-        setWinner({ winner_id: msg.winner_id })
-        setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
+      try {
+        const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished
+        if (msg.type === 'submission_result') {
+          setSubmissionResult(msg)
+          setSubmitting(false)
+        } else if (msg.type === 'game_finished') {
+          setWinner({ winner_id: msg.winner_id })
+          setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
+        }
+      } catch {
+        // ignore malformed messages
       }
     }
 
     ws.onerror = () => setActionError('Ошибка WebSocket-соединения')
+    ws.onclose = () => setActionError('Соединение с сервером разорвано')
 
     return () => ws.close()
   }, [game?.status, token, gameId])

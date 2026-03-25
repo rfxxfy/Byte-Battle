@@ -368,6 +368,9 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uuid.UUID, msg ws.ClientMessage) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
 	game, err := s.gameService.GetGame(ctx, int(gameID))
 	if err != nil {
 		log.Printf("processSubmit: get game error: %v", err)
