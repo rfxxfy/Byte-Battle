@@ -46,10 +46,6 @@ export function GamesPage() {
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    loadGames()
-  }, [])
-
-  const loadGames = () => {
     setLoading(true)
     listGames(50, 0)
       .then((res) => setGames(res.games))
@@ -57,7 +53,7 @@ export function GamesPage() {
         setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err)),
       )
       .finally(() => setLoading(false))
-  }
+  }, [])
 
   const openModal = async () => {
     setModalOpen(true)
@@ -67,7 +63,11 @@ export function GamesPage() {
         const res = await listProblems()
         setProblems(res.problems)
         if (res.problems.length > 0) setSelectedProblemId(res.problems[0].id)
-      } catch {}
+      } catch (err) {
+        setActionError(
+          err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err),
+        )
+      }
     }
   }
 

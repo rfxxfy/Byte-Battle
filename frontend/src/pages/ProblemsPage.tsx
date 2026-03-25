@@ -3,18 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { listProblems, type Problem } from '@/api/problems'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
-
-const difficultyLabel: Record<Problem['difficulty'], string> = {
-  easy: 'Лёгкая',
-  medium: 'Средняя',
-  hard: 'Сложная',
-}
-
-const difficultyClass: Record<Problem['difficulty'], string> = {
-  easy: 'text-green-400 bg-green-400/10',
-  medium: 'text-yellow-400 bg-yellow-400/10',
-  hard: 'text-red-400 bg-red-400/10',
-}
+import { difficultyLabel, difficultyClass } from '@/lib/difficulty'
 
 export function ProblemsPage() {
   const navigate = useNavigate()
