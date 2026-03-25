@@ -11,10 +11,11 @@ import (
 
 type gameResp struct {
 	Game struct {
-		ID        int    `json:"id"`
-		ProblemID string `json:"problem_id"`
-		Status    string `json:"status"`
-		WinnerID  *int   `json:"winner_id"`
+		ID             int    `json:"id"`
+		ProblemID      string `json:"problem_id"`
+		Status         string `json:"status"`
+		WinnerID       *int   `json:"winner_id"`
+		ParticipantIDs []int  `json:"participant_ids"`
 	} `json:"game"`
 }
 
@@ -26,14 +27,18 @@ type gamesListResp struct {
 	Total int64 `json:"total"`
 }
 
+// createGame creates a pending game as user1, then user2 joins.
 func createGame(t *testing.T) gameResp {
 	t.Helper()
 	resp := doAuth(t, http.MethodPost, "/games", map[string]any{
-		"player_ids": []int{user1ID, user2ID},
 		"problem_id": "test-problem",
 	}, token1)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	var g gameResp
+	decodeJSON(t, resp, &g)
+
+	resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token2)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	decodeJSON(t, resp, &g)
 	return g
 }
@@ -52,31 +57,54 @@ func TestGame_CreateAndGet(t *testing.T) {
 	g := createGame(t)
 	assert.Equal(t, "pending", g.Game.Status)
 	assert.Equal(t, "test-problem", g.Game.ProblemID)
+	assert.ElementsMatch(t, []int{user1ID, user2ID}, g.Game.ParticipantIDs)
 
 	resp := doAuth(t, http.MethodGet, fmt.Sprintf("/games/%d", g.Game.ID), nil, token1)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var fetched gameResp
 	decodeJSON(t, resp, &fetched)
 	assert.Equal(t, g.Game.ID, fetched.Game.ID)
+	assert.ElementsMatch(t, []int{user1ID, user2ID}, fetched.Game.ParticipantIDs)
 }
 
-func TestGame_CreateValidation(t *testing.T) {
-	t.Run("too few players", func(t *testing.T) {
+func TestGame_JoinValidation(t *testing.T) {
+	t.Run("already a participant", func(t *testing.T) {
 		resp := doAuth(t, http.MethodPost, "/games", map[string]any{
-			"player_ids": []int{user1ID},
 			"problem_id": "test-problem",
 		}, token1)
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-		assert.Equal(t, "NOT_ENOUGH_PLAYERS", errCode(t, resp))
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		var g gameResp
+		decodeJSON(t, resp, &g)
+
+		// user1 tries to join their own game
+		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token1)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
+		assert.Equal(t, "ALREADY_PARTICIPANT", errCode(t, resp))
 	})
 
-	t.Run("duplicate players", func(t *testing.T) {
+	t.Run("join non-pending game", func(t *testing.T) {
+		g := createActiveGame(t)
+
+		token3 := authToken(t, "player3@test.com")
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token3)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
+		assert.Equal(t, "GAME_ALREADY_STARTED", errCode(t, resp))
+	})
+}
+
+func TestGame_StartValidation(t *testing.T) {
+	t.Run("not enough players", func(t *testing.T) {
+		// Create game without user2 joining
 		resp := doAuth(t, http.MethodPost, "/games", map[string]any{
-			"player_ids": []int{user1ID, user1ID},
 			"problem_id": "test-problem",
 		}, token1)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		var g gameResp
+		decodeJSON(t, resp, &g)
+
+		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil, token1)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-		assert.Equal(t, "DUPLICATE_PLAYERS", errCode(t, resp))
+		assert.Equal(t, "NOT_ENOUGH_PLAYERS", errCode(t, resp))
 	})
 }
 
@@ -221,7 +249,6 @@ func TestGame_InvalidTransitions(t *testing.T) {
 
 func TestGame_CreateWithUnknownProblemID(t *testing.T) {
 	resp := doAuth(t, http.MethodPost, "/games", map[string]any{
-		"player_ids": []int{user1ID, user2ID},
 		"problem_id": "does-not-exist",
 	}, token1)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)

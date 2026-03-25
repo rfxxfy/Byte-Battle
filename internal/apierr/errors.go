@@ -7,7 +7,7 @@ const (
 
 	ErrGameNotFound             = "GAME_NOT_FOUND"
 	ErrNotEnoughPlayers         = "NOT_ENOUGH_PLAYERS"
-	ErrDuplicatePlayers         = "DUPLICATE_PLAYERS"
+	ErrAlreadyParticipant       = "ALREADY_PARTICIPANT"
 	ErrGameAlreadyStarted       = "GAME_ALREADY_STARTED"
 	ErrGameNotInProgress        = "GAME_NOT_IN_PROGRESS"
 	ErrInvalidWinner            = "INVALID_WINNER"
@@ -38,9 +38,9 @@ func (e *AppError) Error() string { return e.Message }
 
 func httpStatusCode(code string) int {
 	switch code {
-	case ErrValidation, ErrNotEnoughPlayers, ErrDuplicatePlayers, ErrInvalidWinner:
+	case ErrValidation, ErrNotEnoughPlayers, ErrInvalidWinner:
 		return http.StatusBadRequest
-	case ErrGameAlreadyStarted, ErrGameNotInProgress,
+	case ErrAlreadyParticipant, ErrGameAlreadyStarted, ErrGameNotInProgress,
 		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled:
 		return http.StatusConflict
 	case ErrInvalidToken, ErrSessionExpired:

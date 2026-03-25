@@ -94,12 +94,16 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	}
 
 	r := doFailing(http.MethodPost, "/games", map[string]any{
-		"player_ids": []int{user1ID, user2ID},
 		"problem_id": "test-problem",
 	})
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
 	decodeJSON(t, r, &g)
+
+	// user2 joins via the main test server (same DB)
+	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token2)
+	require.Equal(t, http.StatusOK, joinResp.StatusCode)
+	joinResp.Body.Close()
 
 	r = doFailing(http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil)
 	require.Equal(t, http.StatusOK, r.StatusCode)

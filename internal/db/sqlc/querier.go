@@ -12,6 +12,7 @@ type Querier interface {
 	AddGameParticipant(ctx context.Context, arg AddGameParticipantParams) error
 	CancelGame(ctx context.Context, id int32) (Game, error)
 	CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error)
+	CountGameParticipants(ctx context.Context, gameID int32) (int64, error)
 	CountGames(ctx context.Context) (int64, error)
 	CreateGame(ctx context.Context, problemID string) (Game, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
@@ -24,6 +25,7 @@ type Querier interface {
 	DeleteVerificationCode(ctx context.Context, email string) error
 	GetGameByID(ctx context.Context, id int32) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
+	GetParticipantIDs(ctx context.Context, gameID int32) ([]int32, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID int32) ([]Session, error)

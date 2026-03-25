@@ -24,6 +24,41 @@ func (q *Queries) AddGameParticipant(ctx context.Context, arg AddGameParticipant
 	return err
 }
 
+const countGameParticipants = `-- name: CountGameParticipants :one
+SELECT count(*) FROM game_participants WHERE game_id = $1
+`
+
+func (q *Queries) CountGameParticipants(ctx context.Context, gameID int32) (int64, error) {
+	row := q.db.QueryRow(ctx, countGameParticipants, gameID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getParticipantIDs = `-- name: GetParticipantIDs :many
+SELECT user_id FROM game_participants WHERE game_id = $1 ORDER BY id
+`
+
+func (q *Queries) GetParticipantIDs(ctx context.Context, gameID int32) ([]int32, error) {
+	rows, err := q.db.Query(ctx, getParticipantIDs, gameID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int32{}
+	for rows.Next() {
+		var user_id int32
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const isGameParticipant = `-- name: IsGameParticipant :one
 SELECT EXISTS(
     SELECT 1 FROM game_participants

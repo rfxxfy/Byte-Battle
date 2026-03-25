@@ -284,6 +284,30 @@ paths:
         "500":
           $ref: "#/components/responses/Error"
 
+  /games/{id}/join:
+    post:
+      operationId: JoinGame
+      summary: Join a pending game as a participant
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: Joined game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
   /games/{id}/cancel:
     post:
       operationId: CancelGame
@@ -461,6 +485,7 @@ components:
         - id
         - problem_id
         - status
+        - participant_ids
         - created_at
         - updated_at
       properties:
@@ -475,6 +500,10 @@ components:
         status:
           type: string
           enum: [pending, active, finished, cancelled]
+        participant_ids:
+          type: array
+          items:
+            type: integer
         created_at:
           type: string
           format: date-time
@@ -507,14 +536,8 @@ components:
     CreateGameRequest:
       type: object
       required:
-        - player_ids
         - problem_id
       properties:
-        player_ids:
-          type: array
-          items:
-            type: integer
-          minItems: 2
         problem_id:
           type: string
           example: "001-two-sum"
