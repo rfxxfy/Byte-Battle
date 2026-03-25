@@ -137,14 +137,6 @@ func (e *DockerExecutor) maintainPool(lang Language, settings *LangSettings) {
 			break
 		}
 	}
-	for {
-		select {
-		case id := <-e.pools[lang]:
-			e.cleanupContainer(context.Background(), id)
-		default:
-			return
-		}
-	}
 }
 
 // Shutdown cancels the pool maintainers, drains warm containers, and waits for
@@ -154,6 +146,17 @@ func (e *DockerExecutor) Shutdown(ctx context.Context) {
 	done := make(chan struct{})
 	go func() {
 		e.wg.Wait()
+		for lang := range e.pools {
+			for {
+				select {
+				case id := <-e.pools[lang]:
+					e.cleanupContainer(context.Background(), id)
+				default:
+					goto next
+				}
+			}
+		next:
+		}
 		close(e.errChan)
 		close(done)
 	}()
