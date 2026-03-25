@@ -154,6 +154,7 @@ func (e *DockerExecutor) Shutdown(ctx context.Context) {
 	done := make(chan struct{})
 	go func() {
 		e.wg.Wait()
+		close(e.errChan)
 		close(done)
 	}()
 	select {
@@ -161,7 +162,6 @@ func (e *DockerExecutor) Shutdown(ctx context.Context) {
 	case <-ctx.Done():
 		log.Printf("executor shutdown timed out, some containers may remain")
 	}
-	close(e.errChan)
 }
 
 func (e *DockerExecutor) maintainPoolIteration(ctx context.Context, lang Language, settings *LangSettings) (exit bool) {
