@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,16 +32,34 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type noOpExecutor struct{}
+// correctExecutor returns the expected output for the test problem (01.out = "3").
+type correctExecutor struct{}
 
-func (noOpExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
-	return executor.ExecutionResult{}, nil
+func (correctExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
+	return executor.ExecutionResult{Stdout: "3"}, nil
 }
 
+// failingExecutor returns output that does not match any test case expected output.
 type failingExecutor struct{}
 
 func (failingExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
-	return executor.ExecutionResult{ExitCode: 1, Stderr: "wrong answer"}, nil
+	return executor.ExecutionResult{Stdout: "wrong", Stderr: "wrong answer"}, nil
+}
+
+type secondTestFailsExecutor struct {
+	mu    sync.Mutex
+	calls int
+}
+
+func (e *secondTestFailsExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
+	e.mu.Lock()
+	n := e.calls
+	e.calls++
+	e.mu.Unlock()
+	if n == 0 {
+		return executor.ExecutionResult{Stdout: "3"}, nil
+	}
+	return executor.ExecutionResult{Stdout: "wrong"}, nil
 }
 
 var (
@@ -132,7 +151,7 @@ func TestMain(m *testing.M) {
 
 	testPool = pool
 	testLoader = loader
-	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, noOpExecutor{}, loader, config.Load()))
+	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, correctExecutor{}, loader, config.Load()))
 
 	var tokErr error
 	token1, tokErr = makeAuthToken("player1@test.com")
