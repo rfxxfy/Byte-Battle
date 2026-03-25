@@ -248,7 +248,12 @@ func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"stdout":       result.Stdout,
+		"stderr":       result.Stderr,
+		"exit_code":    result.ExitCode,
+		"time_used_ms": result.TimeUsed.Milliseconds(),
+	})
 }
 
 func toAPIGame(g sqlcdb.Game, participants []service.Participant) api.Game {

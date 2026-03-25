@@ -1,3 +1,370 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import Editor from '@monaco-editor/react'
+import { getGame, startGame, type Game } from '@/api/games'
+import { getProblem, type Problem } from '@/api/problems'
+import { runCode } from '@/api/execute'
+import { ApiError } from '@/api/client'
+import { errorMessage } from '@/lib/errors'
+import { useAuth } from '@/context/AuthContext'
+import { Button } from '@/components/ui/button'
+
+const LANGUAGES = [
+  { value: 'python', label: 'Python', monaco: 'python' },
+  { value: 'go', label: 'Go', monaco: 'go' },
+  { value: 'javascript', label: 'JavaScript', monaco: 'javascript' },
+] as const
+
+type LangValue = (typeof LANGUAGES)[number]['value']
+
+const DEFAULT_CODE: Record<LangValue, string> = {
+  python: '# Введи решение здесь\n',
+  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\t\n}\n',
+  javascript: '// Введи решение здесь\n',
+}
+
+interface SubmissionResult {
+  accepted: boolean
+  stdout: string
+  stderr: string
+  failed_test?: number
+  user_id: number
+}
+
+interface GameFinished {
+  winner_id: number
+}
+
 export function GamePage() {
-  return <div>Game screen (coming in F8)</div>
+  const { id } = useParams<{ id: string }>()
+  const gameId = Number(id)
+  const { token, userId } = useAuth()
+  const navigate = useNavigate()
+
+  const [game, setGame] = useState<Game | null>(null)
+  const [problem, setProblem] = useState<Problem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
+
+  const [language, setLanguage] = useState<LangValue>('python')
+  const [code, setCode] = useState(DEFAULT_CODE.python)
+  const [stdin, setStdin] = useState('')
+
+  const [running, setRunning] = useState(false)
+  const [runOutput, setRunOutput] = useState<{ stdout: string; stderr: string } | null>(null)
+
+  const [submitting, setSubmitting] = useState(false)
+  const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
+  const [winner, setWinner] = useState<GameFinished | null>(null)
+
+  const wsRef = useRef<WebSocket | null>(null)
+
+  const fetchGame = useCallback(async () => {
+    try {
+      const res = await getGame(gameId)
+      setGame(res.game)
+      if (!problem) {
+        const pRes = await getProblem(res.game.problem_id)
+        setProblem(pRes.problem)
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [gameId, problem])
+
+  // Initial load
+  useEffect(() => {
+    fetchGame()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll while pending so we catch status changes from other players
+  useEffect(() => {
+    if (game?.status !== 'pending') return
+    const timer = setInterval(fetchGame, 2000)
+    return () => clearInterval(timer)
+  }, [game?.status, fetchGame])
+
+  // Connect WebSocket when game is active
+  useEffect(() => {
+    if (game?.status !== 'active' || !token) return
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const ws = new WebSocket(`${proto}//${location.host}/games/${gameId}/ws`, [token])
+    wsRef.current = ws
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished
+      if (msg.type === 'submission_result') {
+        setSubmissionResult(msg)
+        setSubmitting(false)
+      } else if (msg.type === 'game_finished') {
+        setWinner({ winner_id: msg.winner_id })
+        setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
+      }
+    }
+
+    ws.onerror = () => setActionError('Ошибка WebSocket-соединения')
+
+    return () => ws.close()
+  }, [game?.status, token, gameId])
+
+  const handleStart = async () => {
+    setActionError('')
+    try {
+      const res = await startGame(gameId)
+      setGame(res.game)
+    } catch (err) {
+      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+    }
+  }
+
+  const handleRun = async () => {
+    setRunning(true)
+    setRunOutput(null)
+    setActionError('')
+    try {
+      const res = await runCode(code, language, stdin)
+      setRunOutput({ stdout: res.stdout, stderr: res.stderr })
+    } catch (err) {
+      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  const handleSubmit = () => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      setActionError('WebSocket не подключён')
+      return
+    }
+    setSubmitting(true)
+    setSubmissionResult(null)
+    setActionError('')
+    ws.send(JSON.stringify({ type: 'submit', code, language }))
+  }
+
+  const handleLangChange = (lang: LangValue) => {
+    setLanguage(lang)
+    setCode(DEFAULT_CODE[lang])
+  }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
+  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (!game || !problem) return null
+
+  const isParticipant = userId != null && game.participant_ids.includes(userId)
+  const isActive = game.status === 'active'
+  const isFinished = game.status === 'finished' || game.status === 'cancelled'
+  const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
+
+  return (
+    <div className="flex flex-col gap-4" style={{ height: 'calc(100vh - 80px)' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/games"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ← Игры
+          </Link>
+          <span className="text-muted-foreground/40">|</span>
+          <span className="text-sm font-medium">{problem.title}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {game.status === 'pending' && isParticipant && (
+            <Button size="sm" onClick={handleStart}>
+              Начать игру
+            </Button>
+          )}
+          {game.status === 'pending' && (
+            <span className="text-sm text-muted-foreground">Ожидание игроков...</span>
+          )}
+          {isActive && (
+            <div className="flex items-center gap-1.5 text-sm text-green-400">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              Идёт
+            </div>
+          )}
+          {isFinished && (
+            <span className="text-sm text-muted-foreground">Завершена</span>
+          )}
+        </div>
+      </div>
+
+      {actionError && (
+        <p className="text-sm text-destructive flex-shrink-0">{actionError}</p>
+      )}
+
+      {/* Main layout */}
+      <div className="flex gap-4 flex-1 min-h-0">
+        {/* Left: problem + participants */}
+        <div className="w-2/5 flex flex-col gap-3 overflow-y-auto">
+          <div className="rounded-lg border border-border/60 bg-card/50 p-5 flex-shrink-0">
+            <h2 className="text-base font-semibold mb-3">{problem.title}</h2>
+            <div className="flex items-center gap-2 flex-wrap mb-4">
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+                {problem.time_limit_ms} мс
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+                {problem.memory_limit_mb} МБ
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+              {problem.description}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-card/50 p-4 flex-shrink-0">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Участники</p>
+            <div className="flex flex-col gap-1.5">
+              {game.participant_ids.map((pid) => (
+                <div key={pid} className="flex items-center gap-2 text-sm">
+                  <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
+                  <span className={pid === userId ? 'text-primary font-medium' : ''}>
+                    Игрок #{pid}
+                    {pid === userId && ' (ты)'}
+                  </span>
+                  {game.winner_id === pid && (
+                    <span className="ml-auto text-xs text-yellow-400 font-medium">
+                      Победитель
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: editor + controls */}
+        <div className="flex-1 flex flex-col gap-2 min-h-0">
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <select
+              value={language}
+              onChange={(e) => handleLangChange(e.target.value as LangValue)}
+              disabled={!isActive}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.value} value={l.value} className="bg-background">
+                  {l.label}
+                </option>
+              ))}
+            </select>
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRun}
+                disabled={!isActive || running}
+              >
+                {running ? 'Запуск...' : 'Запустить'}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={!isActive || submitting}
+              >
+                {submitting ? 'Проверяем...' : 'Отправить решение'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Monaco editor */}
+          <div className="flex-1 rounded-lg border border-border/60 overflow-hidden min-h-0">
+            <Editor
+              height="100%"
+              language={monacoLang}
+              value={code}
+              onChange={(val) => setCode(val ?? '')}
+              theme="vs-dark"
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                readOnly: !isActive,
+                padding: { top: 12 },
+              }}
+            />
+          </div>
+
+          {/* Stdin */}
+          <textarea
+            placeholder="stdin для кнопки «Запустить»"
+            value={stdin}
+            onChange={(e) => setStdin(e.target.value)}
+            disabled={!isActive}
+            rows={2}
+            className="flex-shrink-0 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 placeholder:text-muted-foreground"
+          />
+
+          {/* Run output */}
+          {runOutput && (
+            <div className="flex-shrink-0 rounded-md border border-border/60 bg-muted/20 p-3 text-xs font-mono max-h-32 overflow-y-auto">
+              {runOutput.stdout && (
+                <pre className="whitespace-pre-wrap">{runOutput.stdout}</pre>
+              )}
+              {runOutput.stderr && (
+                <pre className="whitespace-pre-wrap text-destructive">{runOutput.stderr}</pre>
+              )}
+              {!runOutput.stdout && !runOutput.stderr && (
+                <span className="text-muted-foreground">(нет вывода)</span>
+              )}
+            </div>
+          )}
+
+          {/* Submission result */}
+          {submissionResult && (
+            <div
+              className={`flex-shrink-0 rounded-md border px-4 py-2.5 text-sm font-medium ${
+                submissionResult.accepted
+                  ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                  : 'border-red-500/30 bg-red-500/10 text-red-400'
+              }`}
+            >
+              {submissionResult.accepted ? (
+                'Принято!'
+              ) : (
+                <>
+                  Неверно
+                  {submissionResult.failed_test != null &&
+                    ` — тест #${submissionResult.failed_test + 1}`}
+                  {submissionResult.stderr && (
+                    <pre className="mt-1 text-xs font-mono opacity-80 whitespace-pre-wrap">
+                      {submissionResult.stderr}
+                    </pre>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Winner modal */}
+      {winner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-border/60 rounded-xl p-8 w-full max-w-sm shadow-2xl shadow-black/40 mx-4 text-center">
+            <h2 className="text-xl font-semibold mb-2">
+              {winner.winner_id === userId ? 'Победа!' : 'Игра завершена'}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              {winner.winner_id === userId
+                ? 'Ты решил задачу первым'
+                : `Победил Игрок #${winner.winner_id}`}
+            </p>
+            <Button className="w-full" onClick={() => navigate('/games')}>
+              В лобби
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
