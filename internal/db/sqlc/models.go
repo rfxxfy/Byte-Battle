@@ -12,13 +12,13 @@ import (
 type Game struct {
 	ID          int32              `json:"id"`
 	ProblemID   string             `json:"problem_id"`
+	CreatorID   uuid.UUID          `json:"creator_id"`
 	WinnerID    uuid.NullUUID      `json:"winner_id"`
 	Status      string             `json:"status"`
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	CreatorID   uuid.UUID          `json:"creator_id"`
 }
 
 type GameParticipant struct {
@@ -55,10 +55,10 @@ type User struct {
 	Username      string             `json:"username"`
 	Email         string             `json:"email"`
 	PasswordHash  pgtype.Text        `json:"password_hash"`
+	EmailVerified bool               `json:"email_verified"`
 	Rating        pgtype.Int4        `json:"rating"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	EmailVerified bool               `json:"email_verified"`
 }
 
 type VerificationCode struct {
