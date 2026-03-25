@@ -42,10 +42,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	handler, shutdownExecutor := app.NewRouter(pool, cfg)
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           handler,
+		Handler:           app.NewRouter(pool, cfg),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -58,11 +57,10 @@ func main() {
 
 	<-ctx.Done()
 
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
-	shutdownExecutor(shutdownCtx)
 	log.Printf("Server shut down")
 }

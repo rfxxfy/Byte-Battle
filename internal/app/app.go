@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"log"
 	"net/http"
 
@@ -16,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewRouter(pool *pgxpool.Pool, cfg config.Config) (handler http.Handler, shutdown func(context.Context)) {
+func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 	execCfg := executor.DefaultConfig()
 	if c, err := executor.LoadConfig("executor_config.json"); err == nil {
 		execCfg = c
@@ -32,7 +31,7 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) (handler http.Handler, shu
 		log.Fatalf("failed to load problems: %v", err)
 	}
 
-	return NewRouterWithExecutor(pool, dockerExecutor, loader, cfg), dockerExecutor.Shutdown
+	return NewRouterWithExecutor(pool, dockerExecutor, loader, cfg)
 }
 
 func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, loader *problems.Loader, cfg config.Config) http.Handler {
