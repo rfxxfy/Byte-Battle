@@ -143,7 +143,6 @@ func (e *DockerExecutor) logPoolErrors() {
 func (e *DockerExecutor) initPools() {
 	for lang, settings := range e.config.Languages {
 		e.pools[lang] = make(chan string, poolSize)
-		lang, settings := lang, settings
 		go e.maintainPool(lang, &settings)
 	}
 }
