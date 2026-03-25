@@ -6,6 +6,8 @@ package sqlcdb
 
 import (
 	"context"
+
+	uuid "github.com/google/uuid"
 )
 
 type Querier interface {
@@ -21,22 +23,22 @@ type Querier interface {
 	DeleteExpiredSessions(ctx context.Context) (int64, error)
 	DeleteGame(ctx context.Context, id int32) (int64, error)
 	DeleteSession(ctx context.Context, id int32) (int64, error)
-	DeleteSessionsByUserID(ctx context.Context, userID int32) (int64, error)
+	DeleteSessionsByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
 	DeleteVerificationCode(ctx context.Context, email string) error
 	GetGameByID(ctx context.Context, id int32) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
-	GetParticipantIDs(ctx context.Context, gameID int32) ([]int32, error)
+	GetParticipantIDs(ctx context.Context, gameID int32) ([]uuid.UUID, error)
 	GetParticipantIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantIDsByGameIDsRow, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
-	GetSessionsByUserID(ctx context.Context, userID int32) ([]Session, error)
+	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetVerificationCode(ctx context.Context, email string) (VerificationCode, error)
 	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error)
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error)
-	SetEmailVerified(ctx context.Context, id int32) error
+	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	StartGame(ctx context.Context, id int32) (Game, error)
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
 	UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (VerificationCode, error)

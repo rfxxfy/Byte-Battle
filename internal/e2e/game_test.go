@@ -11,11 +11,11 @@ import (
 
 type gameResp struct {
 	Game struct {
-		ID             int    `json:"id"`
-		ProblemID      string `json:"problem_id"`
-		Status         string `json:"status"`
-		WinnerID       *int   `json:"winner_id"`
-		ParticipantIDs []int  `json:"participant_ids"`
+		ID             int      `json:"id"`
+		ProblemID      string   `json:"problem_id"`
+		Status         string   `json:"status"`
+		WinnerID       *string  `json:"winner_id"`
+		ParticipantIDs []string `json:"participant_ids"`
 	} `json:"game"`
 }
 
@@ -57,14 +57,14 @@ func TestGame_CreateAndGet(t *testing.T) {
 	g := createGame(t)
 	assert.Equal(t, "pending", g.Game.Status)
 	assert.Equal(t, "test-problem", g.Game.ProblemID)
-	assert.ElementsMatch(t, []int{user1ID, user2ID}, g.Game.ParticipantIDs)
+	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, g.Game.ParticipantIDs)
 
 	resp := doAuth(t, http.MethodGet, fmt.Sprintf("/games/%d", g.Game.ID), nil, token1)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var fetched gameResp
 	decodeJSON(t, resp, &fetched)
 	assert.Equal(t, g.Game.ID, fetched.Game.ID)
-	assert.ElementsMatch(t, []int{user1ID, user2ID}, fetched.Game.ParticipantIDs)
+	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, fetched.Game.ParticipantIDs)
 }
 
 func TestGame_JoinValidation(t *testing.T) {
@@ -172,14 +172,14 @@ func TestGame_FullLifecycle(t *testing.T) {
 	assert.Equal(t, "active", started.Game.Status)
 
 	resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/complete", g.Game.ID), map[string]any{
-		"winner_id": user1ID,
+		"winner_id": user1ID.String(),
 	}, token1)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var completed gameResp
 	decodeJSON(t, resp, &completed)
 	assert.Equal(t, "finished", completed.Game.Status)
 	require.NotNil(t, completed.Game.WinnerID)
-	assert.Equal(t, user1ID, *completed.Game.WinnerID)
+	assert.Equal(t, user1ID.String(), *completed.Game.WinnerID)
 }
 
 func TestGame_CancelPending(t *testing.T) {
@@ -207,7 +207,7 @@ func TestGame_InvalidTransitions(t *testing.T) {
 	t.Run("complete pending game", func(t *testing.T) {
 		g := createGame(t)
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/complete", g.Game.ID), map[string]any{
-			"winner_id": user1ID,
+			"winner_id": user1ID.String(),
 		}, token1)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
 		assert.Equal(t, "GAME_NOT_IN_PROGRESS", errCode(t, resp))
@@ -220,7 +220,7 @@ func TestGame_InvalidTransitions(t *testing.T) {
 		resp.Body.Close()
 
 		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/complete", g.Game.ID), map[string]any{
-			"winner_id": user1ID,
+			"winner_id": user1ID.String(),
 		}, token1)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
@@ -248,7 +248,7 @@ func TestGame_InvalidTransitions(t *testing.T) {
 		resp.Body.Close()
 
 		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/complete", g.Game.ID), map[string]any{
-			"winner_id": 999999,
+			"winner_id": "00000000-0000-0000-0000-000000009999",
 		}, token1)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		assert.Equal(t, "INVALID_WINNER", errCode(t, resp))

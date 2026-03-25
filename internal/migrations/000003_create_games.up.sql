@@ -1,7 +1,8 @@
 CREATE TABLE games (
        id SERIAL PRIMARY KEY,
        problem_id TEXT NOT NULL,
-       winner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+       creator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+       winner_id UUID REFERENCES users(id) ON DELETE SET NULL,
        status VARCHAR(20) NOT NULL
            CHECK (status IN ('pending', 'active', 'finished', 'cancelled')),
        started_at TIMESTAMP WITH TIME ZONE,

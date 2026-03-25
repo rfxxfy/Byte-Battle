@@ -7,6 +7,8 @@ package sqlcdb
 
 import (
 	"context"
+
+	uuid "github.com/google/uuid"
 )
 
 const addGameParticipant = `-- name: AddGameParticipant :exec
@@ -15,8 +17,8 @@ VALUES ($1, $2)
 `
 
 type AddGameParticipantParams struct {
-	GameID int32 `json:"game_id"`
-	UserID int32 `json:"user_id"`
+	GameID int32     `json:"game_id"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) AddGameParticipant(ctx context.Context, arg AddGameParticipantParams) error {
@@ -39,15 +41,15 @@ const getParticipantIDs = `-- name: GetParticipantIDs :many
 SELECT user_id FROM game_participants WHERE game_id = $1 ORDER BY id
 `
 
-func (q *Queries) GetParticipantIDs(ctx context.Context, gameID int32) ([]int32, error) {
+func (q *Queries) GetParticipantIDs(ctx context.Context, gameID int32) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, getParticipantIDs, gameID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int32{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var user_id int32
+		var user_id uuid.UUID
 		if err := rows.Scan(&user_id); err != nil {
 			return nil, err
 		}
@@ -64,8 +66,8 @@ SELECT game_id, user_id FROM game_participants WHERE game_id = ANY($1::int[]) OR
 `
 
 type GetParticipantIDsByGameIDsRow struct {
-	GameID int32 `json:"game_id"`
-	UserID int32 `json:"user_id"`
+	GameID int32     `json:"game_id"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) GetParticipantIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantIDsByGameIDsRow, error) {
@@ -96,8 +98,8 @@ SELECT EXISTS(
 `
 
 type IsGameParticipantParams struct {
-	GameID int32 `json:"game_id"`
-	UserID int32 `json:"user_id"`
+	GameID int32     `json:"game_id"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error) {

@@ -8,7 +8,7 @@ package sqlcdb
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	uuid "github.com/google/uuid"
 )
 
 const cancelGame = `-- name: CancelGame :one
@@ -47,8 +47,8 @@ RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_a
 `
 
 type CompleteGameParams struct {
-	ID       int32       `json:"id"`
-	WinnerID pgtype.Int4 `json:"winner_id"`
+	ID       int32         `json:"id"`
+	WinnerID uuid.NullUUID `json:"winner_id"`
 }
 
 func (q *Queries) CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error) {
@@ -86,8 +86,8 @@ RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_a
 `
 
 type CreateGameParams struct {
-	ProblemID string `json:"problem_id"`
-	CreatorID int32  `json:"creator_id"`
+	ProblemID string    `json:"problem_id"`
+	CreatorID uuid.UUID `json:"creator_id"`
 }
 
 func (q *Queries) CreateGame(ctx context.Context, arg CreateGameParams) (Game, error) {

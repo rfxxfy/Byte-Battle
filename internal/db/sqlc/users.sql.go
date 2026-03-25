@@ -8,6 +8,7 @@ package sqlcdb
 import (
 	"context"
 
+	uuid "github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -110,7 +111,7 @@ const setEmailVerified = `-- name: SetEmailVerified :exec
 UPDATE users SET email_verified = true WHERE id = $1
 `
 
-func (q *Queries) SetEmailVerified(ctx context.Context, id int32) error {
+func (q *Queries) SetEmailVerified(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, setEmailVerified, id)
 	return err
 }

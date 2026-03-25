@@ -13,6 +13,7 @@ import (
 	"bytebattle/internal/config"
 	sqlcdb "bytebattle/internal/db/sqlc"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -37,7 +38,7 @@ type entranceDB interface {
 	GetUserByEmail(ctx context.Context, email string) (sqlcdb.User, error)
 	GetUserByUsername(ctx context.Context, username string) (sqlcdb.User, error)
 	CreateUserByEmail(ctx context.Context, arg sqlcdb.CreateUserByEmailParams) (sqlcdb.User, error)
-	SetEmailVerified(ctx context.Context, id int32) error
+	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	GetVerificationCode(ctx context.Context, email string) (sqlcdb.VerificationCode, error)
 	UpsertVerificationCode(ctx context.Context, arg sqlcdb.UpsertVerificationCodeParams) (sqlcdb.VerificationCode, error)
 	IncrementAttemptsIfBelowLimit(ctx context.Context, arg sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.VerificationCode, error)
@@ -45,7 +46,7 @@ type entranceDB interface {
 }
 
 type sessionCreator interface {
-	CreateSession(ctx context.Context, userID int) (sqlcdb.Session, error)
+	CreateSession(ctx context.Context, userID uuid.UUID) (sqlcdb.Session, error)
 }
 
 type entranceService struct {
@@ -156,7 +157,7 @@ func (s *entranceService) VerifyCode(ctx context.Context, email, code string) (s
 		log.Printf("warn: failed to delete verification code for %s: %v", email, err)
 	}
 
-	session, err := s.session.CreateSession(ctx, int(user.ID))
+	session, err := s.session.CreateSession(ctx, user.ID)
 	if err != nil {
 		return sqlcdb.Session{}, fmt.Errorf("create session: %w", err)
 	}

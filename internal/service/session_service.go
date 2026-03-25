@@ -10,6 +10,7 @@ import (
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -50,15 +51,15 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func (s *SessionService) CreateSession(ctx context.Context, userID int) (sqlcdb.Session, error) {
+func (s *SessionService) CreateSession(ctx context.Context, userID uuid.UUID) (sqlcdb.Session, error) {
 	return s.createSession(ctx, userID, s.sessionDuration)
 }
 
-func (s *SessionService) CreateSessionWithDuration(ctx context.Context, userID int, duration time.Duration) (sqlcdb.Session, error) {
+func (s *SessionService) CreateSessionWithDuration(ctx context.Context, userID uuid.UUID, duration time.Duration) (sqlcdb.Session, error) {
 	return s.createSession(ctx, userID, duration)
 }
 
-func (s *SessionService) createSession(ctx context.Context, userID int, duration time.Duration) (sqlcdb.Session, error) {
+func (s *SessionService) createSession(ctx context.Context, userID uuid.UUID, duration time.Duration) (sqlcdb.Session, error) {
 	token, err := generateToken()
 	if err != nil {
 		return sqlcdb.Session{}, err
@@ -67,7 +68,7 @@ func (s *SessionService) createSession(ctx context.Context, userID int, duration
 	expiresAt := time.Now().Add(duration)
 
 	return s.q.CreateSession(ctx, sqlcdb.CreateSessionParams{
-		UserID:    int32(userID),
+		UserID:    userID,
 		Token:     token,
 		ExpiresAt: pgtype.Timestamptz{Time: expiresAt.UTC(), Valid: true},
 	})
@@ -101,8 +102,8 @@ func (s *SessionService) ValidateToken(ctx context.Context, token string) (sqlcd
 	return session, nil
 }
 
-func (s *SessionService) GetUserSessions(ctx context.Context, userID int) ([]sqlcdb.Session, error) {
-	return s.q.GetSessionsByUserID(ctx, int32(userID))
+func (s *SessionService) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]sqlcdb.Session, error) {
+	return s.q.GetSessionsByUserID(ctx, userID)
 }
 
 func (s *SessionService) RefreshSession(ctx context.Context, id int) (sqlcdb.Session, error) {
@@ -129,8 +130,8 @@ func (s *SessionService) EndSession(ctx context.Context, id int) error {
 	return nil
 }
 
-func (s *SessionService) EndAllUserSessions(ctx context.Context, userID int) (int64, error) {
-	return s.q.DeleteSessionsByUserID(ctx, int32(userID))
+func (s *SessionService) EndAllUserSessions(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return s.q.DeleteSessionsByUserID(ctx, userID)
 }
 
 func (s *SessionService) CleanupExpired(ctx context.Context) (int64, error) {
