@@ -3,7 +3,7 @@ import { me, logout as apiLogout } from '../api/auth'
 
 interface AuthState {
   token: string | null
-  userId: number | null
+  userId: string | null
   loading: boolean
 }
 
