@@ -30,21 +30,9 @@ func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Load
 	return &GameService{q: q, pool: pool, problems: loader}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID string) (sqlcdb.Game, error) {
-	if len(playerIDs) < 2 {
-		return sqlcdb.Game{}, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players are required")
-	}
-
+func (s *GameService) CreateGame(ctx context.Context, creatorID int, problemID string) (sqlcdb.Game, error) {
 	if _, err := s.problems.Get(problemID); err != nil {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrProblemNotFound, "problem not found")
-	}
-
-	seen := make(map[int]struct{})
-	for _, id := range playerIDs {
-		if _, exists := seen[id]; exists {
-			return sqlcdb.Game{}, apierr.New(apierr.ErrDuplicatePlayers, "players must be different")
-		}
-		seen[id] = struct{}{}
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -55,18 +43,19 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 
 	qtx := s.q.WithTx(tx)
 
-	game, err := qtx.CreateGame(ctx, problemID)
+	game, err := qtx.CreateGame(ctx, sqlcdb.CreateGameParams{
+		ProblemID: problemID,
+		CreatorID: int32(creatorID),
+	})
 	if err != nil {
 		return sqlcdb.Game{}, err
 	}
 
-	for _, pid := range playerIDs {
-		if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
-			GameID: game.ID,
-			UserID: int32(pid),
-		}); err != nil {
-			return sqlcdb.Game{}, err
-		}
+	if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
+		GameID: game.ID,
+		UserID: int32(creatorID),
+	}); err != nil {
+		return sqlcdb.Game{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -74,6 +63,60 @@ func (s *GameService) CreateGame(ctx context.Context, playerIDs []int, problemID
 	}
 
 	return game, nil
+}
+
+func (s *GameService) JoinGame(ctx context.Context, gameID, userID int) (sqlcdb.Game, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	game, err := qtx.GetGameForUpdate(ctx, int32(gameID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if game.Status != gameStatusPending {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "game is not pending")
+	}
+
+	already, err := qtx.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
+		GameID: game.ID,
+		UserID: int32(userID),
+	})
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	if already {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrAlreadyParticipant, "already a participant")
+	}
+
+	if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
+		GameID: game.ID,
+		UserID: int32(userID),
+	}); err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	return game, nil
+}
+
+func (s *GameService) GetParticipantIDs(ctx context.Context, gameID int) ([]int32, error) {
+	return s.q.GetParticipantIDs(ctx, int32(gameID))
+}
+
+func (s *GameService) GetParticipantIDsByGameIDs(ctx context.Context, gameIDs []int32) ([]sqlcdb.GetParticipantIDsByGameIDsRow, error) {
+	return s.q.GetParticipantIDsByGameIDs(ctx, gameIDs)
 }
 
 func (s *GameService) GetGame(ctx context.Context, id int) (sqlcdb.Game, error) {
@@ -111,7 +154,7 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcd
 	return games, total, nil
 }
 
-func (s *GameService) StartGame(ctx context.Context, id int) (sqlcdb.Game, error) {
+func (s *GameService) StartGame(ctx context.Context, id, userID int) (sqlcdb.Game, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -130,6 +173,18 @@ func (s *GameService) StartGame(ctx context.Context, id int) (sqlcdb.Game, error
 
 	if game.Status != gameStatusPending {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "game already started or completed")
+	}
+
+	if int(game.CreatorID) != userID {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrNotGameCreator, "only the game creator can start the game")
+	}
+
+	count, err := qtx.CountGameParticipants(ctx, game.ID)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	if count < 2 {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players must join before starting")
 	}
 
 	game, err = qtx.StartGame(ctx, game.ID)

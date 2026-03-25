@@ -7,3 +7,12 @@ SELECT EXISTS(
     SELECT 1 FROM game_participants
     WHERE game_id = $1 AND user_id = $2
 ) AS is_participant;
+
+-- name: GetParticipantIDs :many
+SELECT user_id FROM game_participants WHERE game_id = $1 ORDER BY id;
+
+-- name: GetParticipantIDsByGameIDs :many
+SELECT game_id, user_id FROM game_participants WHERE game_id = ANY($1::int[]) ORDER BY game_id, id;
+
+-- name: CountGameParticipants :one
+SELECT count(*) FROM game_participants WHERE game_id = $1;
