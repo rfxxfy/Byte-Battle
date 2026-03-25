@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { enter, confirm } from '../api/auth'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { errorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,7 +28,7 @@ export function LoginPage() {
       await enter(email)
       setStep('code')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Что-то пошло не так')
+      setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     } finally {
       setLoading(false)
     }
@@ -42,7 +43,7 @@ export function LoginPage() {
       login(res.token, res.expires_at)
       navigate('/games', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Что-то пошло не так')
+      setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     } finally {
       setLoading(false)
     }

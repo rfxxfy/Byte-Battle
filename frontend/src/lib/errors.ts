@@ -1,0 +1,33 @@
+const messages: Record<string, string> = {
+  // Auth
+  INVALID_EMAIL: 'Некорректный email',
+  INVALID_CODE: 'Неверный или истёкший код',
+  TOO_MANY_ATTEMPTS: 'Слишком много попыток, попробуй позже',
+  CODE_RECENTLY_SENT: 'Код уже был отправлен, подожди немного',
+  USER_NOT_FOUND: 'Пользователь не найден',
+  SESSION_NOT_FOUND: 'Сессия не найдена',
+  SESSION_EXPIRED: 'Сессия истекла, войди снова',
+  INVALID_TOKEN: 'Неверный токен',
+
+  // Games
+  GAME_NOT_FOUND: 'Игра не найдена',
+  NOT_ENOUGH_PLAYERS: 'Недостаточно игроков для старта',
+  ALREADY_PARTICIPANT: 'Ты уже участник этой игры',
+  GAME_ALREADY_STARTED: 'Игра уже началась или завершена',
+  GAME_NOT_IN_PROGRESS: 'Игра не в процессе',
+  INVALID_WINNER: 'Некорректный победитель',
+  NOT_GAME_CREATOR: 'Только создатель может начать игру',
+  CANNOT_CANCEL_FINISHED_GAME: 'Нельзя отменить завершённую игру',
+  GAME_ALREADY_CANCELLED: 'Игра уже отменена',
+
+  // Problems
+  PROBLEM_NOT_FOUND: 'Задача не найдена',
+
+  // Generic
+  VALIDATION_ERROR: 'Ошибка валидации',
+  INTERNAL_ERROR: 'Внутренняя ошибка сервера',
+}
+
+export function errorMessage(code: string, fallback?: string): string {
+  return messages[code] ?? fallback ?? 'Что-то пошло не так'
+}
