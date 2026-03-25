@@ -62,13 +62,22 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 		return nil, err
 	}
 
+	gameIDs := make([]int32, len(games))
+	for i := range games {
+		gameIDs[i] = games[i].ID
+	}
+	participantRows, err := s.gameService.GetParticipantIDsByGameIDs(ctx, gameIDs)
+	if err != nil {
+		return nil, err
+	}
+	participantMap := make(map[int32][]int32, len(games))
+	for _, row := range participantRows {
+		participantMap[row.GameID] = append(participantMap[row.GameID], row.UserID)
+	}
+
 	apiGames := make([]api.Game, len(games))
 	for i := range games {
-		participantIDs, err := s.gameService.GetParticipantIDs(ctx, int(games[i].ID))
-		if err != nil {
-			return nil, err
-		}
-		apiGames[i] = toAPIGame(games[i], participantIDs)
+		apiGames[i] = toAPIGame(games[i], participantMap[games[i].ID])
 	}
 
 	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
@@ -147,7 +156,8 @@ func (s *HTTPServer) DeleteGame(ctx context.Context, req api.DeleteGameRequestOb
 }
 
 func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObject) (api.StartGameResponseObject, error) {
-	game, err := s.gameService.StartGame(ctx, req.Id)
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.StartGame(ctx, req.Id, userID)
 	if err != nil {
 		return nil, err
 	}

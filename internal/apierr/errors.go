@@ -11,6 +11,7 @@ const (
 	ErrGameAlreadyStarted       = "GAME_ALREADY_STARTED"
 	ErrGameNotInProgress        = "GAME_NOT_IN_PROGRESS"
 	ErrInvalidWinner            = "INVALID_WINNER"
+	ErrNotGameCreator           = "NOT_GAME_CREATOR"
 	ErrCannotCancelFinishedGame = "CANNOT_CANCEL_FINISHED_GAME"
 	ErrGameAlreadyCancelled     = "GAME_ALREADY_CANCELLED"
 
@@ -40,6 +41,8 @@ func httpStatusCode(code string) int {
 	switch code {
 	case ErrValidation, ErrNotEnoughPlayers, ErrInvalidWinner:
 		return http.StatusBadRequest
+	case ErrNotGameCreator:
+		return http.StatusForbidden
 	case ErrAlreadyParticipant, ErrGameAlreadyStarted, ErrGameNotInProgress,
 		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled:
 		return http.StatusConflict

@@ -59,6 +59,35 @@ func (q *Queries) GetParticipantIDs(ctx context.Context, gameID int32) ([]int32,
 	return items, nil
 }
 
+const getParticipantIDsByGameIDs = `-- name: GetParticipantIDsByGameIDs :many
+SELECT game_id, user_id FROM game_participants WHERE game_id = ANY($1::int[]) ORDER BY game_id, id
+`
+
+type GetParticipantIDsByGameIDsRow struct {
+	GameID int32 `json:"game_id"`
+	UserID int32 `json:"user_id"`
+}
+
+func (q *Queries) GetParticipantIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantIDsByGameIDsRow, error) {
+	rows, err := q.db.Query(ctx, getParticipantIDsByGameIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetParticipantIDsByGameIDsRow{}
+	for rows.Next() {
+		var i GetParticipantIDsByGameIDsRow
+		if err := rows.Scan(&i.GameID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const isGameParticipant = `-- name: IsGameParticipant :one
 SELECT EXISTS(
     SELECT 1 FROM game_participants

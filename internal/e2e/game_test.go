@@ -106,6 +106,14 @@ func TestGame_StartValidation(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		assert.Equal(t, "NOT_ENOUGH_PLAYERS", errCode(t, resp))
 	})
+
+	t.Run("non-creator cannot start", func(t *testing.T) {
+		g := createGame(t) // token1 created, token2 joined
+
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil, token2)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, "NOT_GAME_CREATOR", errCode(t, resp))
+	})
 }
 
 func TestGame_NotFound(t *testing.T) {

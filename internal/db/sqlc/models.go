@@ -17,6 +17,7 @@ type Game struct {
 	CompletedAt pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	CreatorID   int32              `json:"creator_id"`
 }
 
 type GameParticipant struct {
