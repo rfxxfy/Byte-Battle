@@ -62,9 +62,22 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 		return nil, err
 	}
 
+	gameIDs := make([]int32, len(games))
+	for i := range games {
+		gameIDs[i] = games[i].ID
+	}
+	participantRows, err := s.gameService.GetParticipantIDsByGameIDs(ctx, gameIDs)
+	if err != nil {
+		return nil, err
+	}
+	participantMap := make(map[int32][]int32, len(games))
+	for _, row := range participantRows {
+		participantMap[row.GameID] = append(participantMap[row.GameID], row.UserID)
+	}
+
 	apiGames := make([]api.Game, len(games))
 	for i := range games {
-		apiGames[i] = toAPIGame(games[i])
+		apiGames[i] = toAPIGame(games[i], participantMap[games[i].ID])
 	}
 
 	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
@@ -91,12 +104,33 @@ func (s *HTTPServer) GetProblem(_ context.Context, req api.GetProblemRequestObje
 }
 
 func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestObject) (api.CreateGameResponseObject, error) {
-	game, err := s.gameService.CreateGame(ctx, req.Body.PlayerIds, req.Body.ProblemId)
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.CreateGame(ctx, userID, req.Body.ProblemId)
 	if err != nil {
 		return nil, err
 	}
 
-	return api.CreateGame201JSONResponse{Game: toAPIGame(game)}, nil
+	participantIDs, err := s.gameService.GetParticipantIDs(ctx, int(game.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return api.CreateGame201JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+}
+
+func (s *HTTPServer) JoinGame(ctx context.Context, req api.JoinGameRequestObject) (api.JoinGameResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.JoinGame(ctx, req.Id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	participantIDs, err := s.gameService.GetParticipantIDs(ctx, int(game.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	return api.JoinGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
 }
 
 func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) (api.GetGameResponseObject, error) {
@@ -105,7 +139,12 @@ func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) 
 		return nil, err
 	}
 
-	return api.GetGame200JSONResponse{Game: toAPIGame(game)}, nil
+	participantIDs, err := s.gameService.GetParticipantIDs(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.GetGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
 }
 
 func (s *HTTPServer) DeleteGame(ctx context.Context, req api.DeleteGameRequestObject) (api.DeleteGameResponseObject, error) {
@@ -117,12 +156,18 @@ func (s *HTTPServer) DeleteGame(ctx context.Context, req api.DeleteGameRequestOb
 }
 
 func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObject) (api.StartGameResponseObject, error) {
-	game, err := s.gameService.StartGame(ctx, req.Id)
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.StartGame(ctx, req.Id, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	return api.StartGame200JSONResponse{Game: toAPIGame(game)}, nil
+	participantIDs, err := s.gameService.GetParticipantIDs(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.StartGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
 }
 
 func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameRequestObject) (api.CompleteGameResponseObject, error) {
@@ -135,7 +180,12 @@ func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameReque
 		return nil, err
 	}
 
-	return api.CompleteGame200JSONResponse{Game: toAPIGame(game)}, nil
+	participantIDs, err := s.gameService.GetParticipantIDs(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.CompleteGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
 }
 
 func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestObject) (api.CancelGameResponseObject, error) {
@@ -144,7 +194,12 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 		return nil, err
 	}
 
-	return api.CancelGame200JSONResponse{Game: toAPIGame(game)}, nil
+	participantIDs, err := s.gameService.GetParticipantIDs(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.CancelGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
 }
 
 func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
@@ -187,13 +242,18 @@ func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
-func toAPIGame(g sqlcdb.Game) api.Game {
+func toAPIGame(g sqlcdb.Game, participantIDs []int32) api.Game {
+	ids := make([]int, len(participantIDs))
+	for i, id := range participantIDs {
+		ids[i] = int(id)
+	}
 	result := api.Game{
-		Id:        int(g.ID),
-		ProblemId: g.ProblemID,
-		Status:    api.GameStatus(g.Status),
-		CreatedAt: g.CreatedAt.Time,
-		UpdatedAt: g.UpdatedAt.Time,
+		Id:             int(g.ID),
+		ProblemId:      g.ProblemID,
+		Status:         api.GameStatus(g.Status),
+		ParticipantIds: ids,
+		CreatedAt:      g.CreatedAt.Time,
+		UpdatedAt:      g.UpdatedAt.Time,
 	}
 	if g.WinnerID.Valid {
 		id := int(g.WinnerID.Int32)

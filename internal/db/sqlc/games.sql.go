@@ -16,7 +16,7 @@ UPDATE games
 SET status = 'cancelled',
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at
+RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at, creator_id
 `
 
 func (q *Queries) CancelGame(ctx context.Context, id int32) (Game, error) {
@@ -31,6 +31,7 @@ func (q *Queries) CancelGame(ctx context.Context, id int32) (Game, error) {
 		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CreatorID,
 	)
 	return i, err
 }
@@ -42,7 +43,7 @@ SET status = 'finished',
     completed_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at
+RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at, creator_id
 `
 
 type CompleteGameParams struct {
@@ -62,6 +63,7 @@ func (q *Queries) CompleteGame(ctx context.Context, arg CompleteGameParams) (Gam
 		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CreatorID,
 	)
 	return i, err
 }
@@ -78,13 +80,18 @@ func (q *Queries) CountGames(ctx context.Context) (int64, error) {
 }
 
 const createGame = `-- name: CreateGame :one
-INSERT INTO games (problem_id, status)
-VALUES ($1, 'pending')
-RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at
+INSERT INTO games (problem_id, creator_id, status)
+VALUES ($1, $2, 'pending')
+RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at, creator_id
 `
 
-func (q *Queries) CreateGame(ctx context.Context, problemID string) (Game, error) {
-	row := q.db.QueryRow(ctx, createGame, problemID)
+type CreateGameParams struct {
+	ProblemID string `json:"problem_id"`
+	CreatorID int32  `json:"creator_id"`
+}
+
+func (q *Queries) CreateGame(ctx context.Context, arg CreateGameParams) (Game, error) {
+	row := q.db.QueryRow(ctx, createGame, arg.ProblemID, arg.CreatorID)
 	var i Game
 	err := row.Scan(
 		&i.ID,
@@ -95,6 +102,7 @@ func (q *Queries) CreateGame(ctx context.Context, problemID string) (Game, error
 		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CreatorID,
 	)
 	return i, err
 }
@@ -112,7 +120,7 @@ func (q *Queries) DeleteGame(ctx context.Context, id int32) (int64, error) {
 }
 
 const getGameByID = `-- name: GetGameByID :one
-SELECT id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at FROM games WHERE id = $1 LIMIT 1
+SELECT id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at, creator_id FROM games WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetGameByID(ctx context.Context, id int32) (Game, error) {
@@ -127,12 +135,13 @@ func (q *Queries) GetGameByID(ctx context.Context, id int32) (Game, error) {
 		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CreatorID,
 	)
 	return i, err
 }
 
 const getGameForUpdate = `-- name: GetGameForUpdate :one
-SELECT id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at FROM games WHERE id = $1 LIMIT 1 FOR UPDATE
+SELECT id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at, creator_id FROM games WHERE id = $1 LIMIT 1 FOR UPDATE
 `
 
 func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) {
@@ -147,12 +156,13 @@ func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) 
 		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CreatorID,
 	)
 	return i, err
 }
 
 const listGames = `-- name: ListGames :many
-SELECT id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at FROM games ORDER BY created_at DESC LIMIT $1 OFFSET $2
+SELECT id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at, creator_id FROM games ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
 type ListGamesParams struct {
@@ -178,6 +188,7 @@ func (q *Queries) ListGames(ctx context.Context, arg ListGamesParams) ([]Game, e
 			&i.CompletedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CreatorID,
 		); err != nil {
 			return nil, err
 		}
@@ -195,7 +206,7 @@ SET status = 'active',
     started_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at
+RETURNING id, problem_id, winner_id, status, started_at, completed_at, created_at, updated_at, creator_id
 `
 
 func (q *Queries) StartGame(ctx context.Context, id int32) (Game, error) {
@@ -210,6 +221,7 @@ func (q *Queries) StartGame(ctx context.Context, id int32) (Game, error) {
 		&i.CompletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CreatorID,
 	)
 	return i, err
 }
