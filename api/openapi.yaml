@@ -26,8 +26,6 @@ paths:
                 $ref: "#/components/schemas/StatusResponse"
         "400":
           $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
 
   /auth/confirm:
     post:
@@ -53,8 +51,6 @@ paths:
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
 
   /auth/me:
     get:
@@ -70,8 +66,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
         "401":
-          $ref: "#/components/responses/Error"
-        "500":
           $ref: "#/components/responses/Error"
 
   /auth/logout:
@@ -89,8 +83,6 @@ paths:
                 $ref: "#/components/schemas/StatusResponse"
         "401":
           $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
 
   /problems:
     get:
@@ -104,8 +96,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListProblemsResponse"
-        "500":
-          $ref: "#/components/responses/Error"
 
   /problems/{problem_id}:
     get:
@@ -127,8 +117,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemResponse"
         "404":
-          $ref: "#/components/responses/Error"
-        "500":
           $ref: "#/components/responses/Error"
 
   /games:
@@ -153,8 +141,6 @@ paths:
         "400":
           $ref: "#/components/responses/Error"
         "401":
-          $ref: "#/components/responses/Error"
-        "500":
           $ref: "#/components/responses/Error"
 
     get:
@@ -184,8 +170,6 @@ paths:
           $ref: "#/components/responses/Error"
         "401":
           $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
 
   /games/{id}:
     get:
@@ -206,8 +190,6 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
-        "500":
-          $ref: "#/components/responses/Error"
 
     delete:
       operationId: DeleteGame
@@ -226,8 +208,6 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-        "500":
           $ref: "#/components/responses/Error"
 
   /games/{id}/start:
@@ -250,8 +230,6 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-        "500":
           $ref: "#/components/responses/Error"
 
   /games/{id}/complete:
@@ -280,8 +258,6 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-        "500":
           $ref: "#/components/responses/Error"
 
   /games/{id}/join:
@@ -328,8 +304,6 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "404":
-          $ref: "#/components/responses/Error"
-        "500":
           $ref: "#/components/responses/Error"
 
 components:
