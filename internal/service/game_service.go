@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -83,7 +84,15 @@ func (s *GameService) JoinGame(ctx context.Context, gameID int, userID uuid.UUID
 	}
 
 	if game.Status != gameStatusPending {
-		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "game is not pending")
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotJoinable, "game is not joinable")
+	}
+
+	count, err := qtx.CountGameParticipants(ctx, game.ID)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	if count >= 2 {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotJoinable, "game is full")
 	}
 
 	already, err := qtx.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
@@ -94,7 +103,7 @@ func (s *GameService) JoinGame(ctx context.Context, gameID int, userID uuid.UUID
 		return sqlcdb.Game{}, err
 	}
 	if already {
-		return sqlcdb.Game{}, apierr.New(apierr.ErrAlreadyParticipant, "already a participant")
+		return sqlcdb.Game{}, apierr.New(apierr.ErrAlreadyInGame, "already in game")
 	}
 
 	if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
@@ -127,7 +136,7 @@ func (s *GameService) GetGame(ctx context.Context, id int) (sqlcdb.Game, error) 
 	return game, err
 }
 
-func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcdb.Game, int64, error) {
+func (s *GameService) ListGames(ctx context.Context, limit, offset int, status *string) ([]sqlcdb.Game, int64, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -138,14 +147,17 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcd
 		offset = 0
 	}
 
-	total, err := s.q.CountGames(ctx)
+	statusParam := toNullableText(status)
+
+	total, err := s.q.CountGames(ctx, statusParam)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	games, err := s.q.ListGames(ctx, sqlcdb.ListGamesParams{
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		Status:     statusParam,
+		ListOffset: int32(offset),
+		ListLimit:  int32(limit),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -183,7 +195,7 @@ func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (
 	if err != nil {
 		return sqlcdb.Game{}, err
 	}
-	if count < 2 {
+	if count != 2 {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players must join before starting")
 	}
 
@@ -197,6 +209,13 @@ func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (
 	}
 
 	return game, nil
+}
+
+func toNullableText(status *string) pgtype.Text {
+	if status == nil {
+		return pgtype.Text{Valid: false}
+	}
+	return pgtype.Text{String: *status, Valid: true}
 }
 
 func (s *GameService) CompleteGame(ctx context.Context, id int, winnerID uuid.UUID) (sqlcdb.Game, error) {

@@ -13,6 +13,7 @@ type gameResp struct {
 	Game struct {
 		ID             int      `json:"id"`
 		ProblemID      string   `json:"problem_id"`
+		CreatorID      string   `json:"creator_id"`
 		Status         string   `json:"status"`
 		WinnerID       *string  `json:"winner_id"`
 		ParticipantIDs []string `json:"participant_ids"`
@@ -57,6 +58,7 @@ func TestGame_CreateAndGet(t *testing.T) {
 	g := createGame(t)
 	assert.Equal(t, "pending", g.Game.Status)
 	assert.Equal(t, "test-problem", g.Game.ProblemID)
+	assert.Equal(t, user1ID.String(), g.Game.CreatorID)
 	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, g.Game.ParticipantIDs)
 
 	resp := doAuth(t, http.MethodGet, fmt.Sprintf("/games/%d", g.Game.ID), nil, token1)
@@ -79,7 +81,7 @@ func TestGame_JoinValidation(t *testing.T) {
 		// user1 tries to join their own game
 		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token1)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
-		assert.Equal(t, "ALREADY_PARTICIPANT", errCode(t, resp))
+		assert.Equal(t, "ALREADY_IN_GAME", errCode(t, resp))
 	})
 
 	t.Run("join non-pending game", func(t *testing.T) {
@@ -88,7 +90,16 @@ func TestGame_JoinValidation(t *testing.T) {
 		token3 := authToken(t, "player3@test.com")
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token3)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
-		assert.Equal(t, "GAME_ALREADY_STARTED", errCode(t, resp))
+		assert.Equal(t, "GAME_NOT_JOINABLE", errCode(t, resp))
+	})
+
+	t.Run("join full game", func(t *testing.T) {
+		g := createGame(t)
+
+		token3 := authToken(t, "player3-full@test.com")
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token3)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
+		assert.Equal(t, "GAME_NOT_JOINABLE", errCode(t, resp))
 	})
 }
 
@@ -137,16 +148,29 @@ func TestGame_NotFound(t *testing.T) {
 }
 
 func TestGame_List(t *testing.T) {
-	for range 3 {
+	for range 2 {
 		createGame(t)
 	}
 
-	resp := doAuth(t, http.MethodGet, "/games?limit=2&offset=0", nil, token1)
+	// one extra pending game (without join) to validate status filter
+	resp := doAuth(t, http.MethodPost, "/games", map[string]any{
+		"problem_id": "test-problem",
+	}, token1)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	resp.Body.Close()
+	resp = doAuth(t, http.MethodGet, "/games?limit=2&offset=0", nil, token1)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var list gamesListResp
 	decodeJSON(t, resp, &list)
 	assert.Len(t, list.Games, 2)
 	assert.GreaterOrEqual(t, list.Total, int64(3))
+
+	resp = doAuth(t, http.MethodGet, "/games?status=pending", nil, token1)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	decodeJSON(t, resp, &list)
+	for _, g := range list.Games {
+		assert.Equal(t, "pending", g.Status)
+	}
 }
 
 func TestGame_Delete(t *testing.T) {

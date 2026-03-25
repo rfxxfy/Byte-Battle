@@ -159,6 +159,12 @@ paths:
           schema:
             type: integer
             default: 0
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, active, finished, cancelled]
       responses:
         "200":
           description: List of games
@@ -459,6 +465,7 @@ components:
       required:
         - id
         - problem_id
+        - creator_id
         - status
         - participant_ids
         - created_at
@@ -469,6 +476,9 @@ components:
         problem_id:
           type: string
           example: "001-two-sum"
+        creator_id:
+          type: string
+          format: uuid
         winner_id:
           type: string
           format: uuid

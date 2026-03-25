@@ -10,10 +10,16 @@ SELECT * FROM games WHERE id = $1 LIMIT 1;
 SELECT * FROM games WHERE id = $1 LIMIT 1 FOR UPDATE;
 
 -- name: ListGames :many
-SELECT * FROM games ORDER BY created_at DESC LIMIT $1 OFFSET $2;
+SELECT *
+FROM games
+WHERE (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+ORDER BY created_at DESC
+LIMIT sqlc.arg(list_limit) OFFSET sqlc.arg(list_offset);
 
 -- name: CountGames :one
-SELECT count(*) FROM games;
+SELECT count(*)
+FROM games
+WHERE (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text);
 
 -- name: StartGame :one
 UPDATE games

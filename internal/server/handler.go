@@ -57,8 +57,13 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	if req.Params.Offset != nil {
 		offset = *req.Params.Offset
 	}
+	var status *string
+	if req.Params.Status != nil && *req.Params.Status != "" {
+		s := string(*req.Params.Status)
+		status = &s
+	}
 
-	games, total, err := s.gameService.ListGames(ctx, limit, offset)
+	games, total, err := s.gameService.ListGames(ctx, limit, offset, status)
 	if err != nil {
 		return nil, err
 	}
@@ -243,6 +248,7 @@ func toAPIGame(g sqlcdb.Game, participantIDs []uuid.UUID) api.Game {
 	result := api.Game{
 		Id:             int(g.ID),
 		ProblemId:      g.ProblemID,
+		CreatorId:      int(g.CreatorID),
 		Status:         api.GameStatus(g.Status),
 		ParticipantIds: participantIDs,
 		CreatedAt:      g.CreatedAt.Time,
@@ -314,6 +320,12 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	defer client.Close() // signals WritePump to exit cleanly
 
 	go client.WritePump()
+
+	joinedMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:   ws.TypePlayerJoined,
+		UserID: session.UserID,
+	})
+	s.hub.Broadcast(int32(gameID), joinedMsg)
 
 	conn.SetReadLimit(32 * 1024)
 	conn.SetReadDeadline(time.Now().Add(ws.PongWait)) //nolint:errcheck // not actionable

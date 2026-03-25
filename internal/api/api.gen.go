@@ -29,22 +29,22 @@ const (
 
 // Defines values for GameStatus.
 const (
-	Active    GameStatus = "active"
-	Cancelled GameStatus = "cancelled"
-	Finished  GameStatus = "finished"
-	Pending   GameStatus = "pending"
+	GameStatusActive    GameStatus = "active"
+	GameStatusCancelled GameStatus = "cancelled"
+	GameStatusFinished  GameStatus = "finished"
+	GameStatusPending   GameStatus = "pending"
 )
 
 // Valid indicates whether the value is a known member of the GameStatus enum.
 func (e GameStatus) Valid() bool {
 	switch e {
-	case Active:
+	case GameStatusActive:
 		return true
-	case Cancelled:
+	case GameStatusCancelled:
 		return true
-	case Finished:
+	case GameStatusFinished:
 		return true
-	case Pending:
+	case GameStatusPending:
 		return true
 	default:
 		return false
@@ -66,6 +66,30 @@ func (e ProblemDifficulty) Valid() bool {
 	case Hard:
 		return true
 	case Medium:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListGamesParamsStatus.
+const (
+	ListGamesParamsStatusActive    ListGamesParamsStatus = "active"
+	ListGamesParamsStatusCancelled ListGamesParamsStatus = "cancelled"
+	ListGamesParamsStatusFinished  ListGamesParamsStatus = "finished"
+	ListGamesParamsStatusPending   ListGamesParamsStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the ListGamesParamsStatus enum.
+func (e ListGamesParamsStatus) Valid() bool {
+	switch e {
+	case ListGamesParamsStatusActive:
+		return true
+	case ListGamesParamsStatusCancelled:
+		return true
+	case ListGamesParamsStatusFinished:
+		return true
+	case ListGamesParamsStatusPending:
 		return true
 	default:
 		return false
@@ -107,6 +131,7 @@ type ErrorResponse struct {
 // Game defines model for Game.
 type Game struct {
 	CreatedAt      time.Time            `json:"created_at"`
+	CreatorId      openapi_types.UUID   `json:"creator_id"`
 	Id             int                  `json:"id"`
 	ParticipantIds []openapi_types.UUID `json:"participant_ids"`
 	ProblemId      string               `json:"problem_id"`
@@ -179,9 +204,13 @@ type Error = ErrorResponse
 
 // ListGamesParams defines parameters for ListGames.
 type ListGamesParams struct {
-	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
-	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit  *int                   `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int                   `form:"offset,omitempty" json:"offset,omitempty"`
+	Status *ListGamesParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 }
+
+// ListGamesParamsStatus defines parameters for ListGames.
+type ListGamesParamsStatus string
 
 // PostAuthConfirmJSONRequestBody defines body for PostAuthConfirm for application/json ContentType.
 type PostAuthConfirmJSONRequestBody = ConfirmRequest
@@ -433,6 +462,14 @@ func (siw *ServerInterfaceWrapper) ListGames(w http.ResponseWriter, r *http.Requ
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
 		return
 	}
 
@@ -1799,32 +1836,33 @@ func (sh *strictHandler) GetProblem(w http.ResponseWriter, r *http.Request, prob
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"TUmcNiQAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

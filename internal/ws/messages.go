@@ -6,6 +6,7 @@ const (
 	TypeSubmit           = "submit"
 	TypeSubmissionResult = "submission_result"
 	TypeGameFinished     = "game_finished"
+	TypePlayerJoined     = "player_joined"
 	TypeError            = "error"
 )
 
