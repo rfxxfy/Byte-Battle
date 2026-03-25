@@ -9,7 +9,7 @@ MIGRATE_VERSION := v4.19.1
 
 GOBIN := $(shell go env GOPATH)/bin
 
-.PHONY: tidy tools generate generate-api generate-sqlc clean
+.PHONY: tidy tools generate generate-api generate-sqlc clean frontend-install frontend-build frontend-dev
 
 tidy:
 	go mod tidy
@@ -38,6 +38,19 @@ generate: tools generate-api generate-sqlc
 # Remove generated files and binaries
 clean:
 	rm -rf internal/api/ internal/db/sqlc/ bin/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Frontend
+# ─────────────────────────────────────────────────────────────────────────────
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-build: frontend-install
+	cd frontend && npm run build
+
+frontend-dev:
+	cd frontend && npm run dev
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Migrations (golang-migrate)

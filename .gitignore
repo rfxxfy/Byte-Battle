@@ -54,3 +54,7 @@ build/
 coverage.txt
 coverage.html
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
