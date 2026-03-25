@@ -7,11 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"os/signal"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -30,10 +27,13 @@ const (
 )
 
 type DockerExecutor struct {
-	cli     dockerClient
-	config  *Config
-	pools   map[Language]chan string
-	errChan chan error
+	cli            dockerClient
+	config         *Config
+	pools          map[Language]chan string
+	errChan        chan error
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
+	wg             sync.WaitGroup
 }
 
 func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
@@ -50,11 +50,14 @@ func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
 
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	e := &DockerExecutor{
-		cli:     cli,
-		config:  cfg,
-		pools:   make(map[Language]chan string),
-		errChan: make(chan error, 16),
+		cli:            cli,
+		config:         cfg,
+		pools:          make(map[Language]chan string),
+		errChan:        make(chan error, 16),
+		shutdownCtx:    shutdownCtx,
+		shutdownCancel: shutdownCancel,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -119,26 +122,46 @@ func (e *DockerExecutor) logPoolErrors() {
 func (e *DockerExecutor) initPools() {
 	for lang, settings := range e.config.Languages {
 		e.pools[lang] = make(chan string, poolSize)
-		go e.maintainPool(lang, &settings)
+		lang, settings := lang, settings
+		e.wg.Add(1)
+		go func() {
+			defer e.wg.Done()
+			e.maintainPool(lang, &settings)
+		}()
 	}
 }
 
 func (e *DockerExecutor) maintainPool(lang Language, settings *LangSettings) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		cancel()
-	}()
-
 	for range poolMaintainerMaxRounds {
-		if e.maintainPoolIteration(ctx, lang, settings) {
+		if e.maintainPoolIteration(e.shutdownCtx, lang, settings) {
+			break
+		}
+	}
+	for {
+		select {
+		case id := <-e.pools[lang]:
+			e.cleanupContainer(context.Background(), id)
+		default:
 			return
 		}
 	}
+}
+
+// Shutdown cancels the pool maintainers, drains warm containers, and waits for
+// cleanup to finish. Call this after the HTTP server has stopped accepting requests.
+func (e *DockerExecutor) Shutdown(ctx context.Context) {
+	e.shutdownCancel()
+	done := make(chan struct{})
+	go func() {
+		e.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		log.Printf("executor shutdown timed out, some containers may remain")
+	}
+	close(e.errChan)
 }
 
 func (e *DockerExecutor) maintainPoolIteration(ctx context.Context, lang Language, settings *LangSettings) (exit bool) {
