@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { ProblemsPage } from './pages/ProblemsPage'
 import { ProblemPage } from './pages/ProblemPage'
@@ -21,37 +22,17 @@ export default function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
-            path="/problems"
             element={
               <ProtectedRoute>
-                <ProblemsPage />
+                <AppLayout />
               </ProtectedRoute>
             }
-          />
-          <Route
-            path="/problems/:id"
-            element={
-              <ProtectedRoute>
-                <ProblemPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/games"
-            element={
-              <ProtectedRoute>
-                <GamesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/games/:id"
-            element={
-              <ProtectedRoute>
-                <GamePage />
-              </ProtectedRoute>
-            }
-          />
+          >
+            <Route path="/problems" element={<ProblemsPage />} />
+            <Route path="/problems/:id" element={<ProblemPage />} />
+            <Route path="/games" element={<GamesPage />} />
+            <Route path="/games/:id" element={<GamePage />} />
+          </Route>
         </Routes>
       </AuthProvider>
     </BrowserRouter>
