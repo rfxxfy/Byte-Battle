@@ -17,6 +17,7 @@ import (
 	"bytebattle/internal/ws"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	gorillaws "github.com/gorilla/websocket"
 )
 
@@ -70,7 +71,7 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	if err != nil {
 		return nil, err
 	}
-	participantMap := make(map[int32][]int32, len(games))
+	participantMap := make(map[int32][]uuid.UUID, len(games))
 	for _, row := range participantRows {
 		participantMap[row.GameID] = append(participantMap[row.GameID], row.UserID)
 	}
@@ -171,10 +172,6 @@ func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObje
 }
 
 func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameRequestObject) (api.CompleteGameResponseObject, error) {
-	if req.Body.WinnerId < 1 {
-		return nil, apierr.New(apierr.ErrValidation, "invalid winner_id")
-	}
-
 	game, err := s.gameService.CompleteGame(ctx, req.Id, req.Body.WinnerId)
 	if err != nil {
 		return nil, err
@@ -242,21 +239,17 @@ func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
-func toAPIGame(g sqlcdb.Game, participantIDs []int32) api.Game {
-	ids := make([]int, len(participantIDs))
-	for i, id := range participantIDs {
-		ids[i] = int(id)
-	}
+func toAPIGame(g sqlcdb.Game, participantIDs []uuid.UUID) api.Game {
 	result := api.Game{
 		Id:             int(g.ID),
 		ProblemId:      g.ProblemID,
 		Status:         api.GameStatus(g.Status),
-		ParticipantIds: ids,
+		ParticipantIds: participantIDs,
 		CreatedAt:      g.CreatedAt.Time,
 		UpdatedAt:      g.UpdatedAt.Time,
 	}
 	if g.WinnerID.Valid {
-		id := int(g.WinnerID.Int32)
+		id := g.WinnerID.UUID
 		result.WinnerId = &id
 	}
 	return result
@@ -346,7 +339,7 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, msg ws.ClientMessage) {
+func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uuid.UUID, msg ws.ClientMessage) {
 	result, execErr := s.executionService.Execute(ctx, executor.ExecutionRequest{
 		Code:     msg.Code,
 		Language: executor.Language(msg.Language),
@@ -371,15 +364,15 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID, userID int32, ms
 		return
 	}
 
-	completed, err := s.gameService.CompleteGame(ctx, int(gameID), int(userID))
+	completed, err := s.gameService.CompleteGame(ctx, int(gameID), userID)
 	if err != nil {
 		// another player already won — ignore
 		return
 	}
 
-	winnerID := int32(0)
+	var winnerID uuid.UUID
 	if completed.WinnerID.Valid {
-		winnerID = completed.WinnerID.Int32
+		winnerID = completed.WinnerID.UUID
 	}
 	finMsg, _ := json.Marshal(ws.ServerMessage{
 		Type:     ws.TypeGameFinished,

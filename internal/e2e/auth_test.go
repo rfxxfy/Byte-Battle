@@ -79,10 +79,10 @@ func TestAuth_Me(t *testing.T) {
 	resp := doAuth(t, http.MethodGet, "/auth/me", nil, token1)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body struct {
-		UserId int `json:"user_id"`
+		UserId string `json:"user_id"`
 	}
 	decodeJSON(t, resp, &body)
-	assert.Equal(t, user1ID, body.UserId)
+	assert.Equal(t, user1ID.String(), body.UserId)
 }
 
 func TestAuth_Me_Unauthorized(t *testing.T) {

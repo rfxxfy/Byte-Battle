@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -46,8 +47,8 @@ var (
 	testSrv    *httptest.Server
 	testPool   *pgxpool.Pool
 	testLoader *problems.Loader
-	user1ID    int
-	user2ID    int
+	user1ID    uuid.UUID
+	user2ID    uuid.UUID
 	token1     string
 	token2     string
 )
@@ -106,7 +107,7 @@ func TestMain(m *testing.M) {
 		_ = pgCtr.Terminate(ctx)
 		os.Exit(1)
 	}
-	user1ID = int(u1.ID)
+	user1ID = u1.ID
 
 	u2, err := q.CreateUser(ctx, sqlcdb.CreateUserParams{
 		Username:     "player2",
@@ -119,7 +120,7 @@ func TestMain(m *testing.M) {
 		_ = pgCtr.Terminate(ctx)
 		os.Exit(1)
 	}
-	user2ID = int(u2.ID)
+	user2ID = u2.ID
 
 	loader, err := problems.NewLoader("testdata/problems")
 	if err != nil {

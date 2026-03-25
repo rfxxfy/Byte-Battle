@@ -8,6 +8,7 @@ package sqlcdb
 import (
 	"context"
 
+	uuid "github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -18,7 +19,7 @@ RETURNING id, user_id, token, expires_at, created_at, updated_at
 `
 
 type CreateSessionParams struct {
-	UserID    int32              `json:"user_id"`
+	UserID    uuid.UUID          `json:"user_id"`
 	Token     string             `json:"token"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
@@ -65,7 +66,7 @@ const deleteSessionsByUserID = `-- name: DeleteSessionsByUserID :execrows
 DELETE FROM sessions WHERE user_id = $1
 `
 
-func (q *Queries) DeleteSessionsByUserID(ctx context.Context, userID int32) (int64, error) {
+func (q *Queries) DeleteSessionsByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteSessionsByUserID, userID)
 	if err != nil {
 		return 0, err
@@ -113,7 +114,7 @@ const getSessionsByUserID = `-- name: GetSessionsByUserID :many
 SELECT id, user_id, token, expires_at, created_at, updated_at FROM sessions WHERE user_id = $1 ORDER BY created_at DESC
 `
 
-func (q *Queries) GetSessionsByUserID(ctx context.Context, userID int32) ([]Session, error) {
+func (q *Queries) GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error) {
 	rows, err := q.db.Query(ctx, getSessionsByUserID, userID)
 	if err != nil {
 		return nil, err

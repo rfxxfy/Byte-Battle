@@ -9,6 +9,7 @@ import (
 	"bytebattle/internal/config"
 	sqlcdb "bytebattle/internal/db/sqlc"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -51,7 +52,7 @@ type mockDB struct {
 	upsertVerification func(context.Context, sqlcdb.UpsertVerificationCodeParams) (sqlcdb.VerificationCode, error)
 	incrementAttempts  func(context.Context, sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.VerificationCode, error)
 	deleteVerification func(context.Context, string) error
-	setEmailVerified   func(context.Context, int32) error
+	setEmailVerified   func(context.Context, uuid.UUID) error
 
 	upsertCalled      bool
 	incrementCalled   bool
@@ -76,7 +77,7 @@ func (m *mockDB) CreateUserByEmail(ctx context.Context, arg sqlcdb.CreateUserByE
 	if m.createUserByEmail != nil {
 		return m.createUserByEmail(ctx, arg)
 	}
-	return sqlcdb.User{ID: 1, Username: arg.Username, Email: arg.Email}, nil
+	return sqlcdb.User{ID: uuid.UUID{}, Username: arg.Username, Email: arg.Email}, nil
 }
 
 func (m *mockDB) GetVerificationCode(ctx context.Context, email string) (sqlcdb.VerificationCode, error) {
@@ -109,7 +110,7 @@ func (m *mockDB) DeleteVerificationCode(ctx context.Context, email string) error
 	return nil
 }
 
-func (m *mockDB) SetEmailVerified(ctx context.Context, id int32) error {
+func (m *mockDB) SetEmailVerified(ctx context.Context, id uuid.UUID) error {
 	m.setVerifiedCalled = true
 	if m.setEmailVerified != nil {
 		return m.setEmailVerified(ctx, id)
@@ -123,7 +124,7 @@ type mockSession struct {
 	err          error
 }
 
-func (m *mockSession) CreateSession(_ context.Context, _ int) (sqlcdb.Session, error) {
+func (m *mockSession) CreateSession(_ context.Context, _ uuid.UUID) (sqlcdb.Session, error) {
 	m.createCalled = true
 	if m.err != nil {
 		return sqlcdb.Session{}, m.err
@@ -225,7 +226,7 @@ func TestVerifyCode_ExistingUser_ReturnsSession(t *testing.T) {
 			return code, nil
 		},
 		getUserByEmail: func(_ context.Context, _ string) (sqlcdb.User, error) {
-			return sqlcdb.User{ID: 1, Email: "user@example.com"}, nil
+			return sqlcdb.User{ID: uuid.UUID{}, Email: "user@example.com"}, nil
 		},
 	}
 	sess := &mockSession{token: "my-session-token"}
@@ -257,13 +258,12 @@ func TestVerifyCode_NewUser_CreatesUserOnVerify(t *testing.T) {
 		incrementAttempts: func(_ context.Context, _ sqlcdb.IncrementAttemptsIfBelowLimitParams) (sqlcdb.VerificationCode, error) {
 			return code, nil
 		},
-		// no existing user
 		getUserByEmail: func(_ context.Context, _ string) (sqlcdb.User, error) {
 			return sqlcdb.User{}, pgx.ErrNoRows
 		},
 		createUserByEmail: func(_ context.Context, arg sqlcdb.CreateUserByEmailParams) (sqlcdb.User, error) {
 			createCalled = true
-			return sqlcdb.User{ID: 2, Email: arg.Email, Username: arg.Username}, nil
+			return sqlcdb.User{ID: uuid.UUID{}, Email: arg.Email, Username: arg.Username}, nil
 		},
 	}
 	sess := &mockSession{}
@@ -345,7 +345,7 @@ func TestSendCode_RateLimitsRecentCode(t *testing.T) {
 	cfg := testEntranceConfig() // CodeTTL = 15min
 	db := &mockDB{
 		getVerification: func(_ context.Context, _ string) (sqlcdb.VerificationCode, error) {
-			// Code expires in 14.5 min → sent 30s ago, within 60s cooldown
+			// Code expires in 14.5 min, sent 30s ago, within 60s cooldown
 			return sqlcdb.VerificationCode{
 				Email:     "user@example.com",
 				ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(cfg.CodeTTL - 30*time.Second), Valid: true},
@@ -368,7 +368,7 @@ func TestSendCode_AllowsAfterCooldown(t *testing.T) {
 	cfg := testEntranceConfig() // CodeTTL = 15min
 	db := &mockDB{
 		getVerification: func(_ context.Context, _ string) (sqlcdb.VerificationCode, error) {
-			// Code expires in 13 min → sent 2min ago, past 60s cooldown
+			// Code expires in 13 min, sent 2min ago, past 60s cooldown
 			return sqlcdb.VerificationCode{
 				Email:     "user@example.com",
 				ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(cfg.CodeTTL - 2*time.Minute), Valid: true},
@@ -438,7 +438,7 @@ func TestVerifyCode_UsernameConflict_RetriesWithNewUsername(t *testing.T) {
 			if attempts < 3 {
 				return sqlcdb.User{}, &pgconn.PgError{Code: "23505", ConstraintName: "users_username_key"}
 			}
-			return sqlcdb.User{ID: 1, Email: arg.Email, Username: arg.Username}, nil
+			return sqlcdb.User{ID: uuid.UUID{}, Email: arg.Email, Username: arg.Username}, nil
 		},
 	}
 	svc := newEntrance(db, &mockSession{}, &mockMailer{})

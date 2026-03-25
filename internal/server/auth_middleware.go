@@ -8,6 +8,8 @@ import (
 	"bytebattle/internal/api"
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
+
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -28,7 +30,7 @@ func (s *HTTPServer) strictAuthMiddleware(publicOps map[string]bool) api.StrictM
 			if err != nil {
 				return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
 			}
-			ctx = context.WithValue(ctx, contextKeyUserID, int(session.UserID))
+			ctx = context.WithValue(ctx, contextKeyUserID, session.UserID)
 			ctx = context.WithValue(ctx, contextKeySession, session)
 			r = r.WithContext(ctx)
 			return f(ctx, w, r, req)
@@ -60,8 +62,8 @@ func bearerToken(r *http.Request) string {
 	return ""
 }
 
-func userIDFromContext(ctx context.Context) (int, bool) {
-	id, ok := ctx.Value(contextKeyUserID).(int)
+func userIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(contextKeyUserID).(uuid.UUID)
 	return id, ok
 }
 
