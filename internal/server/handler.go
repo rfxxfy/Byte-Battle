@@ -343,12 +343,14 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	game, err := s.gameService.GetGame(ctx, int(gameID))
 	if err != nil {
 		log.Printf("processSubmit: get game error: %v", err)
+		s.broadcastError(gameID, userID, "failed to load game")
 		return
 	}
 
 	problem, err := s.problemService.GetProblem(game.ProblemID)
 	if err != nil {
 		log.Printf("processSubmit: get problem error: %v", err)
+		s.broadcastError(gameID, userID, "failed to load problem")
 		return
 	}
 
@@ -371,6 +373,10 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 			failedTest = &idx
 			break
 		}
+	}
+
+	if accepted {
+		stdout, stderr = "", ""
 	}
 
 	resultMsg, _ := json.Marshal(ws.ServerMessage{
@@ -402,4 +408,13 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		WinnerID: winnerID,
 	})
 	s.hub.Broadcast(gameID, finMsg)
+}
+
+func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {
+	errMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:    ws.TypeError,
+		UserID:  userID,
+		Message: msg,
+	})
+	s.hub.Broadcast(gameID, errMsg)
 }

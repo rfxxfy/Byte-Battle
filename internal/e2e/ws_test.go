@@ -72,7 +72,7 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 }
 
 func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
-	// failingExecutor always returns ExitCode=1, so no game_finished should be sent
+	// failingExecutor returns wrong stdout, so no game_finished should be sent
 	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}, testLoader, config.Load()))
 	t.Cleanup(srv.Close)
 
@@ -125,12 +125,71 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	require.NoError(t, conn.ReadJSON(&result))
 	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
 	assert.False(t, result.Accepted)
+	if assert.NotNil(t, result.FailedTest) {
+		assert.Equal(t, 0, *result.FailedTest)
+	}
 
 	// no game_finished should arrive
 	conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond)) //nolint:errcheck // test helper, error not actionable
 	var unexpected ws.ServerMessage
 	err = conn.ReadJSON(&unexpected)
 	assert.Error(t, err, "expected timeout, not a game_finished message")
+}
+
+func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
+	// secondTestFailsExecutor passes test 0 but fails test 1 → failed_test must be 1
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, &secondTestFailsExecutor{}, testLoader, config.Load()))
+	t.Cleanup(srv.Close)
+
+	srvURL := srv.URL
+	doSrv := func(method, path string, body any, token string) *http.Response {
+		var buf bytes.Buffer
+		if body != nil {
+			require.NoError(t, json.NewEncoder(&buf).Encode(body))
+		}
+		req, err := http.NewRequest(method, srvURL+path, &buf)
+		require.NoError(t, err)
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := srv.Client().Do(req)
+		require.NoError(t, err)
+		return resp
+	}
+
+	r := doSrv(http.MethodPost, "/games", map[string]any{"problem_id": "test-problem"}, token1)
+	require.Equal(t, http.StatusCreated, r.StatusCode)
+	var g gameResp
+	decodeJSON(t, r, &g)
+
+	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token2)
+	require.Equal(t, http.StatusOK, joinResp.StatusCode)
+	joinResp.Body.Close()
+
+	r = doSrv(http.MethodPost, fmt.Sprintf("/games/%d/start", g.Game.ID), nil, token1)
+	require.Equal(t, http.StatusOK, r.StatusCode)
+	r.Body.Close()
+
+	wsURLSrv := "ws" + strings.TrimPrefix(srvURL, "http") + fmt.Sprintf("/games/%d/ws", g.Game.ID)
+	conn, _, err := wsDialer(token1).Dial(wsURLSrv, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "partial solution",
+		Language: "go",
+	}))
+
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper, error not actionable
+	var result ws.ServerMessage
+	require.NoError(t, conn.ReadJSON(&result))
+	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
+	assert.False(t, result.Accepted)
+	if assert.NotNil(t, result.FailedTest) {
+		assert.Equal(t, 1, *result.FailedTest)
+	}
 }
 
 func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
