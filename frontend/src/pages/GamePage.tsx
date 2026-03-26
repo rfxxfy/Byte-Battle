@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { getGame, startGame, type Game } from '@/api/games'
+import { getGame, startGame, cancelGame, leaveGame, joinGame, type Game, type GameParticipant } from '@/api/games'
 import { getProblem, type Problem } from '@/api/problems'
 import { runCode } from '@/api/execute'
 import { ApiError } from '@/api/client'
@@ -28,12 +28,14 @@ interface SubmissionResult {
   stdout: string
   stderr: string
   failed_test?: number
-  user_id: number
+  user_id: string
 }
 
 interface GameFinished {
-  winner_id: number
+  winner_id: string
 }
+
+const participantLabel = (p: GameParticipant) => p.name ?? p.id.slice(0, 8)
 
 export function GamePage() {
   const { id } = useParams<{ id: string }>()
@@ -82,7 +84,7 @@ export function GamePage() {
     fetchGame()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll while pending so we catch status changes from other players
+  // Poll while pending so we catch participant joins and game start
   useEffect(() => {
     if (game?.status !== 'pending') return
     const timer = setInterval(fetchGame, 2000)
@@ -113,7 +115,13 @@ export function GamePage() {
     }
 
     ws.onerror = () => setActionError('Ошибка WebSocket-соединения')
-    ws.onclose = () => setActionError('Соединение с сервером разорвано')
+    ws.onclose = () => {
+      setGame((prev) => {
+        if (prev?.status === 'finished') return prev
+        setActionError('Соединение с сервером разорвано')
+        return prev
+      })
+    }
 
     return () => ws.close()
   }, [game?.status, token, gameId])
@@ -126,6 +134,40 @@ export function GamePage() {
     } catch (err) {
       setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     }
+  }
+
+  const handleCancel = async () => {
+    setActionError('')
+    try {
+      await cancelGame(gameId)
+      navigate('/games')
+    } catch (err) {
+      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+    }
+  }
+
+  const handleLeave = async () => {
+    setActionError('')
+    try {
+      await leaveGame(gameId)
+      navigate('/games')
+    } catch (err) {
+      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+    }
+  }
+
+  const handleJoin = async () => {
+    setActionError('')
+    try {
+      const res = await joinGame(gameId)
+      setGame(res.game)
+    } catch (err) {
+      setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+    }
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href)
   }
 
   const handleRun = async () => {
@@ -163,10 +205,105 @@ export function GamePage() {
   if (error) return <p className="text-sm text-destructive">{error}</p>
   if (!game || !problem) return null
 
-  const isParticipant = userId != null && game.participant_ids.includes(userId)
+  const isCreator = userId != null && game.creator_id === userId
+  const isParticipant = userId != null && game.participants.some((p) => p.id === userId)
   const isActive = game.status === 'active'
   const isFinished = game.status === 'finished' || game.status === 'cancelled'
+  const canStart = isCreator && game.participants.length >= 2
+
+  // Lobby (pending)
+  if (game.status === 'pending') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] py-8">
+        <div className="w-full max-w-md flex flex-col gap-4">
+          {/* Back link */}
+          <Link
+            to="/games"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors self-start"
+          >
+            ← Игры
+          </Link>
+
+          {/* Problem card */}
+          <div className="rounded-lg border border-border/60 bg-card/50 p-5">
+            <h2 className="text-base font-semibold mb-1">{problem.title}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+                {problem.time_limit_ms} мс
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+                {problem.memory_limit_mb} МБ
+              </span>
+            </div>
+          </div>
+
+          {/* Participants card */}
+          <div className="rounded-lg border border-border/60 bg-card/50 p-5">
+            <p className="text-xs font-medium text-muted-foreground mb-3">
+              Участники · {game.participants.length}
+            </p>
+            <div className="flex flex-col gap-2">
+              {game.participants.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
+                  <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
+                  <span className={p.id === userId ? 'text-primary font-medium' : ''}>
+                    {participantLabel(p)}
+                    {p.id === userId && ' (ты)'}
+                    {p.id === game.creator_id && (
+                      <span className="ml-1.5 text-xs text-muted-foreground">создатель</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {actionError && (
+            <p className="text-sm text-destructive">{actionError}</p>
+          )}
+
+          {/* Actions */}
+          {isCreator ? (
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleStart} disabled={!canStart} className="w-full">
+                Начать игру
+              </Button>
+              {!canStart && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Нужен хотя бы 1 соперник
+                </p>
+              )}
+              <Button variant="outline" onClick={handleCopyLink} className="w-full">
+                Скопировать ссылку
+              </Button>
+              <Button variant="outline" onClick={handleCancel} className="w-full">
+                Отменить игру
+              </Button>
+            </div>
+          ) : isParticipant ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-center text-muted-foreground">
+                Ждём пока создатель начнёт игру...
+              </p>
+              <Button variant="outline" onClick={handleLeave} className="w-full">
+                Покинуть игру
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={handleJoin} className="w-full">
+              Вступить в игру
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Game / Finished
   const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
+  const winnerParticipant = winner
+    ? game.participants.find((p) => p.id === winner.winner_id)
+    : null
 
   return (
     <div className="flex flex-col gap-4" style={{ height: 'calc(100vh - 80px)' }}>
@@ -183,14 +320,6 @@ export function GamePage() {
           <span className="text-sm font-medium">{problem.title}</span>
         </div>
         <div className="flex items-center gap-3">
-          {game.status === 'pending' && isParticipant && (
-            <Button size="sm" onClick={handleStart}>
-              Начать игру
-            </Button>
-          )}
-          {game.status === 'pending' && (
-            <span className="text-sm text-muted-foreground">Ожидание игроков...</span>
-          )}
           {isActive && (
             <div className="flex items-center gap-1.5 text-sm text-green-400">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -229,14 +358,14 @@ export function GamePage() {
           <div className="rounded-lg border border-border/60 bg-card/50 p-4 flex-shrink-0">
             <p className="text-xs font-medium text-muted-foreground mb-2">Участники</p>
             <div className="flex flex-col gap-1.5">
-              {game.participant_ids.map((pid) => (
-                <div key={pid} className="flex items-center gap-2 text-sm">
+              {game.participants.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
                   <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
-                  <span className={pid === userId ? 'text-primary font-medium' : ''}>
-                    Игрок #{pid}
-                    {pid === userId && ' (ты)'}
+                  <span className={p.id === userId ? 'text-primary font-medium' : ''}>
+                    {participantLabel(p)}
+                    {p.id === userId && ' (ты)'}
                   </span>
-                  {game.winner_id === pid && (
+                  {game.winner_id === p.id && (
                     <span className="ml-auto text-xs text-yellow-400 font-medium">
                       Победитель
                     </span>
@@ -254,8 +383,7 @@ export function GamePage() {
             <select
               value={language}
               onChange={(e) => handleLangChange(e.target.value as LangValue)}
-              disabled={!isActive}
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.value} value={l.value} className="bg-background">
@@ -295,7 +423,7 @@ export function GamePage() {
                 fontSize: 14,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
-                readOnly: !isActive,
+                readOnly: isFinished,
                 padding: { top: 12 },
               }}
             />
@@ -364,7 +492,7 @@ export function GamePage() {
             <p className="text-sm text-muted-foreground mb-6">
               {winner.winner_id === userId
                 ? 'Ты решил задачу первым'
-                : `Победил Игрок #${winner.winner_id}`}
+                : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id.slice(0, 8)}`}
             </p>
             <Button className="w-full" onClick={() => navigate('/games')}>
               В лобби

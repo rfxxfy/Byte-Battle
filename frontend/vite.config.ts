@@ -16,7 +16,7 @@ export default defineConfig({
         target: 'http://localhost:8080',
         ws: true,
         bypass: (req) => {
-          if (req.headers.accept?.includes('text/html')) return '/index.html'
+          if (req.headers['accept']?.includes('text/html') || req.headers['sec-fetch-mode'] === 'navigate') return '/index.html'
         },
       },
     },
