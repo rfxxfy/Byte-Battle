@@ -185,6 +185,21 @@ func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameReque
 	return api.CompleteGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
 }
 
+func (s *HTTPServer) LeaveGame(ctx context.Context, req api.LeaveGameRequestObject) (api.LeaveGameResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.LeaveGame(ctx, req.Id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	participantIDs, err := s.gameService.GetParticipantIDs(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.LeaveGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+}
+
 func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestObject) (api.CancelGameResponseObject, error) {
 	game, err := s.gameService.CancelGame(ctx, req.Id)
 	if err != nil {

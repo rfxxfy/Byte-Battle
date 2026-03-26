@@ -108,3 +108,20 @@ func (q *Queries) IsGameParticipant(ctx context.Context, arg IsGameParticipantPa
 	err := row.Scan(&is_participant)
 	return is_participant, err
 }
+
+const removeGameParticipant = `-- name: RemoveGameParticipant :execrows
+DELETE FROM game_participants WHERE game_id = $1 AND user_id = $2
+`
+
+type RemoveGameParticipantParams struct {
+	GameID int32     `json:"game_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error) {
+	result, err := q.db.Exec(ctx, removeGameParticipant, arg.GameID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

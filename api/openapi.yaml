@@ -306,6 +306,30 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
 
+  /games/{id}/leave:
+    post:
+      operationId: LeaveGame
+      summary: Leave a pending game as a participant
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GameID"
+      responses:
+        "200":
+          description: Left game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
   /games/{id}/cancel:
     post:
       operationId: CancelGame
