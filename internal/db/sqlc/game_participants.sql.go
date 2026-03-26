@@ -9,6 +9,7 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addGameParticipant = `-- name: AddGameParticipant :exec
@@ -80,6 +81,73 @@ func (q *Queries) GetParticipantIDsByGameIDs(ctx context.Context, dollar_1 []int
 	for rows.Next() {
 		var i GetParticipantIDsByGameIDsRow
 		if err := rows.Scan(&i.GameID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getParticipants = `-- name: GetParticipants :many
+SELECT gp.user_id, u.name
+FROM game_participants gp
+JOIN users u ON u.id = gp.user_id
+WHERE gp.game_id = $1
+ORDER BY gp.id
+`
+
+type GetParticipantsRow struct {
+	UserID uuid.UUID   `json:"user_id"`
+	Name   pgtype.Text `json:"name"`
+}
+
+func (q *Queries) GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error) {
+	rows, err := q.db.Query(ctx, getParticipants, gameID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetParticipantsRow{}
+	for rows.Next() {
+		var i GetParticipantsRow
+		if err := rows.Scan(&i.UserID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getParticipantsByGameIDs = `-- name: GetParticipantsByGameIDs :many
+SELECT gp.game_id, gp.user_id, u.name
+FROM game_participants gp
+JOIN users u ON u.id = gp.user_id
+WHERE gp.game_id = ANY($1::int[])
+ORDER BY gp.game_id, gp.id
+`
+
+type GetParticipantsByGameIDsRow struct {
+	GameID int32       `json:"game_id"`
+	UserID uuid.UUID   `json:"user_id"`
+	Name   pgtype.Text `json:"name"`
+}
+
+func (q *Queries) GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error) {
+	rows, err := q.db.Query(ctx, getParticipantsByGameIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetParticipantsByGameIDsRow{}
+	for rows.Next() {
+		var i GetParticipantsByGameIDsRow
+		if err := rows.Scan(&i.GameID, &i.UserID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
