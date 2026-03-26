@@ -59,6 +59,7 @@ type User struct {
 	Rating        pgtype.Int4        `json:"rating"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	Name          pgtype.Text        `json:"name"`
 }
 
 type VerificationCode struct {
