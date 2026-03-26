@@ -9,6 +9,7 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addGameParticipant = `-- name: AddGameParticipant :exec
@@ -37,23 +38,32 @@ func (q *Queries) CountGameParticipants(ctx context.Context, gameID int32) (int6
 	return count, err
 }
 
-const getParticipantIDs = `-- name: GetParticipantIDs :many
-SELECT user_id FROM game_participants WHERE game_id = $1 ORDER BY id
+const getParticipants = `-- name: GetParticipants :many
+SELECT gp.user_id, u.name
+FROM game_participants gp
+JOIN users u ON u.id = gp.user_id
+WHERE gp.game_id = $1
+ORDER BY gp.id
 `
 
-func (q *Queries) GetParticipantIDs(ctx context.Context, gameID int32) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, getParticipantIDs, gameID)
+type GetParticipantsRow struct {
+	UserID uuid.UUID   `json:"user_id"`
+	Name   pgtype.Text `json:"name"`
+}
+
+func (q *Queries) GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error) {
+	rows, err := q.db.Query(ctx, getParticipants, gameID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []uuid.UUID{}
+	items := []GetParticipantsRow{}
 	for rows.Next() {
-		var user_id uuid.UUID
-		if err := rows.Scan(&user_id); err != nil {
+		var i GetParticipantsRow
+		if err := rows.Scan(&i.UserID, &i.Name); err != nil {
 			return nil, err
 		}
-		items = append(items, user_id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -61,25 +71,30 @@ func (q *Queries) GetParticipantIDs(ctx context.Context, gameID int32) ([]uuid.U
 	return items, nil
 }
 
-const getParticipantIDsByGameIDs = `-- name: GetParticipantIDsByGameIDs :many
-SELECT game_id, user_id FROM game_participants WHERE game_id = ANY($1::int[]) ORDER BY game_id, id
+const getParticipantsByGameIDs = `-- name: GetParticipantsByGameIDs :many
+SELECT gp.game_id, gp.user_id, u.name
+FROM game_participants gp
+JOIN users u ON u.id = gp.user_id
+WHERE gp.game_id = ANY($1::int[])
+ORDER BY gp.game_id, gp.id
 `
 
-type GetParticipantIDsByGameIDsRow struct {
-	GameID int32     `json:"game_id"`
-	UserID uuid.UUID `json:"user_id"`
+type GetParticipantsByGameIDsRow struct {
+	GameID int32       `json:"game_id"`
+	UserID uuid.UUID   `json:"user_id"`
+	Name   pgtype.Text `json:"name"`
 }
 
-func (q *Queries) GetParticipantIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantIDsByGameIDsRow, error) {
-	rows, err := q.db.Query(ctx, getParticipantIDsByGameIDs, dollar_1)
+func (q *Queries) GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error) {
+	rows, err := q.db.Query(ctx, getParticipantsByGameIDs, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetParticipantIDsByGameIDsRow{}
+	items := []GetParticipantsByGameIDsRow{}
 	for rows.Next() {
-		var i GetParticipantIDsByGameIDsRow
-		if err := rows.Scan(&i.GameID, &i.UserID); err != nil {
+		var i GetParticipantsByGameIDsRow
+		if err := rows.Scan(&i.GameID, &i.UserID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
