@@ -9,7 +9,6 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const cancelGame = `-- name: CancelGame :one
@@ -70,13 +69,11 @@ func (q *Queries) CompleteGame(ctx context.Context, arg CompleteGameParams) (Gam
 }
 
 const countGames = `-- name: CountGames :one
-SELECT count(*)
-FROM games
-WHERE ($1::text IS NULL OR status = $1::text)
+SELECT count(*) FROM games
 `
 
-func (q *Queries) CountGames(ctx context.Context, status pgtype.Text) (int64, error) {
-	row := q.db.QueryRow(ctx, countGames, status)
+func (q *Queries) CountGames(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countGames)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -167,19 +164,17 @@ func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) 
 const listGames = `-- name: ListGames :many
 SELECT id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at
 FROM games
-WHERE ($1::text IS NULL OR status = $1::text)
 ORDER BY created_at DESC
-LIMIT $3 OFFSET $2
+LIMIT $2 OFFSET $1
 `
 
 type ListGamesParams struct {
-	Status     pgtype.Text `json:"status"`
-	ListOffset int32       `json:"list_offset"`
-	ListLimit  int32       `json:"list_limit"`
+	ListOffset int32 `json:"list_offset"`
+	ListLimit  int32 `json:"list_limit"`
 }
 
 func (q *Queries) ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error) {
-	rows, err := q.db.Query(ctx, listGames, arg.Status, arg.ListOffset, arg.ListLimit)
+	rows, err := q.db.Query(ctx, listGames, arg.ListOffset, arg.ListLimit)
 	if err != nil {
 		return nil, err
 	}

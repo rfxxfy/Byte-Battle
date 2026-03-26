@@ -57,13 +57,8 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	if req.Params.Offset != nil {
 		offset = *req.Params.Offset
 	}
-	var status *string
-	if req.Params.Status != nil && *req.Params.Status != "" {
-		s := string(*req.Params.Status)
-		status = &s
-	}
 
-	games, total, err := s.gameService.ListGames(ctx, limit, offset, status)
+	games, total, err := s.gameService.ListGames(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}

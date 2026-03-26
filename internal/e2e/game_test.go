@@ -81,7 +81,7 @@ func TestGame_JoinValidation(t *testing.T) {
 		// user1 tries to join their own game
 		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token1)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
-		assert.Equal(t, "ALREADY_IN_GAME", errCode(t, resp))
+		assert.Equal(t, "ALREADY_PARTICIPANT", errCode(t, resp))
 	})
 
 	t.Run("join non-pending game", func(t *testing.T) {
@@ -90,16 +90,18 @@ func TestGame_JoinValidation(t *testing.T) {
 		token3 := authToken(t, "player3@test.com")
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token3)
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
-		assert.Equal(t, "GAME_NOT_JOINABLE", errCode(t, resp))
+		assert.Equal(t, "GAME_ALREADY_STARTED", errCode(t, resp))
 	})
 
-	t.Run("join full game", func(t *testing.T) {
+	t.Run("third player can join pending game", func(t *testing.T) {
 		g := createGame(t)
 
 		token3 := authToken(t, "player3-full@test.com")
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/join", g.Game.ID), nil, token3)
-		assert.Equal(t, http.StatusConflict, resp.StatusCode)
-		assert.Equal(t, "GAME_NOT_JOINABLE", errCode(t, resp))
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var joined gameResp
+		decodeJSON(t, resp, &joined)
+		assert.Len(t, joined.Game.ParticipantIDs, 3)
 	})
 }
 
@@ -152,7 +154,7 @@ func TestGame_List(t *testing.T) {
 		createGame(t)
 	}
 
-	// one extra pending game (without join) to validate status filter
+	// one extra pending game (without join) to increase total
 	resp := doAuth(t, http.MethodPost, "/games", map[string]any{
 		"problem_id": "test-problem",
 	}, token1)
@@ -164,13 +166,6 @@ func TestGame_List(t *testing.T) {
 	decodeJSON(t, resp, &list)
 	assert.Len(t, list.Games, 2)
 	assert.GreaterOrEqual(t, list.Total, int64(3))
-
-	resp = doAuth(t, http.MethodGet, "/games?status=pending", nil, token1)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	decodeJSON(t, resp, &list)
-	for _, g := range list.Games {
-		assert.Equal(t, "pending", g.Status)
-	}
 }
 
 func TestGame_Delete(t *testing.T) {

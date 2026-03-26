@@ -8,7 +8,6 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -16,7 +15,7 @@ type Querier interface {
 	CancelGame(ctx context.Context, id int32) (Game, error)
 	CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error)
 	CountGameParticipants(ctx context.Context, gameID int32) (int64, error)
-	CountGames(ctx context.Context, status pgtype.Text) (int64, error)
+	CountGames(ctx context.Context) (int64, error)
 	CreateGame(ctx context.Context, arg CreateGameParams) (Game, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
