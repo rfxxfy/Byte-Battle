@@ -11,13 +11,24 @@ import (
 
 type gameResp struct {
 	Game struct {
-		ID             int      `json:"id"`
-		ProblemID      string   `json:"problem_id"`
-		CreatorID      string   `json:"creator_id"`
-		Status         string   `json:"status"`
-		WinnerID       *string  `json:"winner_id"`
-		ParticipantIDs []string `json:"participant_ids"`
+		ID           int    `json:"id"`
+		ProblemID    string `json:"problem_id"`
+		CreatorID    string `json:"creator_id"`
+		Status       string `json:"status"`
+		WinnerID     *string `json:"winner_id"`
+		Participants []struct {
+			ID   string  `json:"id"`
+			Name *string `json:"name"`
+		} `json:"participants"`
 	} `json:"game"`
+}
+
+func participantIDs(g gameResp) []string {
+	ids := make([]string, len(g.Game.Participants))
+	for i, p := range g.Game.Participants {
+		ids[i] = p.ID
+	}
+	return ids
 }
 
 type gamesListResp struct {
@@ -59,14 +70,14 @@ func TestGame_CreateAndGet(t *testing.T) {
 	assert.Equal(t, "pending", g.Game.Status)
 	assert.Equal(t, "test-problem", g.Game.ProblemID)
 	assert.Equal(t, user1ID.String(), g.Game.CreatorID)
-	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, g.Game.ParticipantIDs)
+	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, participantIDs(g))
 
 	resp := doAuth(t, http.MethodGet, fmt.Sprintf("/games/%d", g.Game.ID), nil, token1)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	var fetched gameResp
 	decodeJSON(t, resp, &fetched)
 	assert.Equal(t, g.Game.ID, fetched.Game.ID)
-	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, fetched.Game.ParticipantIDs)
+	assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, participantIDs(fetched))
 }
 
 func TestGame_JoinValidation(t *testing.T) {
@@ -101,7 +112,7 @@ func TestGame_JoinValidation(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		var joined gameResp
 		decodeJSON(t, resp, &joined)
-		assert.Len(t, joined.Game.ParticipantIDs, 3)
+		assert.Len(t, joined.Game.Participants, 3)
 	})
 }
 
@@ -285,14 +296,14 @@ func TestGame_CreateWithUnknownProblemID(t *testing.T) {
 func TestGame_Leave(t *testing.T) {
 	t.Run("participant leaves successfully", func(t *testing.T) {
 		g := createGame(t) // user1 created, user2 joined
-		assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, g.Game.ParticipantIDs)
+		assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, participantIDs(g))
 
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/leave", g.Game.ID), nil, token2)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		var left gameResp
 		decodeJSON(t, resp, &left)
 		assert.Equal(t, "pending", left.Game.Status)
-		assert.Equal(t, []string{user1ID.String()}, left.Game.ParticipantIDs)
+		assert.Equal(t, []string{user1ID.String()}, participantIDs(left))
 	})
 
 	t.Run("creator cannot leave", func(t *testing.T) {
