@@ -12,24 +12,24 @@ export interface MeResponse {
 }
 
 export const enter = (email: string) =>
-  apiFetch<{ status: string }>('/api/auth/enter', {
+  apiFetch<{ status: string }>('/auth/enter', {
     method: 'POST',
     body: JSON.stringify({ email }),
   })
 
 export const confirm = (email: string, code: string) =>
-  apiFetch<TokenResponse>('/api/auth/confirm', {
+  apiFetch<TokenResponse>('/auth/confirm', {
     method: 'POST',
     body: JSON.stringify({ email, code }),
   })
 
 export const updateMe = (name: string) =>
-  apiFetch<MeResponse>('/api/auth/me', {
+  apiFetch<MeResponse>('/auth/me', {
     method: 'PATCH',
     body: JSON.stringify({ name }),
   })
 
-export const me = () => apiFetch<MeResponse>('/api/auth/me')
+export const me = () => apiFetch<MeResponse>('/auth/me')
 
 export const logout = () =>
-  apiFetch<{ status: string }>('/api/auth/logout', { method: 'POST' })
+  apiFetch<{ status: string }>('/auth/logout', { method: 'POST' })

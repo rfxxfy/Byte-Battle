@@ -10,6 +10,8 @@ export class ApiError extends Error {
   }
 }
 
+const API_BASE = '/api'
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -24,7 +26,7 @@ export async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(path, { ...options, headers })
+  const res = await fetch(API_BASE + path, { ...options, headers })
 
   if (res.status === 401) {
     localStorage.removeItem('token')

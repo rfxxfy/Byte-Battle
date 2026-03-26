@@ -8,7 +8,7 @@ export interface ExecuteResponse {
 }
 
 export const runCode = (code: string, language: string, input: string) =>
-  apiFetch<ExecuteResponse>('/api/execute', {
+  apiFetch<ExecuteResponse>('/execute', {
     method: 'POST',
     body: JSON.stringify({ code, language, input }),
   })
