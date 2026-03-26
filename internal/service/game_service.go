@@ -7,7 +7,6 @@ import (
 
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
-	"bytebattle/internal/problems"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -31,28 +30,24 @@ const (
 var errGameAlreadyFinished = errors.New("game already finished")
 
 type GameService struct {
-	q        *sqlcdb.Queries
-	pool     *pgxpool.Pool
-	problems *problems.Loader
+	q    *sqlcdb.Queries
+	pool *pgxpool.Pool
 }
 
-func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Loader) *GameService {
-	return &GameService{q: q, pool: pool, problems: loader}
+func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool) *GameService {
+	return &GameService{q: q, pool: pool}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemIDs []string, isPublic, isSolo bool, timeLimitMinutes *int16) (sqlcdb.Game, error) {
-	if len(problemIDs) == 0 {
+func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemSlugs []string, isPublic, isSolo bool, timeLimitMinutes *int16) (sqlcdb.Game, error) {
+	if len(problemSlugs) == 0 {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "at least one problem is required")
 	}
-	if len(problemIDs) > maxGameProblems {
+	if len(problemSlugs) > maxGameProblems {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "too many problems in game")
 	}
-	for _, problemID := range problemIDs {
-		if problemID == "" {
-			return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "problem_id cannot be empty")
-		}
-		if _, err := s.problems.Get(problemID); err != nil {
-			return sqlcdb.Game{}, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+	for _, slug := range problemSlugs {
+		if slug == "" {
+			return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "problem slug cannot be empty")
 		}
 	}
 
@@ -78,11 +73,16 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 		return sqlcdb.Game{}, err
 	}
 
-	for idx, problemID := range problemIDs {
+	for idx, slug := range problemSlugs {
+		versionID, err := s.resolveProblemVersion(ctx, qtx, creatorID, slug)
+		if err != nil {
+			return sqlcdb.Game{}, err
+		}
 		if err := qtx.AddGameProblem(ctx, sqlcdb.AddGameProblemParams{
-			GameID:       game.ID,
-			ProblemIndex: int32(idx),
-			ProblemID:    problemID,
+			GameID:           game.ID,
+			ProblemIndex:     int32(idx),
+			ProblemID:        slug,
+			ProblemVersionID: versionID,
 		}); err != nil {
 			return sqlcdb.Game{}, err
 		}
@@ -100,6 +100,28 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 	}
 
 	return game, nil
+}
+
+func (s *GameService) resolveProblemVersion(ctx context.Context, qtx *sqlcdb.Queries, requesterID uuid.UUID, slug string) (int64, error) {
+	catalog, err := qtx.GetProblemCatalogBySlug(ctx, slug)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	if catalog.Visibility == "private" {
+		if !catalog.OwnerUserID.Valid || catalog.OwnerUserID.UUID != requesterID {
+			return 0, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+		}
+	}
+
+	if !catalog.CurrentVersionID.Valid {
+		return 0, apierr.New(apierr.ErrProblemNotFound, "problem has no published version")
+	}
+
+	return catalog.CurrentVersionID.Int64, nil
 }
 
 func (s *GameService) JoinGame(ctx context.Context, gameID int, userID uuid.UUID) (sqlcdb.Game, error) {
@@ -200,6 +222,17 @@ func (s *GameService) GetGameProblemIDByIndex(ctx context.Context, gameID, probl
 		return "", apierr.New(apierr.ErrGameNotFound, "game problem not found")
 	}
 	return id, err
+}
+
+func (s *GameService) GetGameProblemByIndex(ctx context.Context, gameID, problemIndex int32) (sqlcdb.GetGameProblemByIndexRow, error) {
+	row, err := s.q.GetGameProblemByIndex(ctx, sqlcdb.GetGameProblemByIndexParams{
+		GameID:       gameID,
+		ProblemIndex: problemIndex,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.GetGameProblemByIndexRow{}, apierr.New(apierr.ErrGameNotFound, "game problem not found")
+	}
+	return row, err
 }
 
 func (s *GameService) GetGameProblemIDsByGameIDs(ctx context.Context, gameIDs []int32) (map[int32][]string, error) {

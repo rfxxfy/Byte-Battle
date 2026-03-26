@@ -10,18 +10,24 @@ import (
 )
 
 const addGameProblem = `-- name: AddGameProblem :exec
-INSERT INTO game_problems (game_id, problem_index, problem_id)
-VALUES ($1, $2, $3)
+INSERT INTO game_problems (game_id, problem_index, problem_id, problem_version_id)
+VALUES ($1, $2, $3, $4)
 `
 
 type AddGameProblemParams struct {
-	GameID       int32  `json:"game_id"`
-	ProblemIndex int32  `json:"problem_index"`
-	ProblemID    string `json:"problem_id"`
+	GameID           int32  `json:"game_id"`
+	ProblemIndex     int32  `json:"problem_index"`
+	ProblemID        string `json:"problem_id"`
+	ProblemVersionID int64  `json:"problem_version_id"`
 }
 
 func (q *Queries) AddGameProblem(ctx context.Context, arg AddGameProblemParams) error {
-	_, err := q.db.Exec(ctx, addGameProblem, arg.GameID, arg.ProblemIndex, arg.ProblemID)
+	_, err := q.db.Exec(ctx, addGameProblem,
+		arg.GameID,
+		arg.ProblemIndex,
+		arg.ProblemID,
+		arg.ProblemVersionID,
+	)
 	return err
 }
 
@@ -36,6 +42,32 @@ func (q *Queries) CountGameProblems(ctx context.Context, gameID int32) (int64, e
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const getGameProblemByIndex = `-- name: GetGameProblemByIndex :one
+SELECT gp.problem_id, gp.problem_version_id, pv.artifact_path
+FROM game_problems gp
+JOIN problem_versions pv ON pv.id = gp.problem_version_id
+WHERE gp.game_id = $1 AND gp.problem_index = $2
+LIMIT 1
+`
+
+type GetGameProblemByIndexParams struct {
+	GameID       int32 `json:"game_id"`
+	ProblemIndex int32 `json:"problem_index"`
+}
+
+type GetGameProblemByIndexRow struct {
+	ProblemID        string `json:"problem_id"`
+	ProblemVersionID int64  `json:"problem_version_id"`
+	ArtifactPath     string `json:"artifact_path"`
+}
+
+func (q *Queries) GetGameProblemByIndex(ctx context.Context, arg GetGameProblemByIndexParams) (GetGameProblemByIndexRow, error) {
+	row := q.db.QueryRow(ctx, getGameProblemByIndex, arg.GameID, arg.ProblemIndex)
+	var i GetGameProblemByIndexRow
+	err := row.Scan(&i.ProblemID, &i.ProblemVersionID, &i.ArtifactPath)
+	return i, err
 }
 
 const getGameProblemIDByIndex = `-- name: GetGameProblemIDByIndex :one
