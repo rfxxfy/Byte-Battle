@@ -11,7 +11,7 @@ import (
 
 func TestExecute_Auth(t *testing.T) {
 	execute := func(auth string) *http.Response {
-		req, err := http.NewRequest(http.MethodPost, testSrv.URL+"/execute",
+		req, err := http.NewRequest(http.MethodPost, testSrv.URL+"/api/execute",
 			strings.NewReader(`{"code":"x","language":"go","input":""}`))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
