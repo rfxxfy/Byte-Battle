@@ -201,9 +201,7 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 		Language: "go",
 	}))
 
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper, error not actionable
-	var result ws.ServerMessage
-	require.NoError(t, conn.ReadJSON(&result))
+	result := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
 	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
 	assert.False(t, result.Accepted)
 	if assert.NotNil(t, result.FailedTest) {
