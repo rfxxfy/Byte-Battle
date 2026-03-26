@@ -14,6 +14,7 @@ import (
 	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 	"bytebattle/internal/problems"
+	"bytebattle/internal/service"
 	"bytebattle/internal/ws"
 
 	"github.com/go-chi/chi/v5"
@@ -67,16 +68,9 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	for i := range games {
 		gameIDs[i] = games[i].ID
 	}
-	participantRows, err := s.gameService.GetParticipantsByGameIDs(ctx, gameIDs)
+	participantMap, err := s.gameService.GetParticipantsByGameIDs(ctx, gameIDs)
 	if err != nil {
 		return nil, err
-	}
-	participantMap := make(map[int32][]sqlcdb.GetParticipantsRow, len(games))
-	for _, row := range participantRows {
-		participantMap[row.GameID] = append(participantMap[row.GameID], sqlcdb.GetParticipantsRow{
-			UserID: row.UserID,
-			Name:   row.Name,
-		})
 	}
 
 	apiGames := make([]api.Game, len(games))
@@ -257,26 +251,19 @@ func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
-func toAPIGame(g sqlcdb.Game, rows []sqlcdb.GetParticipantsRow) api.Game {
-	participantIDs := make([]uuid.UUID, len(rows))
-	participants := make([]api.GameParticipant, len(rows))
-	for i, r := range rows {
-		participantIDs[i] = r.UserID
-		p := api.GameParticipant{Id: r.UserID}
-		if r.Name.Valid {
-			p.Name = &r.Name.String
-		}
-		participants[i] = p
+func toAPIGame(g sqlcdb.Game, participants []service.Participant) api.Game {
+	apiParticipants := make([]api.GameParticipant, len(participants))
+	for i, p := range participants {
+		apiParticipants[i] = api.GameParticipant{Id: p.ID, Name: p.Name}
 	}
 	result := api.Game{
-		Id:             int(g.ID),
-		ProblemId:      g.ProblemID,
-		CreatorId:      g.CreatorID,
-		Status:         api.GameStatus(g.Status),
-		ParticipantIds: participantIDs,
-		Participants:   participants,
-		CreatedAt:      g.CreatedAt.Time,
-		UpdatedAt:      g.UpdatedAt.Time,
+		Id:           int(g.ID),
+		ProblemId:    g.ProblemID,
+		CreatorId:    g.CreatorID,
+		Status:       api.GameStatus(g.Status),
+		Participants: apiParticipants,
+		CreatedAt:    g.CreatedAt.Time,
+		UpdatedAt:    g.UpdatedAt.Time,
 	}
 	if g.WinnerID.Valid {
 		id := g.WinnerID.UUID

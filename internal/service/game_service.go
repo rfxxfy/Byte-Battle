@@ -13,6 +13,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type Participant struct {
+	ID   uuid.UUID
+	Name *string
+}
+
 const (
 	gameStatusPending   = "pending"
 	gameStatusActive    = "active"
@@ -111,20 +116,36 @@ func (s *GameService) JoinGame(ctx context.Context, gameID int, userID uuid.UUID
 	return game, nil
 }
 
-func (s *GameService) GetParticipantIDs(ctx context.Context, gameID int) ([]uuid.UUID, error) {
-	return s.q.GetParticipantIDs(ctx, int32(gameID))
+func (s *GameService) GetParticipants(ctx context.Context, gameID int) ([]Participant, error) {
+	rows, err := s.q.GetParticipants(ctx, int32(gameID))
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Participant, len(rows))
+	for i, r := range rows {
+		p := Participant{ID: r.UserID}
+		if r.Name.Valid {
+			p.Name = &r.Name.String
+		}
+		result[i] = p
+	}
+	return result, nil
 }
 
-func (s *GameService) GetParticipantIDsByGameIDs(ctx context.Context, gameIDs []int32) ([]sqlcdb.GetParticipantIDsByGameIDsRow, error) {
-	return s.q.GetParticipantIDsByGameIDs(ctx, gameIDs)
-}
-
-func (s *GameService) GetParticipants(ctx context.Context, gameID int) ([]sqlcdb.GetParticipantsRow, error) {
-	return s.q.GetParticipants(ctx, int32(gameID))
-}
-
-func (s *GameService) GetParticipantsByGameIDs(ctx context.Context, gameIDs []int32) ([]sqlcdb.GetParticipantsByGameIDsRow, error) {
-	return s.q.GetParticipantsByGameIDs(ctx, gameIDs)
+func (s *GameService) GetParticipantsByGameIDs(ctx context.Context, gameIDs []int32) (map[int32][]Participant, error) {
+	rows, err := s.q.GetParticipantsByGameIDs(ctx, gameIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int32][]Participant, len(gameIDs))
+	for _, r := range rows {
+		p := Participant{ID: r.UserID}
+		if r.Name.Valid {
+			p.Name = &r.Name.String
+		}
+		result[r.GameID] = append(result[r.GameID], p)
+	}
+	return result, nil
 }
 
 func (s *GameService) GetGame(ctx context.Context, id int) (sqlcdb.Game, error) {

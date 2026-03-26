@@ -535,7 +535,6 @@ components:
         - problem_id
         - creator_id
         - status
-        - participant_ids
         - participants
         - created_at
         - updated_at
@@ -555,11 +554,6 @@ components:
         status:
           type: string
           enum: [pending, active, finished, cancelled]
-        participant_ids:
-          type: array
-          items:
-            type: string
-            format: uuid
         participants:
           type: array
           items:
