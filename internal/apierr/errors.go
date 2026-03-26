@@ -46,11 +46,11 @@ func httpStatusCode(code string) int {
 	case ErrNotGameCreator, ErrCreatorCannotLeave:
 		return http.StatusForbidden
 	case ErrAlreadyParticipant, ErrGameAlreadyStarted, ErrGameNotInProgress,
-		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled, ErrNotParticipant:
+		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled:
 		return http.StatusConflict
 	case ErrInvalidToken, ErrSessionExpired:
 		return http.StatusUnauthorized
-	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound, ErrUserNotFound:
+	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound, ErrUserNotFound, ErrNotParticipant:
 		return http.StatusNotFound
 	case ErrTooManyAttempts, ErrCodeRecentlySent:
 		return http.StatusTooManyRequests

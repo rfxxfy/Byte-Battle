@@ -299,8 +299,11 @@ func (s *GameService) LeaveGame(ctx context.Context, gameID int, userID uuid.UUI
 		return sqlcdb.Game{}, err
 	}
 
+	if game.Status == gameStatusCancelled {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyCancelled, "cannot leave a cancelled game")
+	}
 	if game.Status != gameStatusPending {
-		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "can only leave a pending game")
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "cannot leave a non-pending game")
 	}
 
 	if game.CreatorID == userID {
