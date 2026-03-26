@@ -16,3 +16,6 @@ SELECT game_id, user_id FROM game_participants WHERE game_id = ANY($1::int[]) OR
 
 -- name: CountGameParticipants :one
 SELECT count(*) FROM game_participants WHERE game_id = $1;
+
+-- name: RemoveGameParticipant :execrows
+DELETE FROM game_participants WHERE game_id = $1 AND user_id = $2;

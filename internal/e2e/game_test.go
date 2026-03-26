@@ -281,3 +281,56 @@ func TestGame_CreateWithUnknownProblemID(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	assert.Equal(t, "PROBLEM_NOT_FOUND", errCode(t, resp))
 }
+
+func TestGame_Leave(t *testing.T) {
+	t.Run("participant leaves successfully", func(t *testing.T) {
+		g := createGame(t) // user1 created, user2 joined
+		assert.ElementsMatch(t, []string{user1ID.String(), user2ID.String()}, g.Game.ParticipantIDs)
+
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/leave", g.Game.ID), nil, token2)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		var left gameResp
+		decodeJSON(t, resp, &left)
+		assert.Equal(t, "pending", left.Game.Status)
+		assert.Equal(t, []string{user1ID.String()}, left.Game.ParticipantIDs)
+	})
+
+	t.Run("creator cannot leave", func(t *testing.T) {
+		g := createGame(t)
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/leave", g.Game.ID), nil, token1)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, "CREATOR_CANNOT_LEAVE", errCode(t, resp))
+	})
+
+	t.Run("non-participant cannot leave", func(t *testing.T) {
+		g := createGame(t)
+		token3 := authToken(t, "outsider-leave@test.com")
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/leave", g.Game.ID), nil, token3)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, "NOT_PARTICIPANT", errCode(t, resp))
+	})
+
+	t.Run("cannot leave active game", func(t *testing.T) {
+		g := createActiveGame(t)
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/leave", g.Game.ID), nil, token2)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
+		assert.Equal(t, "GAME_ALREADY_STARTED", errCode(t, resp))
+	})
+
+	t.Run("cannot leave cancelled game", func(t *testing.T) {
+		g := createGame(t)
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/cancel", g.Game.ID), nil, token1)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = doAuth(t, http.MethodPost, fmt.Sprintf("/games/%d/leave", g.Game.ID), nil, token2)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
+		assert.Equal(t, "GAME_ALREADY_CANCELLED", errCode(t, resp))
+	})
+
+	t.Run("non-existent game", func(t *testing.T) {
+		resp := doAuth(t, http.MethodPost, "/games/999999/leave", nil, token1)
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, "GAME_NOT_FOUND", errCode(t, resp))
+	})
+}

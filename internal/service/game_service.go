@@ -282,6 +282,52 @@ func (s *GameService) CancelGame(ctx context.Context, id int) (sqlcdb.Game, erro
 	return game, nil
 }
 
+func (s *GameService) LeaveGame(ctx context.Context, gameID int, userID uuid.UUID) (sqlcdb.Game, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	game, err := qtx.GetGameForUpdate(ctx, int32(gameID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	if game.Status == gameStatusCancelled {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyCancelled, "cannot leave a cancelled game")
+	}
+	if game.Status != gameStatusPending {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameAlreadyStarted, "cannot leave a non-pending game")
+	}
+
+	if game.CreatorID == userID {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrCreatorCannotLeave, "game creator cannot leave; cancel the game instead")
+	}
+
+	rows, err := qtx.RemoveGameParticipant(ctx, sqlcdb.RemoveGameParticipantParams{
+		GameID: game.ID,
+		UserID: userID,
+	})
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	if rows == 0 {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrNotParticipant, "not a participant of this game")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, err
+	}
+
+	return game, nil
+}
+
 func (s *GameService) DeleteGame(ctx context.Context, id int) error {
 	rowsAff, err := s.q.DeleteGame(ctx, int32(id))
 	if err != nil {
