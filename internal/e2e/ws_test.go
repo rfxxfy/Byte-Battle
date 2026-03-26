@@ -52,7 +52,13 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 	wsPath := fmt.Sprintf("/games/%d/ws", g.Game.ID)
 
 	conn1 := wsConnect(t, wsPath, token1)
+	joined1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
+	assert.Equal(t, user1ID, joined1.UserID)
 	conn2 := wsConnect(t, wsPath, token2)
+	joined2ForConn1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
+	assert.Equal(t, user2ID, joined2ForConn1.UserID)
+	joined2ForConn2 := wsReadUntilType(t, conn2, ws.TypePlayerJoined)
+	assert.Equal(t, user2ID, joined2ForConn2.UserID)
 
 	require.NoError(t, conn1.WriteJSON(ws.ClientMessage{
 		Type:     ws.TypeSubmit,
@@ -60,15 +66,30 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 		Language: "python",
 	}))
 
-	r1 := wsRead(t, conn1)
+	r1 := wsReadUntilType(t, conn1, ws.TypeSubmissionResult)
 	assert.Equal(t, ws.TypeSubmissionResult, r1.Type)
 	assert.Equal(t, user1ID, r1.UserID)
 	assert.True(t, r1.Accepted)
 
-	r2 := wsRead(t, conn2)
+	r2 := wsReadUntilType(t, conn2, ws.TypeSubmissionResult)
 	assert.Equal(t, ws.TypeSubmissionResult, r2.Type)
 	assert.Equal(t, user1ID, r2.UserID)
 	assert.True(t, r2.Accepted)
+}
+
+func TestGameWS_PlayerJoinedBroadcast(t *testing.T) {
+	g := createActiveGame(t)
+	wsPath := fmt.Sprintf("/games/%d/ws", g.Game.ID)
+
+	conn1 := wsConnect(t, wsPath, token1)
+	joined1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
+	assert.Equal(t, user1ID, joined1.UserID)
+
+	conn2 := wsConnect(t, wsPath, token2)
+	joined2ForConn1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
+	assert.Equal(t, user2ID, joined2ForConn1.UserID)
+	joined2ForConn2 := wsReadUntilType(t, conn2, ws.TypePlayerJoined)
+	assert.Equal(t, user2ID, joined2ForConn2.UserID)
 }
 
 func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
@@ -120,9 +141,7 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 		Language: "go",
 	}))
 
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper, error not actionable
-	var result ws.ServerMessage
-	require.NoError(t, conn.ReadJSON(&result))
+	result := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
 	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
 	assert.False(t, result.Accepted)
 	if assert.NotNil(t, result.FailedTest) {
@@ -182,9 +201,7 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 		Language: "go",
 	}))
 
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper, error not actionable
-	var result ws.ServerMessage
-	require.NoError(t, conn.ReadJSON(&result))
+	result := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
 	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
 	assert.False(t, result.Accepted)
 	if assert.NotNil(t, result.FailedTest) {
@@ -195,6 +212,8 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 	g := createActiveGame(t)
 	conn := wsConnect(t, fmt.Sprintf("/games/%d/ws", g.Game.ID), token1)
+	joined := wsReadUntilType(t, conn, ws.TypePlayerJoined)
+	assert.Equal(t, user1ID, joined.UserID)
 
 	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
 		Type:     ws.TypeSubmit,
@@ -202,11 +221,29 @@ func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 		Language: "go",
 	}))
 
-	result := wsRead(t, conn)
+	result := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
 	assert.Equal(t, ws.TypeSubmissionResult, result.Type)
 	assert.True(t, result.Accepted)
 
-	finished := wsRead(t, conn)
+	finished := wsReadUntilType(t, conn, ws.TypeGameFinished)
 	assert.Equal(t, ws.TypeGameFinished, finished.Type)
 	assert.Equal(t, user1ID, finished.WinnerID)
+}
+
+func wsReadUntilType(t *testing.T, conn wsJSONReader, wantType string) ws.ServerMessage {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		require.NoError(t, conn.SetReadDeadline(deadline))
+		var msg ws.ServerMessage
+		require.NoError(t, conn.ReadJSON(&msg))
+		if msg.Type == wantType {
+			return msg
+		}
+	}
+}
+
+type wsJSONReader interface {
+	ReadJSON(v any) error
+	SetReadDeadline(t time.Time) error
 }

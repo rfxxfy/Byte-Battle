@@ -459,6 +459,7 @@ components:
       required:
         - id
         - problem_id
+        - creator_id
         - status
         - participant_ids
         - created_at
@@ -469,6 +470,9 @@ components:
         problem_id:
           type: string
           example: "001-two-sum"
+        creator_id:
+          type: string
+          format: uuid
         winner_id:
           type: string
           format: uuid

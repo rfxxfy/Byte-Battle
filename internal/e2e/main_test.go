@@ -26,7 +26,6 @@ import (
 	"bytebattle/internal/executor"
 	"bytebattle/internal/migrations"
 	"bytebattle/internal/problems"
-	"bytebattle/internal/ws"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -296,14 +295,6 @@ func wsDial(t *testing.T, path, token string) (*websocket.Conn, *http.Response) 
 		t.Cleanup(func() { conn.Close() })
 	}
 	return conn, resp
-}
-
-func wsRead(t *testing.T, conn *websocket.Conn) ws.ServerMessage {
-	t.Helper()
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second)) //nolint:errcheck // test helper
-	var msg ws.ServerMessage
-	require.NoError(t, conn.ReadJSON(&msg))
-	return msg
 }
 
 func wsURL(path string) string {

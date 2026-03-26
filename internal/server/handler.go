@@ -243,6 +243,7 @@ func toAPIGame(g sqlcdb.Game, participantIDs []uuid.UUID) api.Game {
 	result := api.Game{
 		Id:             int(g.ID),
 		ProblemId:      g.ProblemID,
+		CreatorId:      g.CreatorID,
 		Status:         api.GameStatus(g.Status),
 		ParticipantIds: participantIDs,
 		CreatedAt:      g.CreatedAt.Time,
@@ -314,6 +315,12 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	defer client.Close() // signals WritePump to exit cleanly
 
 	go client.WritePump()
+
+	joinedMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:   ws.TypePlayerJoined,
+		UserID: session.UserID,
+	})
+	s.hub.Broadcast(int32(gameID), joinedMsg)
 
 	conn.SetReadLimit(32 * 1024)
 	conn.SetReadDeadline(time.Now().Add(ws.PongWait)) //nolint:errcheck // not actionable
