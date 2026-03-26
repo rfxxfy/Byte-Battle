@@ -144,8 +144,8 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcd
 	}
 
 	games, err := s.q.ListGames(ctx, sqlcdb.ListGamesParams{
-		ListOffset: int32(offset),
-		ListLimit:  int32(limit),
+		Limit:  int32(limit),
+		Offset: int32(offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -183,7 +183,7 @@ func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (
 	if err != nil {
 		return sqlcdb.Game{}, err
 	}
-	if count != 2 {
+	if count < 2 {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players must join before starting")
 	}
 

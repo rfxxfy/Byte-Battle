@@ -162,19 +162,16 @@ func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) 
 }
 
 const listGames = `-- name: ListGames :many
-SELECT id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at
-FROM games
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $1
+SELECT id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at FROM games ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
 type ListGamesParams struct {
-	ListOffset int32 `json:"list_offset"`
-	ListLimit  int32 `json:"list_limit"`
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
 }
 
 func (q *Queries) ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error) {
-	rows, err := q.db.Query(ctx, listGames, arg.ListOffset, arg.ListLimit)
+	rows, err := q.db.Query(ctx, listGames, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

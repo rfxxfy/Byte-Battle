@@ -10,10 +10,7 @@ SELECT * FROM games WHERE id = $1 LIMIT 1;
 SELECT * FROM games WHERE id = $1 LIMIT 1 FOR UPDATE;
 
 -- name: ListGames :many
-SELECT *
-FROM games
-ORDER BY created_at DESC
-LIMIT sqlc.arg(list_limit) OFFSET sqlc.arg(list_offset);
+SELECT * FROM games ORDER BY created_at DESC LIMIT $1 OFFSET $2;
 
 -- name: CountGames :one
 SELECT count(*) FROM games;
