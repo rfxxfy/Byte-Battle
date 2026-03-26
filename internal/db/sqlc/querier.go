@@ -39,6 +39,7 @@ type Querier interface {
 	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error)
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error)
+	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	StartGame(ctx context.Context, id int32) (Game, error)
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
