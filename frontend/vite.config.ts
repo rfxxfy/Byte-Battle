@@ -12,10 +12,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/auth': 'http://localhost:8080',
-      '/problems': 'http://localhost:8080',
-      '/games': 'http://localhost:8080',
-      '/execute': 'http://localhost:8080',
+      '/api': 'http://localhost:8080',
     },
   },
 })

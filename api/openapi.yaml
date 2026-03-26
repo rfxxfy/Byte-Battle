@@ -3,6 +3,9 @@ info:
   title: Byte Battle API
   version: "0.1.0"
 
+servers:
+  - url: /api
+
 security: []  # default: no auth required; individual operations opt-in via BearerAuth
 
 paths:

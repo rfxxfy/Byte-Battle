@@ -29,7 +29,7 @@ type problemsListResp struct {
 }
 
 func TestProblem_List(t *testing.T) {
-	resp := do(t, http.MethodGet, "/problems", nil)
+	resp := do(t, http.MethodGet, "/api/problems", nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var list problemsListResp
 	decodeJSON(t, resp, &list)
@@ -47,7 +47,7 @@ func TestProblem_List(t *testing.T) {
 }
 
 func TestProblem_GetByID(t *testing.T) {
-	resp := do(t, http.MethodGet, "/problems/test-problem", nil)
+	resp := do(t, http.MethodGet, "/api/problems/test-problem", nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var p problemResp
 	decodeJSON(t, resp, &p)
@@ -61,7 +61,7 @@ func TestProblem_GetByID(t *testing.T) {
 }
 
 func TestProblem_GetByID_NotFound(t *testing.T) {
-	resp := do(t, http.MethodGet, "/problems/nonexistent-problem", nil)
+	resp := do(t, http.MethodGet, "/api/problems/nonexistent-problem", nil)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	assert.Equal(t, "PROBLEM_NOT_FOUND", errCode(t, resp))
 }

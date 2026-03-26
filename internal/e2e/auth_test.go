@@ -17,7 +17,7 @@ import (
 )
 
 func TestAuth_Enter_InvalidEmail(t *testing.T) {
-	resp := do(t, http.MethodPost, "/auth/enter", map[string]any{"email": "not-an-email"})
+	resp := do(t, http.MethodPost, "/api/auth/enter", map[string]any{"email": "not-an-email"})
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "INVALID_EMAIL", errCode(t, resp))
 }
@@ -25,7 +25,7 @@ func TestAuth_Enter_InvalidEmail(t *testing.T) {
 func TestAuth_Confirm_InvalidCode(t *testing.T) {
 	seedCode(t, "player1@test.com", "123456", 5*time.Minute)
 
-	resp := do(t, http.MethodPost, "/auth/confirm", map[string]any{
+	resp := do(t, http.MethodPost, "/api/auth/confirm", map[string]any{
 		"email": "player1@test.com",
 		"code":  "000000", // wrong
 	})
@@ -36,7 +36,7 @@ func TestAuth_Confirm_InvalidCode(t *testing.T) {
 func TestAuth_Confirm_ExpiredCode(t *testing.T) {
 	seedCode(t, "player1@test.com", "123456", -1*time.Minute)
 
-	resp := do(t, http.MethodPost, "/auth/confirm", map[string]any{
+	resp := do(t, http.MethodPost, "/api/auth/confirm", map[string]any{
 		"email": "player1@test.com",
 		"code":  "123456",
 	})
@@ -45,7 +45,7 @@ func TestAuth_Confirm_ExpiredCode(t *testing.T) {
 }
 
 func TestAuth_Confirm_UnknownEmail(t *testing.T) {
-	resp := do(t, http.MethodPost, "/auth/confirm", map[string]any{
+	resp := do(t, http.MethodPost, "/api/auth/confirm", map[string]any{
 		"email": "ghost@test.com",
 		"code":  "123456",
 	})
@@ -59,7 +59,7 @@ func TestAuth_Confirm_TooManyAttempts(t *testing.T) {
 
 	// first MaxAttempts (5) wrong attempts must each return INVALID_CODE
 	for range 5 {
-		resp := do(t, http.MethodPost, "/auth/confirm", map[string]any{
+		resp := do(t, http.MethodPost, "/api/auth/confirm", map[string]any{
 			"email": "player2@test.com",
 			"code":  "000000",
 		})
@@ -68,7 +68,7 @@ func TestAuth_Confirm_TooManyAttempts(t *testing.T) {
 	}
 
 	// next attempt — even correct code — must be rejected
-	resp := do(t, http.MethodPost, "/auth/confirm", map[string]any{
+	resp := do(t, http.MethodPost, "/api/auth/confirm", map[string]any{
 		"email": "player2@test.com",
 		"code":  "999999",
 	})
@@ -77,7 +77,7 @@ func TestAuth_Confirm_TooManyAttempts(t *testing.T) {
 }
 
 func TestAuth_Me(t *testing.T) {
-	resp := doAuth(t, http.MethodGet, "/auth/me", nil, token1)
+	resp := doAuth(t, http.MethodGet, "/api/auth/me", nil, token1)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body struct {
 		UserId string `json:"user_id"`
@@ -87,7 +87,7 @@ func TestAuth_Me(t *testing.T) {
 }
 
 func TestAuth_Me_Unauthorized(t *testing.T) {
-	resp := do(t, http.MethodGet, "/auth/me", nil)
+	resp := do(t, http.MethodGet, "/api/auth/me", nil)
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	assert.Equal(t, "INVALID_TOKEN", errCode(t, resp))
 }
@@ -95,11 +95,11 @@ func TestAuth_Me_Unauthorized(t *testing.T) {
 func TestAuth_Logout(t *testing.T) {
 	tok := authToken(t, "player1@test.com")
 
-	resp := doAuth(t, http.MethodPost, "/auth/logout", nil, tok)
+	resp := doAuth(t, http.MethodPost, "/api/auth/logout", nil, tok)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
-	resp = doAuth(t, http.MethodGet, "/auth/me", nil, tok)
+	resp = doAuth(t, http.MethodGet, "/api/auth/me", nil, tok)
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	assert.Equal(t, "INVALID_TOKEN", errCode(t, resp))
 }
@@ -107,7 +107,7 @@ func TestAuth_Logout(t *testing.T) {
 func TestAuth_PatchMe_SetName(t *testing.T) {
 	tok := authToken(t, "player1@test.com")
 
-	resp := doAuth(t, http.MethodPatch, "/auth/me", map[string]any{"name": "Alice"}, tok)
+	resp := doAuth(t, http.MethodPatch, "/api/auth/me", map[string]any{"name": "Alice"}, tok)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var patchBody struct {
 		Name *string `json:"name"`
@@ -117,7 +117,7 @@ func TestAuth_PatchMe_SetName(t *testing.T) {
 	assert.Equal(t, "Alice", *patchBody.Name)
 
 	// GetAuthMe should now return the name
-	resp2 := doAuth(t, http.MethodGet, "/auth/me", nil, tok)
+	resp2 := doAuth(t, http.MethodGet, "/api/auth/me", nil, tok)
 	require.Equal(t, http.StatusOK, resp2.StatusCode)
 	var meBody struct {
 		Name *string `json:"name"`
@@ -130,7 +130,7 @@ func TestAuth_PatchMe_SetName(t *testing.T) {
 func TestAuth_PatchMe_TrimsWhitespace(t *testing.T) {
 	tok := authToken(t, "player1@test.com")
 
-	resp := doAuth(t, http.MethodPatch, "/auth/me", map[string]any{"name": "  Bob  "}, tok)
+	resp := doAuth(t, http.MethodPatch, "/api/auth/me", map[string]any{"name": "  Bob  "}, tok)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var body struct {
 		Name *string `json:"name"`
@@ -141,25 +141,25 @@ func TestAuth_PatchMe_TrimsWhitespace(t *testing.T) {
 }
 
 func TestAuth_PatchMe_EmptyName(t *testing.T) {
-	resp := doAuth(t, http.MethodPatch, "/auth/me", map[string]any{"name": ""}, token1)
+	resp := doAuth(t, http.MethodPatch, "/api/auth/me", map[string]any{"name": ""}, token1)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
 }
 
 func TestAuth_PatchMe_WhitespaceOnlyName(t *testing.T) {
-	resp := doAuth(t, http.MethodPatch, "/auth/me", map[string]any{"name": "   "}, token1)
+	resp := doAuth(t, http.MethodPatch, "/api/auth/me", map[string]any{"name": "   "}, token1)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
 }
 
 func TestAuth_PatchMe_TooLongName(t *testing.T) {
-	resp := doAuth(t, http.MethodPatch, "/auth/me", map[string]any{"name": strings.Repeat("a", 101)}, token1)
+	resp := doAuth(t, http.MethodPatch, "/api/auth/me", map[string]any{"name": strings.Repeat("a", 101)}, token1)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
 }
 
 func TestAuth_PatchMe_Unauthorized(t *testing.T) {
-	resp := do(t, http.MethodPatch, "/auth/me", map[string]any{"name": "Alice"})
+	resp := do(t, http.MethodPatch, "/api/auth/me", map[string]any{"name": "Alice"})
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	assert.Equal(t, "INVALID_TOKEN", errCode(t, resp))
 }
@@ -167,13 +167,13 @@ func TestAuth_PatchMe_Unauthorized(t *testing.T) {
 func TestAuth_Confirm_IncludesName(t *testing.T) {
 	// Give player2 a known name
 	tok := authToken(t, "player2@test.com")
-	resp := doAuth(t, http.MethodPatch, "/auth/me", map[string]any{"name": "Player Two"}, tok)
+	resp := doAuth(t, http.MethodPatch, "/api/auth/me", map[string]any{"name": "Player Two"}, tok)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
 	// New login — confirm response should include the name without extra /auth/me call
 	seedCode(t, "player2@test.com", "111111", 5*time.Minute)
-	resp2 := do(t, http.MethodPost, "/auth/confirm", map[string]any{
+	resp2 := do(t, http.MethodPost, "/api/auth/confirm", map[string]any{
 		"email": "player2@test.com",
 		"code":  "111111",
 	})

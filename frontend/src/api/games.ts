@@ -12,20 +12,20 @@ export interface Game {
 
 export const listGames = (limit = 10, offset = 0) =>
   apiFetch<{ games: Game[]; total: number }>(
-    `/games?limit=${limit}&offset=${offset}`,
+    `/api/games?limit=${limit}&offset=${offset}`,
   )
 
 export const getGame = (id: number) =>
-  apiFetch<{ game: Game }>(`/games/${id}`)
+  apiFetch<{ game: Game }>(`/api/games/${id}`)
 
 export const createGame = (problemId: string) =>
-  apiFetch<{ game: Game }>('/games', {
+  apiFetch<{ game: Game }>('/api/games', {
     method: 'POST',
     body: JSON.stringify({ problem_id: problemId }),
   })
 
 export const joinGame = (id: number) =>
-  apiFetch<{ game: Game }>(`/games/${id}/join`, { method: 'POST' })
+  apiFetch<{ game: Game }>(`/api/games/${id}/join`, { method: 'POST' })
 
 export const startGame = (id: number) =>
-  apiFetch<{ game: Game }>(`/games/${id}/start`, { method: 'POST' })
+  apiFetch<{ game: Game }>(`/api/games/${id}/start`, { method: 'POST' })

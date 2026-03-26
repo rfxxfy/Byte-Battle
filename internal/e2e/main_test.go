@@ -199,7 +199,7 @@ func makeAuthToken(email string) (string, error) {
 	}
 
 	body, _ := json.Marshal(map[string]string{"email": email, "code": code})
-	resp, err := testSrv.Client().Post(testSrv.URL+"/auth/confirm", "application/json", bytes.NewReader(body))
+	resp, err := testSrv.Client().Post(testSrv.URL+"/api/auth/confirm", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("post /auth/confirm: %w", err)
 	}

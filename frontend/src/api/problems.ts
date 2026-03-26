@@ -11,7 +11,7 @@ export interface Problem {
 }
 
 export const listProblems = () =>
-  apiFetch<{ problems: Problem[] }>('/problems')
+  apiFetch<{ problems: Problem[] }>('/api/problems')
 
 export const getProblem = (id: string) =>
-  apiFetch<{ problem: Problem }>(`/problems/${id}`)
+  apiFetch<{ problem: Problem }>(`/api/problems/${id}`)
