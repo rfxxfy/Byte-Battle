@@ -106,7 +106,7 @@ func New(
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: corsAllowed,
-		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Authorization", "Content-Type"},
 		MaxAge:         300,
 	}))
@@ -115,10 +115,13 @@ func New(
 	if n := httpRatePerMinute(); n > 0 {
 		r.Use(httprate.LimitByIP(n, time.Minute))
 	}
+	r.Use(s.optionalAuthMiddleware)
 
 	r.Get("/health", s.handleHealth)
 	r.Get("/", s.handleRoot)
 	r.Get("/api/games/{id}/ws", s.handleGameWS)
+	r.With(s.requireAuth).Post("/api/problems", s.handleUploadProblem)
+	r.With(s.requireAuth).Post("/api/problems/{slug}/versions", s.handleUploadProblemVersion)
 
 	strictOpts := api.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  requestErrorHandler,

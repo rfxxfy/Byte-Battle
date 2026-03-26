@@ -112,8 +112,24 @@ paths:
   /problems:
     get:
       operationId: ListProblems
-      summary: List all available problems
+      summary: List published public problems with optional search
       security: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            default: ""
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
       responses:
         "200":
           description: List of problems
@@ -122,10 +138,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListProblemsResponse"
 
+  /problems/mine:
+    get:
+      operationId: ListMyProblems
+      summary: List problems owned by the current user (all visibility)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            default: ""
+      responses:
+        "200":
+          description: List of own problems
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMyProblemsResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+
   /problems/{problem_id}:
     get:
       operationId: GetProblem
-      summary: Get problem by ID
+      summary: Get problem by slug (visibility check applied)
       security: []
       parameters:
         - name: problem_id
@@ -141,6 +179,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: PatchProblem
+      summary: Update problem visibility (owner only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: problem_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchProblemRequest"
+      responses:
+        "200":
+          description: Problem updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatchProblemResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
 
@@ -617,11 +687,68 @@ components:
       type: object
       required:
         - problems
+        - total
       properties:
         problems:
           type: array
           items:
             $ref: "#/components/schemas/Problem"
+        total:
+          type: integer
+          format: int64
+
+    MyProblem:
+      type: object
+      required:
+        - id
+        - title
+        - visibility
+        - status
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        visibility:
+          type: string
+          enum: [public, unlisted, private]
+        status:
+          type: string
+          enum: [published, archived]
+        version:
+          type: integer
+          nullable: true
+
+    ListMyProblemsResponse:
+      type: object
+      required:
+        - problems
+      properties:
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/MyProblem"
+
+    PatchProblemRequest:
+      type: object
+      required:
+        - visibility
+      properties:
+        visibility:
+          type: string
+          enum: [public, unlisted, private]
+
+    PatchProblemResponse:
+      type: object
+      required:
+        - slug
+        - visibility
+      properties:
+        slug:
+          type: string
+        visibility:
+          type: string
+          enum: [public, unlisted, private]
 
     GameParticipant:
       type: object

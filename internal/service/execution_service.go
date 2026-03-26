@@ -78,6 +78,10 @@ func (s *ExecutionService) IsReady() bool {
 	return s.executor.IsReady()
 }
 
+func (s *ExecutionService) Executor() executor.Executor {
+	return s.executor
+}
+
 func (s *ExecutionService) Execute(ctx context.Context, req executor.ExecutionRequest) (executor.ExecutionResult, error) {
 	return s.executor.Run(ctx, req)
 }

@@ -50,6 +50,10 @@ linters:
       # db.Close() error is unactionable in error paths
       - linters: [gosec]
         text: "G104"
+      # paths from os.MkdirTemp are not tainted user input
+      - linters: [gosec]
+        text: "G703"
+        path: "internal/server/handler\\.go"
 
   settings:
     errcheck:
@@ -61,6 +65,7 @@ linters:
         - (*github.com/gorilla/websocket.Conn).Close
         - (*github.com/gorilla/websocket.Conn).SetReadDeadline
         - (*github.com/gorilla/websocket.Conn).SetWriteDeadline
+        - os.RemoveAll
 
     gocritic:
       enabled-tags:

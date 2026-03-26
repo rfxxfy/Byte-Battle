@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 
@@ -20,25 +19,39 @@ const (
 	contextKeySession contextKey = "session"
 )
 
+func (s *HTTPServer) optionalAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token := bearerToken(r); token != "" {
+			if session, err := s.sessionService.ValidateToken(r.Context(), token); err == nil {
+				s.sessionService.TryRefresh(r.Context(), session)
+				ctx := context.WithValue(r.Context(), contextKeyUserID, session.UserID)
+				ctx = context.WithValue(ctx, contextKeySession, session)
+				r = r.WithContext(ctx)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *HTTPServer) requireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := userIDFromContext(r.Context()); !ok {
+			writeHTTPError(w, apierr.New(apierr.ErrInvalidToken, "unauthorized"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *HTTPServer) strictAuthMiddleware(publicOps map[string]bool) api.StrictMiddlewareFunc {
 	return func(f api.StrictHandlerFunc, operationID string) api.StrictHandlerFunc {
 		if publicOps[operationID] {
 			return f
 		}
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req interface{}) (interface{}, error) {
-			token := bearerToken(r)
-			session, err := s.sessionService.ValidateToken(ctx, token)
-			if err != nil {
-				var ae *apierr.AppError
-				if errors.As(err, &ae) {
-					return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
-				}
-				return nil, apierr.New(apierr.ErrInternal, "internal server error")
+			if _, ok := userIDFromContext(ctx); !ok {
+				return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
 			}
-			s.sessionService.TryRefresh(ctx, session)
-			ctx = context.WithValue(ctx, contextKeyUserID, session.UserID)
-			ctx = context.WithValue(ctx, contextKeySession, session)
-			r = r.WithContext(ctx)
 			return f(ctx, w, r, req)
 		}
 	}
