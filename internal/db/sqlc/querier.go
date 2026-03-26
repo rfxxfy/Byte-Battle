@@ -33,6 +33,7 @@ type Querier interface {
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetVerificationCode(ctx context.Context, email string) (VerificationCode, error)
 	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error)
@@ -41,6 +42,7 @@ type Querier interface {
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	StartGame(ctx context.Context, id int32) (Game, error)
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
+	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (User, error)
 	UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (VerificationCode, error)
 }
 

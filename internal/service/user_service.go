@@ -6,6 +6,7 @@ import (
 
 	sqlcdb "bytebattle/internal/db/sqlc"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -16,6 +17,17 @@ type UserService struct {
 
 func NewUserService(q *sqlcdb.Queries) *UserService {
 	return &UserService{q: q}
+}
+
+func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (sqlcdb.User, error) {
+	return s.q.GetUserByID(ctx, id)
+}
+
+func (s *UserService) UpdateName(ctx context.Context, id uuid.UUID, name string) (sqlcdb.User, error) {
+	return s.q.UpdateUserName(ctx, sqlcdb.UpdateUserNameParams{
+		ID:   id,
+		Name: pgtype.Text{String: name, Valid: true},
+	})
 }
 
 func (s *UserService) GetOrCreateTestUser(ctx context.Context) (sqlcdb.User, error) {

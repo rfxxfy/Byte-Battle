@@ -15,7 +15,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at
+RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at, name
 `
 
 type CreateUserParams struct {
@@ -36,23 +36,25 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Name,
 	)
 	return i, err
 }
 
 const createUserByEmail = `-- name: CreateUserByEmail :one
-INSERT INTO users (username, email)
-VALUES ($1, $2)
-RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at
+INSERT INTO users (username, email, name)
+VALUES ($1, $2, $3)
+RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at, name
 `
 
 type CreateUserByEmailParams struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	Username string      `json:"username"`
+	Email    string      `json:"email"`
+	Name     pgtype.Text `json:"name"`
 }
 
 func (q *Queries) CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUserByEmail, arg.Username, arg.Email)
+	row := q.db.QueryRow(ctx, createUserByEmail, arg.Username, arg.Email, arg.Name)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -63,12 +65,13 @@ func (q *Queries) CreateUserByEmail(ctx context.Context, arg CreateUserByEmailPa
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Name,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
+SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at, name FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -83,12 +86,34 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Name,
+	)
+	return i, err
+}
+
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at, name FROM users WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.EmailVerified,
+		&i.Rating,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at FROM users WHERE username = $1 LIMIT 1
+SELECT id, username, email, password_hash, email_verified, rating, created_at, updated_at, name FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -103,6 +128,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Rating,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Name,
 	)
 	return i, err
 }
@@ -114,4 +140,30 @@ UPDATE users SET email_verified = true WHERE id = $1
 func (q *Queries) SetEmailVerified(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, setEmailVerified, id)
 	return err
+}
+
+const updateUserName = `-- name: UpdateUserName :one
+UPDATE users SET name = $2 WHERE id = $1 RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at, name
+`
+
+type UpdateUserNameParams struct {
+	ID   uuid.UUID   `json:"id"`
+	Name pgtype.Text `json:"name"`
+}
+
+func (q *Queries) UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserName, arg.ID, arg.Name)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.PasswordHash,
+		&i.EmailVerified,
+		&i.Rating,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+	)
+	return i, err
 }

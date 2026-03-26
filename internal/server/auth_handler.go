@@ -32,7 +32,15 @@ func (s *HTTPServer) GetAuthMe(ctx context.Context, _ api.GetAuthMeRequestObject
 	if !ok {
 		return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
 	}
-	return api.GetAuthMe200JSONResponse{UserId: userID}, nil
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, apierr.New(apierr.ErrInternal, "internal server error")
+	}
+	resp := api.GetAuthMe200JSONResponse{UserId: userID}
+	if user.Name.Valid {
+		resp.Name = &user.Name.String
+	}
+	return resp, nil
 }
 
 func (s *HTTPServer) PostAuthLogout(ctx context.Context, _ api.PostAuthLogoutRequestObject) (api.PostAuthLogoutResponseObject, error) {
@@ -45,6 +53,22 @@ func (s *HTTPServer) PostAuthLogout(ctx context.Context, _ api.PostAuthLogoutReq
 		}
 	}
 	return api.PostAuthLogout200JSONResponse{Status: "ok"}, nil
+}
+
+func (s *HTTPServer) PatchAuthMe(ctx context.Context, req api.PatchAuthMeRequestObject) (api.PatchAuthMeResponseObject, error) {
+	userID, ok := userIDFromContext(ctx)
+	if !ok {
+		return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
+	}
+	user, err := s.users.UpdateName(ctx, userID, req.Body.Name)
+	if err != nil {
+		return nil, apierr.New(apierr.ErrInternal, "internal server error")
+	}
+	resp := api.PatchAuthMe200JSONResponse{UserId: userID}
+	if user.Name.Valid {
+		resp.Name = &user.Name.String
+	}
+	return resp, nil
 }
 
 func entranceAppErr(err error) *apierr.AppError {
