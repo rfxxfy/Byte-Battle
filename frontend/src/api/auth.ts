@@ -3,6 +3,7 @@ import { apiFetch } from './client'
 export interface TokenResponse {
   token: string
   expires_at: string
+  name?: string
 }
 
 export interface MeResponse {

@@ -403,6 +403,9 @@ components:
         expires_at:
           type: string
           format: date-time
+        name:
+          type: string
+          nullable: true
 
     UpdateMeRequest:
       type: object

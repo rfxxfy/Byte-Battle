@@ -21,10 +21,15 @@ func (s *HTTPServer) PostAuthConfirm(ctx context.Context, req api.PostAuthConfir
 	if err != nil {
 		return nil, entranceAppErr(err)
 	}
-	return api.PostAuthConfirm200JSONResponse{
+	resp := api.PostAuthConfirm200JSONResponse{
 		Token:     session.Token,
 		ExpiresAt: session.ExpiresAt.Time,
-	}, nil
+	}
+	user, err := s.users.GetByID(ctx, session.UserID)
+	if err == nil && user.Name.Valid {
+		resp.Name = &user.Name.String
+	}
+	return resp, nil
 }
 
 func (s *HTTPServer) GetAuthMe(ctx context.Context, _ api.GetAuthMeRequestObject) (api.GetAuthMeResponseObject, error) {
@@ -61,6 +66,9 @@ func (s *HTTPServer) PatchAuthMe(ctx context.Context, req api.PatchAuthMeRequest
 		return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
 	}
 	user, err := s.users.UpdateName(ctx, userID, req.Body.Name)
+	if errors.Is(err, service.ErrInvalidName) {
+		return nil, apierr.New(apierr.ErrValidation, err.Error())
+	}
 	if err != nil {
 		return nil, apierr.New(apierr.ErrInternal, "internal server error")
 	}

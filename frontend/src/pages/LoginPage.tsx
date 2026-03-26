@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { enter, confirm, updateMe, me } from '../api/auth'
+import { enter, confirm, updateMe } from '../api/auth'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { errorMessage } from '@/lib/errors'
@@ -42,8 +42,7 @@ export function LoginPage() {
     try {
       const res = await confirm(email, code)
       login(res.token, res.expires_at)
-      const user = await me()
-      if (!user.name) {
+      if (!res.name) {
         setStep('name')
       } else {
         navigate('/games', { replace: true })

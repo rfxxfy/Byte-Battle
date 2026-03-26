@@ -42,19 +42,18 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const createUserByEmail = `-- name: CreateUserByEmail :one
-INSERT INTO users (username, email, name)
-VALUES ($1, $2, $3)
+INSERT INTO users (username, email)
+VALUES ($1, $2)
 RETURNING id, username, email, password_hash, email_verified, rating, created_at, updated_at, name
 `
 
 type CreateUserByEmailParams struct {
-	Username string      `json:"username"`
-	Email    string      `json:"email"`
-	Name     pgtype.Text `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
 }
 
 func (q *Queries) CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUserByEmail, arg.Username, arg.Email, arg.Name)
+	row := q.db.QueryRow(ctx, createUserByEmail, arg.Username, arg.Email)
 	var i User
 	err := row.Scan(
 		&i.ID,

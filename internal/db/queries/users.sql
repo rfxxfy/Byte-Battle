@@ -13,8 +13,8 @@ VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: CreateUserByEmail :one
-INSERT INTO users (username, email, name)
-VALUES ($1, $2, $3)
+INSERT INTO users (username, email)
+VALUES ($1, $2)
 RETURNING *;
 
 -- name: UpdateUserName :one
