@@ -48,14 +48,15 @@ func newUpgrader() gorillaws.Upgrader {
 var upgrader = newUpgrader() //nolint:gochecknoglobals // package-level for performance, initialized once at startup
 
 type HTTPServer struct {
-	pool             *pgxpool.Pool
-	users            *service.UserService
-	gameService      *service.GameService
-	problemService   *service.ProblemService
-	sessionService   *service.SessionService
-	executionService *service.ExecutionService
-	hub              *ws.Hub
-	entrance         service.EntranceService
+	pool              *pgxpool.Pool
+	users             *service.UserService
+	gameService       *service.GameService
+	problemService    *service.ProblemService
+	sessionService    *service.SessionService
+	executionService  *service.ExecutionService
+	submissionService *service.SubmissionService
+	hub               *ws.Hub
+	entrance          service.EntranceService
 }
 
 func New(
@@ -65,18 +66,20 @@ func New(
 	problemService *service.ProblemService,
 	sessionService *service.SessionService,
 	executionService *service.ExecutionService,
+	submissionService *service.SubmissionService,
 	hub *ws.Hub,
 	entrance service.EntranceService,
 ) http.Handler {
 	s := &HTTPServer{
-		pool:             pool,
-		users:            users,
-		gameService:      gameService,
-		problemService:   problemService,
-		sessionService:   sessionService,
-		executionService: executionService,
-		hub:              hub,
-		entrance:         entrance,
+		pool:              pool,
+		users:             users,
+		gameService:       gameService,
+		problemService:    problemService,
+		sessionService:    sessionService,
+		executionService:  executionService,
+		submissionService: submissionService,
+		hub:               hub,
+		entrance:          entrance,
 	}
 
 	origins := allowedOrigins()
