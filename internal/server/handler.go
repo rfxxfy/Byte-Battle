@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -359,7 +360,12 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	result, err := s.submissionService.Submit(ctx, int(gameID), userID, msg.Code, executor.Language(msg.Language))
 	if err != nil {
 		log.Printf("processSubmit: %v", err)
-		s.broadcastError(gameID, userID, err.Error())
+		var appErr *apierr.AppError
+		if errors.As(err, &appErr) {
+			s.broadcastError(gameID, userID, appErr.Message)
+		} else {
+			s.broadcastError(gameID, userID, "internal error")
+		}
 		return
 	}
 

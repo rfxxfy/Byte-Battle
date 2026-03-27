@@ -228,6 +228,10 @@ func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (
 	return game, nil
 }
 
+func (s *GameService) CompleteGameAsWinner(ctx context.Context, id int, winnerID uuid.UUID) (sqlcdb.Game, error) {
+	return s.completeGame(ctx, id, winnerID)
+}
+
 func (s *GameService) CompleteGame(ctx context.Context, id int, callerID, winnerID uuid.UUID) (sqlcdb.Game, error) {
 	game, err := s.q.GetGameByID(ctx, int32(id))
 	if errors.Is(err, pgx.ErrNoRows) {
