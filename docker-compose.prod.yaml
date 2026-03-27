@@ -44,6 +44,7 @@ services:
       HTTP_PORT: "8080"
       PROBLEMS_DIR: /app/problems
       ALLOWED_ORIGINS: https://bytebattle.online
+      HTTP_RATE_PER_MINUTE: ${HTTP_RATE_PER_MINUTE:-100}
     volumes:
       - ./problems:/app/problems:ro
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,18 @@ import (
 	gorillaws "github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func httpRatePerMinute() int {
+	v := os.Getenv("HTTP_RATE_PER_MINUTE")
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
 
 func allowedOrigins() []string {
 	v := os.Getenv("ALLOWED_ORIGINS")
@@ -99,7 +112,9 @@ func New(
 	}))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(httprate.LimitByIP(100, time.Minute))
+	if n := httpRatePerMinute(); n > 0 {
+		r.Use(httprate.LimitByIP(n, time.Minute))
+	}
 
 	r.Get("/health", s.handleHealth)
 	r.Get("/", s.handleRoot)
