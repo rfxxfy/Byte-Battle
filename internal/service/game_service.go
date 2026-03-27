@@ -23,6 +23,7 @@ const (
 	gameStatusActive    = "active"
 	gameStatusFinished  = "finished"
 	gameStatusCancelled = "cancelled"
+	maxGameProblems     = 20
 )
 
 type GameService struct {
@@ -35,9 +36,20 @@ func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Load
 	return &GameService{q: q, pool: pool, problems: loader}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemID string) (sqlcdb.Game, error) {
-	if _, err := s.problems.Get(problemID); err != nil {
-		return sqlcdb.Game{}, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemIDs []string) (sqlcdb.Game, error) {
+	if len(problemIDs) == 0 {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "at least one problem is required")
+	}
+	if len(problemIDs) > maxGameProblems {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "too many problems in game")
+	}
+	for _, problemID := range problemIDs {
+		if problemID == "" {
+			return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "problem_id cannot be empty")
+		}
+		if _, err := s.problems.Get(problemID); err != nil {
+			return sqlcdb.Game{}, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+		}
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -49,11 +61,21 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 	qtx := s.q.WithTx(tx)
 
 	game, err := qtx.CreateGame(ctx, sqlcdb.CreateGameParams{
-		ProblemID: problemID,
+		ProblemID: problemIDs[0],
 		CreatorID: creatorID,
 	})
 	if err != nil {
 		return sqlcdb.Game{}, err
+	}
+
+	for idx, problemID := range problemIDs {
+		if err := qtx.AddGameProblem(ctx, sqlcdb.AddGameProblemParams{
+			GameID:       game.ID,
+			ProblemIndex: int32(idx),
+			ProblemID:    problemID,
+		}); err != nil {
+			return sqlcdb.Game{}, err
+		}
 	}
 
 	if err := qtx.AddGameParticipant(ctx, sqlcdb.AddGameParticipantParams{
@@ -148,6 +170,22 @@ func (s *GameService) GetParticipantsByGameIDs(ctx context.Context, gameIDs []in
 	return result, nil
 }
 
+func (s *GameService) GetGameProblemIDs(ctx context.Context, gameID int32) ([]string, error) {
+	return s.q.GetGameProblemIDs(ctx, gameID)
+}
+
+func (s *GameService) GetGameProblemIDsByGameIDs(ctx context.Context, gameIDs []int32) (map[int32][]string, error) {
+	rows, err := s.q.GetGameProblemIDsByGameIDs(ctx, gameIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int32][]string, len(gameIDs))
+	for _, row := range rows {
+		result[row.GameID] = append(result[row.GameID], row.ProblemID)
+	}
+	return result, nil
+}
+
 func (s *GameService) GetGame(ctx context.Context, id int) (sqlcdb.Game, error) {
 	game, err := s.q.GetGameByID(ctx, int32(id))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -230,6 +268,106 @@ func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (
 
 func (s *GameService) CompleteGameAsWinner(ctx context.Context, id int, winnerID uuid.UUID) (sqlcdb.Game, error) {
 	return s.completeGame(ctx, id, winnerID)
+}
+
+func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := s.q.WithTx(tx)
+
+	game, err := qtx.GetGameForUpdate(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, false, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	totalProblems, err := validateAcceptedSubmissionState(ctx, qtx, game, userID)
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	game, finished, err := finishOrAdvanceAfterAcceptedSubmit(ctx, qtx, game, userID, totalProblems)
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	return game, finished, nil
+}
+
+func validateAcceptedSubmissionState(ctx context.Context, qtx *sqlcdb.Queries, game sqlcdb.Game, userID uuid.UUID) (int64, error) {
+	if game.Status != gameStatusActive {
+		return 0, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
+	}
+
+	ok, err := qtx.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
+		GameID: game.ID,
+		UserID: userID,
+	})
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, apierr.New(apierr.ErrInvalidWinner, "winner must be one of the players")
+	}
+
+	totalProblems, err := qtx.CountGameProblems(ctx, game.ID)
+	if err != nil {
+		return 0, err
+	}
+	if totalProblems == 0 {
+		return 0, apierr.New(apierr.ErrValidation, "game has no problems")
+	}
+
+	return totalProblems, nil
+}
+
+func finishOrAdvanceAfterAcceptedSubmit(
+	ctx context.Context,
+	qtx *sqlcdb.Queries,
+	game sqlcdb.Game,
+	userID uuid.UUID,
+	totalProblems int64,
+) (sqlcdb.Game, bool, error) {
+	if int64(game.CurrentProblemIndex) >= totalProblems-1 {
+		updated, err := qtx.CompleteGame(ctx, sqlcdb.CompleteGameParams{
+			ID:       game.ID,
+			WinnerID: uuid.NullUUID{UUID: userID, Valid: true},
+		})
+		if err != nil {
+			return sqlcdb.Game{}, false, err
+		}
+		return updated, true, nil
+	}
+
+	nextIndex := game.CurrentProblemIndex + 1
+	nextProblemID, err := qtx.GetGameProblemIDByIndex(ctx, sqlcdb.GetGameProblemIDByIndexParams{
+		GameID:       game.ID,
+		ProblemIndex: nextIndex,
+	})
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	updated, err := qtx.AdvanceGameProblem(ctx, sqlcdb.AdvanceGameProblemParams{
+		ID:                  game.ID,
+		CurrentProblemIndex: nextIndex,
+		ProblemID:           nextProblemID,
+	})
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	return updated, false, nil
 }
 
 func (s *GameService) CompleteGame(ctx context.Context, id int, callerID, winnerID uuid.UUID) (sqlcdb.Game, error) {

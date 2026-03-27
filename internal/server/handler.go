@@ -72,10 +72,14 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	if err != nil {
 		return nil, err
 	}
+	problemIDsMap, err := s.gameService.GetGameProblemIDsByGameIDs(ctx, gameIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	apiGames := make([]api.Game, len(games))
 	for i := range games {
-		apiGames[i] = toAPIGame(games[i], participantMap[games[i].ID])
+		apiGames[i] = toAPIGame(games[i], participantMap[games[i].ID], problemIDsMap[games[i].ID])
 	}
 
 	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
@@ -103,7 +107,16 @@ func (s *HTTPServer) GetProblem(_ context.Context, req api.GetProblemRequestObje
 
 func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestObject) (api.CreateGameResponseObject, error) {
 	userID, _ := userIDFromContext(ctx)
-	game, err := s.gameService.CreateGame(ctx, userID, req.Body.ProblemId)
+
+	problemIDs := []string{}
+	if req.Body.ProblemIds != nil {
+		problemIDs = append(problemIDs, *req.Body.ProblemIds...)
+	}
+	if len(problemIDs) == 0 && req.Body.ProblemId != nil && *req.Body.ProblemId != "" {
+		problemIDs = []string{*req.Body.ProblemId}
+	}
+
+	game, err := s.gameService.CreateGame(ctx, userID, problemIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +125,12 @@ func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestOb
 	if err != nil {
 		return nil, err
 	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return api.CreateGame201JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+	return api.CreateGame201JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs)}, nil
 }
 
 func (s *HTTPServer) JoinGame(ctx context.Context, req api.JoinGameRequestObject) (api.JoinGameResponseObject, error) {
@@ -127,8 +144,12 @@ func (s *HTTPServer) JoinGame(ctx context.Context, req api.JoinGameRequestObject
 	if err != nil {
 		return nil, err
 	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return api.JoinGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+	return api.JoinGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs)}, nil
 }
 
 func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) (api.GetGameResponseObject, error) {
@@ -141,8 +162,12 @@ func (s *HTTPServer) GetGame(ctx context.Context, req api.GetGameRequestObject) 
 	if err != nil {
 		return nil, err
 	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return api.GetGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+	return api.GetGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs)}, nil
 }
 
 func (s *HTTPServer) DeleteGame(ctx context.Context, req api.DeleteGameRequestObject) (api.DeleteGameResponseObject, error) {
@@ -165,8 +190,12 @@ func (s *HTTPServer) StartGame(ctx context.Context, req api.StartGameRequestObje
 	if err != nil {
 		return nil, err
 	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return api.StartGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+	return api.StartGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs)}, nil
 }
 
 func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameRequestObject) (api.CompleteGameResponseObject, error) {
@@ -180,8 +209,12 @@ func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameReque
 	if err != nil {
 		return nil, err
 	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return api.CompleteGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+	return api.CompleteGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs)}, nil
 }
 
 func (s *HTTPServer) LeaveGame(ctx context.Context, req api.LeaveGameRequestObject) (api.LeaveGameResponseObject, error) {
@@ -195,8 +228,12 @@ func (s *HTTPServer) LeaveGame(ctx context.Context, req api.LeaveGameRequestObje
 	if err != nil {
 		return nil, err
 	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return api.LeaveGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+	return api.LeaveGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs)}, nil
 }
 
 func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestObject) (api.CancelGameResponseObject, error) {
@@ -210,8 +247,12 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 	if err != nil {
 		return nil, err
 	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
 
-	return api.CancelGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
+	return api.CancelGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs)}, nil
 }
 
 func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteRequestObject) (api.PostExecuteResponseObject, error) {
@@ -239,19 +280,24 @@ func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteReq
 	}, nil
 }
 
-func toAPIGame(g sqlcdb.Game, participants []service.Participant) api.Game {
+func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []string) api.Game {
+	if len(problemIDs) == 0 {
+		problemIDs = []string{g.ProblemID}
+	}
 	apiParticipants := make([]api.GameParticipant, len(participants))
 	for i, p := range participants {
 		apiParticipants[i] = api.GameParticipant{Id: p.ID, Name: p.Name}
 	}
 	result := api.Game{
-		Id:           int(g.ID),
-		ProblemId:    g.ProblemID,
-		CreatorId:    g.CreatorID,
-		Status:       api.GameStatus(g.Status),
-		Participants: apiParticipants,
-		CreatedAt:    g.CreatedAt.Time,
-		UpdatedAt:    g.UpdatedAt.Time,
+		Id:                  int(g.ID),
+		ProblemId:           g.ProblemID,
+		ProblemIds:          problemIDs,
+		CurrentProblemIndex: int(g.CurrentProblemIndex),
+		CreatorId:           g.CreatorID,
+		Status:              api.GameStatus(g.Status),
+		Participants:        apiParticipants,
+		CreatedAt:           g.CreatedAt.Time,
+		UpdatedAt:           g.UpdatedAt.Time,
 	}
 	if g.WinnerID.Valid {
 		id := g.WinnerID.UUID
@@ -385,6 +431,16 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 			WinnerID: result.WinnerID,
 		})
 		s.hub.Broadcast(gameID, finMsg)
+		return
+	}
+
+	if result.Accepted && result.ProblemID != "" {
+		roundMsg, _ := json.Marshal(ws.ServerMessage{
+			Type:       ws.TypeRoundAdvanced,
+			ProblemID:  result.ProblemID,
+			ProblemIdx: result.ProblemIdx,
+		})
+		s.hub.Broadcast(gameID, roundMsg)
 	}
 }
 

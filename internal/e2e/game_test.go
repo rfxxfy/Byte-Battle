@@ -11,11 +11,13 @@ import (
 
 type gameResp struct {
 	Game struct {
-		ID           int     `json:"id"`
-		ProblemID    string  `json:"problem_id"`
-		CreatorID    string  `json:"creator_id"`
-		Status       string  `json:"status"`
-		WinnerID     *string `json:"winner_id"`
+		ID           int      `json:"id"`
+		ProblemID    string   `json:"problem_id"`
+		ProblemIDs   []string `json:"problem_ids"`
+		ProblemIndex int      `json:"current_problem_index"`
+		CreatorID    string   `json:"creator_id"`
+		Status       string   `json:"status"`
+		WinnerID     *string  `json:"winner_id"`
 		Participants []struct {
 			ID   string  `json:"id"`
 			Name *string `json:"name"`
@@ -43,7 +45,7 @@ type gamesListResp struct {
 func createGame(t *testing.T) gameResp {
 	t.Helper()
 	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
-		"problem_id": "test-problem",
+		"problem_ids": []string{"test-problem"},
 	}, token1)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	var g gameResp
@@ -53,6 +55,32 @@ func createGame(t *testing.T) gameResp {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	decodeJSON(t, resp, &g)
 	return g
+}
+
+func TestGame_CreateWithMultipleProblems(t *testing.T) {
+	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
+		"problem_ids": []string{"test-problem", "test-problem"},
+	}, token1)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	var g gameResp
+	decodeJSON(t, resp, &g)
+
+	assert.Equal(t, "test-problem", g.Game.ProblemID)
+	assert.Equal(t, 0, g.Game.ProblemIndex)
+	assert.Equal(t, []string{"test-problem", "test-problem"}, g.Game.ProblemIDs)
+}
+
+func TestGame_CreateWithTooManyProblems(t *testing.T) {
+	problemIDs := make([]string, 21)
+	for i := range problemIDs {
+		problemIDs[i] = "test-problem"
+	}
+
+	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
+		"problem_ids": problemIDs,
+	}, token1)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
 }
 
 func createActiveGame(t *testing.T) gameResp {

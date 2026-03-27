@@ -18,6 +18,8 @@ type SubmissionResult struct {
 	Stdout     string
 	Stderr     string
 	WinnerID   uuid.UUID
+	ProblemID  string
+	ProblemIdx int
 }
 
 type SubmissionService struct {
@@ -80,7 +82,7 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 		}, nil
 	}
 
-	completed, err := s.gameSvc.CompleteGameAsWinner(ctx, gameID, userID)
+	updatedGame, finished, err := s.gameSvc.HandleAcceptedSubmission(ctx, gameID, userID)
 	if err != nil {
 		var appErr *apierr.AppError
 		if errors.As(err, &appErr) && appErr.ErrorCode == apierr.ErrGameNotInProgress {
@@ -90,6 +92,13 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 		}
 		return SubmissionResult{}, fmt.Errorf("complete game: %w", err)
 	}
+	if !finished {
+		return SubmissionResult{
+			Accepted:   true,
+			ProblemID:  updatedGame.ProblemID,
+			ProblemIdx: int(updatedGame.CurrentProblemIndex),
+		}, nil
+	}
 
-	return SubmissionResult{Accepted: true, WinnerID: completed.WinnerID.UUID}, nil
+	return SubmissionResult{Accepted: true, WinnerID: updatedGame.WinnerID.UUID}, nil
 }

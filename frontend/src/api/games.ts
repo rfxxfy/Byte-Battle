@@ -8,6 +8,8 @@ export interface GameParticipant {
 export interface Game {
   id: number
   problem_id: string
+  problem_ids: string[]
+  current_problem_index: number
   creator_id: string
   status: 'pending' | 'active' | 'finished' | 'cancelled'
   participants: GameParticipant[]
@@ -24,10 +26,13 @@ export const listGames = (limit = 10, offset = 0) =>
 export const getGame = (id: number) =>
   apiFetch<{ game: Game }>(`/games/${id}`)
 
-export const createGame = (problemId: string) =>
+export const createGame = (problemIds: string[]) =>
   apiFetch<{ game: Game }>('/games', {
     method: 'POST',
-    body: JSON.stringify({ problem_id: problemId }),
+    body: JSON.stringify({
+      problem_ids: problemIds.slice(0, 20),
+      problem_id: problemIds[0],
+    }),
   })
 
 export const joinGame = (id: number) =>
