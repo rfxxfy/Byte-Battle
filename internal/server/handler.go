@@ -177,7 +177,6 @@ func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameReque
 	if gameInfo.CreatorID != userID {
 		return nil, apierr.New(apierr.ErrNotGameCreator, "only the game creator can complete the game")
 	}
-
 	game, err := s.gameService.CompleteGame(ctx, req.Id, req.Body.WinnerId)
 	if err != nil {
 		return nil, err
@@ -222,6 +221,14 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 }
 
 func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteRequestObject) (api.PostExecuteResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	if !s.executionService.TryAcquireSlot(userID) {
+		return nil, apierr.New(apierr.ErrExecutionInProgress, "execution already in progress")
+	}
+	defer s.executionService.ReleaseSlot(userID)
+	if err := s.executionService.CheckRateLimit(userID); err != nil {
+		return nil, err
+	}
 	result, err := s.executionService.Execute(ctx, executor.ExecutionRequest{
 		Code:     request.Body.Code,
 		Language: executor.Language(request.Body.Language),
@@ -334,9 +341,6 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 		return conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 	})
 
-	// allow only one submit at a time per connection
-	submitSem := make(chan struct{}, 1)
-
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
@@ -351,20 +355,7 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		s.tryDispatchSubmit(connCtx, submitSem, int32(gameID), session.UserID, msg)
-	}
-}
-
-// tryDispatchSubmit runs processSubmit in a goroutine if no submit is already in progress.
-func (s *HTTPServer) tryDispatchSubmit(ctx context.Context, sem chan struct{}, gameID int32, userID uuid.UUID, msg ws.ClientMessage) {
-	select {
-	case sem <- struct{}{}:
-		go func(m ws.ClientMessage) {
-			defer func() { <-sem }()
-			s.processSubmit(ctx, gameID, userID, m)
-		}(msg)
-	default:
-		// submit already in progress, ignore
+		go s.processSubmit(connCtx, int32(gameID), session.UserID, msg)
 	}
 }
 
@@ -383,6 +374,16 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	if err != nil {
 		log.Printf("processSubmit: get problem error: %v", err)
 		s.broadcastError(gameID, userID, "failed to load problem")
+		return
+	}
+
+	if !s.executionService.TryAcquireSlot(userID) {
+		s.broadcastError(gameID, userID, "execution already in progress")
+		return
+	}
+	defer s.executionService.ReleaseSlot(userID)
+	if err := s.executionService.CheckRateLimit(userID); err != nil {
+		s.broadcastError(gameID, userID, "execution rate limit exceeded")
 		return
 	}
 
