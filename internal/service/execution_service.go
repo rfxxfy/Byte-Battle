@@ -29,8 +29,34 @@ type ExecutionService struct {
 	slots    sync.Map // uuid.UUID -> chan struct{} (per-user concurrency slot)
 }
 
-func NewExecutionService(exec executor.Executor) *ExecutionService {
-	return &ExecutionService{executor: exec, rl: DefaultRateLimitConfig}
+func NewExecutionService(exec executor.Executor, cfg ...RateLimitConfig) *ExecutionService {
+	rl := DefaultRateLimitConfig
+	if len(cfg) > 0 {
+		rl = cfg[0]
+	}
+	svc := &ExecutionService{executor: exec, rl: rl}
+	go svc.cleanupLoop()
+	return svc
+}
+
+// cleanupLoop periodically removes stale per-user entries from limiters and slots maps.
+// An entry is considered stale when the limiter is fully replenished (user has been
+// idle long enough for all tokens to recover) and no execution slot is held.
+func (s *ExecutionService) cleanupLoop() {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.limiters.Range(func(k, v any) bool {
+			if v.(*rate.Limiter).Tokens() >= float64(s.rl.Burst) {
+				s.limiters.Delete(k)
+				// Only delete the slot if no execution is in progress.
+				if ch, ok := s.slots.Load(k); ok && len(ch.(chan struct{})) == 0 {
+					s.slots.Delete(k)
+				}
+			}
+			return true
+		})
+	}
 }
 
 func (s *ExecutionService) CheckRateLimit(userID uuid.UUID) error {

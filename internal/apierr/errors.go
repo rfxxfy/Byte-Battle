@@ -26,8 +26,8 @@ const (
 	ErrInvalidCode          = "INVALID_CODE"
 	ErrTooManyAttempts      = "TOO_MANY_ATTEMPTS"
 	ErrCodeRecentlySent     = "CODE_RECENTLY_SENT"
-	ErrExecutionRateLimited  = "EXECUTION_RATE_LIMITED"
-	ErrExecutionInProgress   = "EXECUTION_IN_PROGRESS"
+	ErrExecutionRateLimited = "EXECUTION_RATE_LIMITED"
+	ErrExecutionInProgress  = "EXECUTION_IN_PROGRESS"
 	ErrUserNotFound         = "USER_NOT_FOUND"
 
 	ErrValidation = "VALIDATION_ERROR"
