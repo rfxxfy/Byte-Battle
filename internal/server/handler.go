@@ -177,7 +177,6 @@ func (s *HTTPServer) CompleteGame(ctx context.Context, req api.CompleteGameReque
 	if gameInfo.CreatorID != userID {
 		return nil, apierr.New(apierr.ErrNotGameCreator, "only the game creator can complete the game")
 	}
-
 	game, err := s.gameService.CompleteGame(ctx, req.Id, req.Body.WinnerId)
 	if err != nil {
 		return nil, err
@@ -223,13 +222,13 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 
 func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteRequestObject) (api.PostExecuteResponseObject, error) {
 	userID, _ := userIDFromContext(ctx)
-	if err := s.executionService.CheckRateLimit(userID); err != nil {
-		return nil, err
-	}
 	if !s.executionService.TryAcquireSlot(userID) {
 		return nil, apierr.New(apierr.ErrExecutionInProgress, "execution already in progress")
 	}
 	defer s.executionService.ReleaseSlot(userID)
+	if err := s.executionService.CheckRateLimit(userID); err != nil {
+		return nil, err
+	}
 	result, err := s.executionService.Execute(ctx, executor.ExecutionRequest{
 		Code:     request.Body.Code,
 		Language: executor.Language(request.Body.Language),
@@ -378,15 +377,15 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		return
 	}
 
-	if err := s.executionService.CheckRateLimit(userID); err != nil {
-		s.broadcastError(gameID, userID, "execution rate limit exceeded")
-		return
-	}
 	if !s.executionService.TryAcquireSlot(userID) {
 		s.broadcastError(gameID, userID, "execution already in progress")
 		return
 	}
 	defer s.executionService.ReleaseSlot(userID)
+	if err := s.executionService.CheckRateLimit(userID); err != nil {
+		s.broadcastError(gameID, userID, "execution rate limit exceeded")
+		return
+	}
 
 	accepted := true
 	var failedTest *int

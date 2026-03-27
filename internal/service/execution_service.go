@@ -39,24 +39,32 @@ func NewExecutionService(exec executor.Executor, cfg ...RateLimitConfig) *Execut
 	return svc
 }
 
-// cleanupLoop periodically removes stale per-user entries from limiters and slots maps.
-// An entry is considered stale when the limiter is fully replenished (user has been
-// idle long enough for all tokens to recover) and no execution slot is held.
 func (s *ExecutionService) cleanupLoop() {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for range ticker.C {
-		s.limiters.Range(func(k, v any) bool {
-			if v.(*rate.Limiter).Tokens() >= float64(s.rl.Burst) {
-				s.limiters.Delete(k)
-				// Only delete the slot if no execution is in progress.
-				if ch, ok := s.slots.Load(k); ok && len(ch.(chan struct{})) == 0 {
-					s.slots.Delete(k)
-				}
-			}
-			return true
-		})
+		s.runCleanup()
 	}
+}
+
+func (s *ExecutionService) runCleanup() {
+	s.limiters.Range(func(k, v any) bool {
+		if v.(*rate.Limiter).Tokens() >= float64(s.rl.Burst) {
+			s.limiters.Delete(k)
+			if ch, ok := s.slots.Load(k); ok && len(ch.(chan struct{})) == 0 {
+				s.slots.Delete(k)
+			}
+		}
+		return true
+	})
+	s.slots.Range(func(k, v any) bool {
+		if _, hasLimiter := s.limiters.Load(k); !hasLimiter {
+			if len(v.(chan struct{})) == 0 {
+				s.slots.Delete(k)
+			}
+		}
+		return true
+	})
 }
 
 func (s *ExecutionService) CheckRateLimit(userID uuid.UUID) error {
