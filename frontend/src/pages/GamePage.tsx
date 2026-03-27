@@ -91,39 +91,56 @@ export function GamePage() {
     return () => clearInterval(timer)
   }, [game?.status, fetchGame])
 
-  // Connect WebSocket when game is active
+  // Connect WebSocket when game is active, reconnect on unexpected close
   useEffect(() => {
     if (game?.status !== 'active' || !token) return
 
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(`${proto}//${location.host}/games/${gameId}/ws`, [token])
-    wsRef.current = ws
+    let stopped = false
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null
 
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished
-        if (msg.type === 'submission_result') {
-          setSubmissionResult(msg)
-          setSubmitting(false)
-        } else if (msg.type === 'game_finished') {
-          setWinner({ winner_id: msg.winner_id })
-          setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
+    const connect = () => {
+      if (stopped) return
+
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const ws = new WebSocket(`${proto}//${location.host}/api/games/${gameId}/ws`, [token])
+      wsRef.current = ws
+
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished
+          if (msg.type === 'submission_result') {
+            setSubmissionResult(msg)
+            setSubmitting(false)
+          } else if (msg.type === 'game_finished') {
+            setWinner({ winner_id: msg.winner_id })
+            setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
+          }
+        } catch {
+          // ignore malformed messages
         }
-      } catch {
-        // ignore malformed messages
+      }
+
+      ws.onerror = () => setActionError('Ошибка WebSocket-соединения')
+      ws.onclose = () => {
+        wsRef.current = null
+        setGame((prev) => {
+          if (prev?.status === 'finished') return prev
+          if (!stopped) {
+            setActionError('Переподключение...')
+            retryTimeout = setTimeout(connect, 3000)
+          }
+          return prev
+        })
       }
     }
 
-    ws.onerror = () => setActionError('Ошибка WebSocket-соединения')
-    ws.onclose = () => {
-      setGame((prev) => {
-        if (prev?.status === 'finished') return prev
-        setActionError('Соединение с сервером разорвано')
-        return prev
-      })
-    }
+    connect()
 
-    return () => ws.close()
+    return () => {
+      stopped = true
+      if (retryTimeout) clearTimeout(retryTimeout)
+      wsRef.current?.close()
+    }
   }, [game?.status, token, gameId])
 
   const handleStart = async () => {

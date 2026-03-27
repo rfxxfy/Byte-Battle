@@ -343,11 +343,17 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	})
 	s.hub.Broadcast(int32(gameID), joinedMsg)
 
+	connCtx, connCancel := context.WithCancel(context.Background())
+	defer connCancel()
+
 	conn.SetReadLimit(32 * 1024)
 	conn.SetReadDeadline(time.Now().Add(ws.PongWait)) //nolint:errcheck // not actionable
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(ws.PongWait))
 	})
+
+	// allow only one submit at a time per connection
+	submitSem := make(chan struct{}, 1)
 
 	for {
 		_, data, err := conn.ReadMessage()
@@ -363,7 +369,15 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		s.processSubmit(r.Context(), int32(gameID), session.UserID, msg)
+		select {
+		case submitSem <- struct{}{}:
+			go func(m ws.ClientMessage) {
+				defer func() { <-submitSem }()
+				s.processSubmit(connCtx, int32(gameID), session.UserID, m)
+			}(msg)
+		default:
+			// submit already in progress, ignore
+		}
 	}
 }
 

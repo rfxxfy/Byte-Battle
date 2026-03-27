@@ -220,15 +220,6 @@ func (e *DockerExecutor) tryFillPool(ctx context.Context, lang Language, setting
 	}
 }
 
-// sandboxSecurityOpt returns the no-new-privileges security option for sandboxed
-// containers. Set EXECUTOR_NO_NEW_PRIVS=false to disable it — needed on hosts
-// where AppArmor + cap-drop ALL blocks exec (e.g. Ubuntu 24.04 local dev).
-func sandboxSecurityOpt() []string {
-	if os.Getenv("EXECUTOR_NO_NEW_PRIVS") == "false" {
-		return nil
-	}
-	return []string{"no-new-privileges:true"}
-}
 
 func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *LangSettings) (string, error) {
 	memLimit := langConfig.MemoryLimit
@@ -246,7 +237,7 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 		},
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
-		SecurityOpt: sandboxSecurityOpt(),
+		SecurityOpt: []string{"no-new-privileges:true"},
 		Tmpfs: map[string]string{
 			"/tmp": "",
 			"/run": "",
@@ -408,7 +399,7 @@ func (e *DockerExecutor) createContainerWithLimits(ctx context.Context, langConf
 		},
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
-		SecurityOpt: sandboxSecurityOpt(),
+		SecurityOpt: []string{"no-new-privileges:true"},
 		Tmpfs: map[string]string{
 			"/tmp": "",
 			"/run": "",
