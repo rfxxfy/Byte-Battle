@@ -285,6 +285,31 @@ func TestGame_InvalidTransitions(t *testing.T) {
 	})
 }
 
+func TestGame_OwnershipChecks(t *testing.T) {
+	t.Run("non-creator cannot delete", func(t *testing.T) {
+		g := createGame(t)
+		resp := doAuth(t, http.MethodDelete, fmt.Sprintf("/api/games/%d", g.Game.ID), nil, token2)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, "NOT_GAME_CREATOR", errCode(t, resp))
+	})
+
+	t.Run("non-creator cannot cancel", func(t *testing.T) {
+		g := createGame(t)
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/cancel", g.Game.ID), nil, token2)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, "NOT_GAME_CREATOR", errCode(t, resp))
+	})
+
+	t.Run("non-creator cannot complete", func(t *testing.T) {
+		g := createActiveGame(t)
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/complete", g.Game.ID), map[string]any{
+			"winner_id": user1ID.String(),
+		}, token2)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Equal(t, "NOT_GAME_CREATOR", errCode(t, resp))
+	})
+}
+
 func TestGame_CreateWithUnknownProblemID(t *testing.T) {
 	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
 		"problem_id": "does-not-exist",
