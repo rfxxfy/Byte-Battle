@@ -5,6 +5,21 @@
 #   IMAGE=ghcr.io/owner/byte-battle
 
 services:
+  caddy:
+    image: caddy:2.11.2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv/frontend:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
   migrate:
     image: ${IMAGE}:latest
     entrypoint: ["/usr/local/bin/migrate"]
@@ -24,13 +39,11 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    ports:
-      - "${HTTP_PORT}:8080"
     environment:
       DB_DSN: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable
       HTTP_PORT: "8080"
       PROBLEMS_DIR: /app/problems
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      ALLOWED_ORIGINS: https://bytebattle.online
     volumes:
       - ./problems:/app/problems:ro
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
@@ -72,3 +85,5 @@ services:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
