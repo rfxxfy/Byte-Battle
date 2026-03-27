@@ -100,7 +100,7 @@ export function GamesPage() {
   }
 
   const rowAction = (game: Game) => {
-    const isParticipant = userId != null && game.participant_ids.includes(userId)
+    const isParticipant = userId != null && game.participants.some((p) => p.id === userId)
 
     if (game.status === 'pending' && !isParticipant) {
       return (
@@ -193,7 +193,7 @@ export function GamesPage() {
                       {statusLabel[g.status]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{g.participant_ids.length}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{g.participants.length}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {formatDate(g.created_at)}
                   </td>
