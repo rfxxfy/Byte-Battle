@@ -28,6 +28,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
         with:
@@ -49,14 +52,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # ─── Build frontend ─────────────────────────────────────────────────
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+
       # ─── Deploy to VPS ─────────────────────────────────────────────────
-      - name: Copy compose file to server
+      - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: docker-compose.prod.yaml
+          source: "docker-compose.prod.yaml,Caddyfile,frontend/dist"
           target: /opt/bytebattle/
 
       - name: Deploy to server
@@ -75,8 +89,8 @@ jobs:
             IMAGE=${{ env.IMAGE_LC }}
             sed -i "s|^IMAGE=.*|IMAGE=${IMAGE}|" .env || echo "IMAGE=${IMAGE}" >> .env
 
-            # Pull new image
-            docker compose -f docker-compose.prod.yaml pull app
+            # Pull new images
+            docker compose -f docker-compose.prod.yaml pull app caddy
 
-            # Run migrations and restart app (migrate service runs first, then app)
+            # Run migrations and restart all services
             docker compose -f docker-compose.prod.yaml up -d
