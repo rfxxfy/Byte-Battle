@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"bytebattle/internal/api"
@@ -211,49 +210,21 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 	return api.CancelGame200JSONResponse{Game: toAPIGame(game, participantIDs)}, nil
 }
 
-func (s *HTTPServer) handleExecute(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		writeHTTPError(w, apierr.New(apierr.ErrInvalidToken, "missing or invalid Authorization header"))
-		return
-	}
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-	if _, err := s.sessionService.ValidateToken(r.Context(), token); err != nil {
-		writeHTTPError(w, err)
-		return
-	}
-
-	var req struct {
-		Code     string `json:"code"`
-		Language string `json:"language"`
-		Input    string `json:"input"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid request body"})
-		return
-	}
-
-	result, err := s.executionService.Execute(r.Context(), executor.ExecutionRequest{
-		Code:     req.Code,
-		Language: executor.Language(req.Language),
-		Stdin:    req.Input,
+func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteRequestObject) (api.PostExecuteResponseObject, error) {
+	result, err := s.executionService.Execute(ctx, executor.ExecutionRequest{
+		Code:     request.Body.Code,
+		Language: executor.Language(request.Body.Language),
+		Stdin:    request.Body.Input,
 	})
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-		return
+		return nil, err
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"stdout":       result.Stdout,
-		"stderr":       result.Stderr,
-		"exit_code":    result.ExitCode,
-		"time_used_ms": result.TimeUsed.Milliseconds(),
-	})
+	return api.PostExecute200JSONResponse{
+		Stdout:     result.Stdout,
+		Stderr:     result.Stderr,
+		ExitCode:   result.ExitCode,
+		TimeUsedMs: int(result.TimeUsed.Milliseconds()),
+	}, nil
 }
 
 func toAPIGame(g sqlcdb.Game, participants []service.Participant) api.Game {
