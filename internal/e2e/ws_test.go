@@ -13,9 +13,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 
 	"bytebattle/internal/app"
 	"bytebattle/internal/config"
+	"bytebattle/internal/service"
 	"bytebattle/internal/ws"
 )
 
@@ -253,12 +255,14 @@ func TestGameWS_ConcurrentSlotRejected(t *testing.T) {
 }
 
 func TestGameWS_TwoPlayersRace_OnlyOneWins(t *testing.T) {
-	g := createActiveGame(t)
+	// Use a custom server with unlimited rate to avoid cross-test token exhaustion.
+	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 100})
+	g := createActiveGameOnServer(t, srv)
 	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 
-	conn1 := wsConnect(t, wsPath, token1)
+	conn1 := wsConnectOnServer(t, srv, wsPath, token1)
 	wsReadUntilType(t, conn1, ws.TypePlayerJoined)
-	conn2 := wsConnect(t, wsPath, token2)
+	conn2 := wsConnectOnServer(t, srv, wsPath, token2)
 	wsReadUntilType(t, conn1, ws.TypePlayerJoined) // user2 joined (on conn1)
 	wsReadUntilType(t, conn2, ws.TypePlayerJoined)
 
