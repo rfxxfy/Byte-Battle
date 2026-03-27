@@ -26,6 +26,7 @@ import (
 	"bytebattle/internal/executor"
 	"bytebattle/internal/migrations"
 	"bytebattle/internal/problems"
+	"bytebattle/internal/service"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -299,4 +300,84 @@ func wsDial(t *testing.T, path, token string) (*websocket.Conn, *http.Response) 
 
 func wsURL(path string) string {
 	return "ws" + testSrv.URL[len("http"):] + path
+}
+
+type blockingExecutor struct {
+	once    sync.Once
+	started chan struct{}
+	unblock chan struct{}
+}
+
+func newBlockingExecutor() *blockingExecutor {
+	return &blockingExecutor{
+		started: make(chan struct{}),
+		unblock: make(chan struct{}),
+	}
+}
+
+func (e *blockingExecutor) Run(ctx context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
+	e.once.Do(func() { close(e.started) })
+	select {
+	case <-e.unblock:
+		return executor.ExecutionResult{Stdout: "wrong"}, nil
+	case <-ctx.Done():
+		return executor.ExecutionResult{}, ctx.Err()
+	}
+}
+
+// newGameServer creates a test HTTP server with the given executor and optional rate limit config.
+func newGameServer(t *testing.T, exec executor.Executor, rlCfg ...service.RateLimitConfig) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, exec, testLoader, config.Load(), rlCfg...))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// doOnServer performs an authenticated HTTP request against a custom test server.
+func doOnServer(t *testing.T, srv *httptest.Server, method, path string, body any, token string) *http.Response {
+	t.Helper()
+	var buf bytes.Buffer
+	if body != nil {
+		require.NoError(t, json.NewEncoder(&buf).Encode(body))
+	}
+	req, err := http.NewRequest(method, srv.URL+path, &buf)
+	require.NoError(t, err)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := srv.Client().Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// createActiveGameOnServer creates a pending game as user1, has user2 join, then starts it.
+func createActiveGameOnServer(t *testing.T, srv *httptest.Server) gameResp {
+	t.Helper()
+	r := doOnServer(t, srv, http.MethodPost, "/api/games", map[string]any{"problem_id": "test-problem"}, token1)
+	require.Equal(t, http.StatusCreated, r.StatusCode)
+	var g gameResp
+	decodeJSON(t, r, &g)
+
+	r = doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
+	require.Equal(t, http.StatusOK, r.StatusCode)
+	r.Body.Close()
+
+	r = doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/%d/start", g.Game.ID), nil, token1)
+	require.Equal(t, http.StatusOK, r.StatusCode)
+	var started gameResp
+	decodeJSON(t, r, &started)
+	return started
+}
+
+// wsConnectOnServer dials a WebSocket on a custom test server.
+func wsConnectOnServer(t *testing.T, srv *httptest.Server, path, token string) *websocket.Conn {
+	t.Helper()
+	u := "ws" + srv.URL[len("http"):] + path
+	conn, _, err := wsDialer(token).Dial(u, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+	return conn
 }
