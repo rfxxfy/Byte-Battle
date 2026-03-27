@@ -192,15 +192,15 @@ func TestExecutionService_Cleanup_RemovesOrphanedSlot(t *testing.T) {
 	svc.TryAcquireSlot(userID) // slot held during first cleanup
 
 	time.Sleep(5 * time.Millisecond) // limiter replenishes
-	svc.runCleanup()                  // limiter deleted, slot preserved (still in flight)
+	svc.runCleanup()                 // limiter deleted, slot preserved (still in flight)
 
 	_, limiterExists := svc.limiters.Load(userID)
 	_, slotExists := svc.slots.Load(userID)
 	require.False(t, limiterExists, "limiter should be gone after first cleanup")
 	require.True(t, slotExists, "slot should survive while in flight")
 
-	svc.ReleaseSlot(userID)  // execution finishes
-	svc.runCleanup()          // second cleanup: orphaned slot should now be removed
+	svc.ReleaseSlot(userID) // execution finishes
+	svc.runCleanup()        // second cleanup: orphaned slot should now be removed
 
 	_, slotExists = svc.slots.Load(userID)
 	assert.False(t, slotExists, "orphaned slot must be removed on second cleanup")
