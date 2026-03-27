@@ -22,11 +22,13 @@ const (
 	ErrInvalidToken    = "INVALID_TOKEN"
 	ErrProblemNotFound = "PROBLEM_NOT_FOUND"
 
-	ErrInvalidEmail     = "INVALID_EMAIL"
-	ErrInvalidCode      = "INVALID_CODE"
-	ErrTooManyAttempts  = "TOO_MANY_ATTEMPTS"
-	ErrCodeRecentlySent = "CODE_RECENTLY_SENT"
-	ErrUserNotFound     = "USER_NOT_FOUND"
+	ErrInvalidEmail         = "INVALID_EMAIL"
+	ErrInvalidCode          = "INVALID_CODE"
+	ErrTooManyAttempts      = "TOO_MANY_ATTEMPTS"
+	ErrCodeRecentlySent     = "CODE_RECENTLY_SENT"
+	ErrExecutionRateLimited  = "EXECUTION_RATE_LIMITED"
+	ErrExecutionInProgress   = "EXECUTION_IN_PROGRESS"
+	ErrUserNotFound         = "USER_NOT_FOUND"
 
 	ErrValidation = "VALIDATION_ERROR"
 )
@@ -52,7 +54,7 @@ func httpStatusCode(code string) int {
 		return http.StatusUnauthorized
 	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound, ErrUserNotFound, ErrNotParticipant:
 		return http.StatusNotFound
-	case ErrTooManyAttempts, ErrCodeRecentlySent:
+	case ErrTooManyAttempts, ErrCodeRecentlySent, ErrExecutionRateLimited, ErrExecutionInProgress:
 		return http.StatusTooManyRequests
 	case ErrInvalidEmail, ErrInvalidCode:
 		return http.StatusBadRequest
