@@ -369,15 +369,20 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		select {
-		case submitSem <- struct{}{}:
-			go func(m ws.ClientMessage) {
-				defer func() { <-submitSem }()
-				s.processSubmit(connCtx, int32(gameID), session.UserID, m)
-			}(msg)
-		default:
-			// submit already in progress, ignore
-		}
+		s.tryDispatchSubmit(connCtx, submitSem, int32(gameID), session.UserID, msg)
+	}
+}
+
+// tryDispatchSubmit runs processSubmit in a goroutine if no submit is already in progress.
+func (s *HTTPServer) tryDispatchSubmit(ctx context.Context, sem chan struct{}, gameID int32, userID uuid.UUID, msg ws.ClientMessage) {
+	select {
+	case sem <- struct{}{}:
+		go func(m ws.ClientMessage) {
+			defer func() { <-sem }()
+			s.processSubmit(ctx, gameID, userID, m)
+		}(msg)
+	default:
+		// submit already in progress, ignore
 	}
 }
 

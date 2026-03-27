@@ -220,7 +220,6 @@ func (e *DockerExecutor) tryFillPool(ctx context.Context, lang Language, setting
 	}
 }
 
-
 func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *LangSettings) (string, error) {
 	memLimit := langConfig.MemoryLimit
 	if memLimit == 0 {
