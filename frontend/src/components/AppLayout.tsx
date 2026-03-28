@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 
 export function AppLayout() {
-  const { logout, email } = useAuth()
+  const { logout } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -47,10 +47,19 @@ export function AppLayout() {
               </NavLink>
             </nav>
           </div>
-          <div className="flex items-center gap-3">
-            {email && (
-              <span className="text-xs text-muted-foreground">{email}</span>
-            )}
+          <div className="flex items-center gap-2">
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                `px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                }`
+              }
+            >
+              Профиль
+            </NavLink>
             <Button
               variant="ghost"
               size="sm"
