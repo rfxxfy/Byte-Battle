@@ -31,7 +31,7 @@ export function ProblemPage() {
     setCreating(true)
     setCreateError('')
     try {
-      const res = await createGame(problem.id)
+      const res = await createGame([problem.id])
       navigate(`/games/${res.game.id}`)
     } catch (err) {
       setCreateError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))

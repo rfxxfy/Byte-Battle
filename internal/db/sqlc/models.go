@@ -10,21 +10,27 @@ import (
 )
 
 type Game struct {
-	ID          int32              `json:"id"`
-	ProblemID   string             `json:"problem_id"`
-	CreatorID   uuid.UUID          `json:"creator_id"`
-	WinnerID    uuid.NullUUID      `json:"winner_id"`
-	Status      string             `json:"status"`
-	StartedAt   pgtype.Timestamptz `json:"started_at"`
-	CompletedAt pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	ID                  int32              `json:"id"`
+	CreatorID           uuid.UUID          `json:"creator_id"`
+	WinnerID            uuid.NullUUID      `json:"winner_id"`
+	Status              string             `json:"status"`
+	StartedAt           pgtype.Timestamptz `json:"started_at"`
+	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	CurrentProblemIndex int32              `json:"current_problem_index"`
 }
 
 type GameParticipant struct {
 	ID     int32     `json:"id"`
 	GameID int32     `json:"game_id"`
 	UserID uuid.UUID `json:"user_id"`
+}
+
+type GameProblem struct {
+	GameID       int32  `json:"game_id"`
+	ProblemIndex int32  `json:"problem_index"`
+	ProblemID    string `json:"problem_id"`
 }
 
 type Session struct {

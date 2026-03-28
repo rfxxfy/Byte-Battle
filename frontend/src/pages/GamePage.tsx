@@ -35,6 +35,11 @@ interface GameFinished {
   winner_id: string
 }
 
+interface RoundAdvanced {
+  problem_id: string
+  problem_index: number
+}
+
 const participantLabel = (p: GameParticipant) => p.name ?? p.id.slice(0, 8)
 
 export function GamePage() {
@@ -61,17 +66,13 @@ export function GamePage() {
   const [winner, setWinner] = useState<GameFinished | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
-  const problemLoadedRef = useRef(false)
 
   const fetchGame = useCallback(async () => {
     try {
       const res = await getGame(gameId)
       setGame(res.game)
-      if (!problemLoadedRef.current) {
-        problemLoadedRef.current = true
-        const pRes = await getProblem(res.game.problem_id)
-        setProblem(pRes.problem)
-      }
+      const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
+      setProblem(pRes.problem)
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     } finally {
@@ -107,10 +108,23 @@ export function GamePage() {
 
       ws.onmessage = (e) => {
         try {
-          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished
+          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & RoundAdvanced
           if (msg.type === 'submission_result') {
             setSubmissionResult(msg)
             setSubmitting(false)
+          } else if (msg.type === 'round_advanced') {
+            setGame((prev) => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                current_problem_index: msg.problem_index,
+              }
+            })
+            getProblem(msg.problem_id)
+              .then((res) => setProblem(res.problem))
+              .catch(() => {
+                setActionError('Не удалось загрузить следующую задачу')
+              })
           } else if (msg.type === 'game_finished') {
             setWinner({ winner_id: msg.winner_id })
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
@@ -335,6 +349,10 @@ export function GamePage() {
           </Link>
           <span className="text-muted-foreground/40">|</span>
           <span className="text-sm font-medium">{problem.title}</span>
+          <span className="text-muted-foreground/40">|</span>
+          <span className="text-xs text-muted-foreground">
+            {game.current_problem_index + 1}/{game.problem_ids.length}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {isActive && (
@@ -359,6 +377,9 @@ export function GamePage() {
         <div className="w-2/5 flex flex-col gap-3 overflow-y-auto">
           <div className="rounded-lg border border-border/60 bg-card/50 p-5 flex-shrink-0">
             <h2 className="text-base font-semibold mb-3">{problem.title}</h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              Прогресс: {game.current_problem_index + 1}/{game.problem_ids.length}
+            </p>
             <div className="flex items-center gap-2 flex-wrap mb-4">
               <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
                 {problem.time_limit_ms} мс

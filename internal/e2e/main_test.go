@@ -356,7 +356,7 @@ func doOnServer(t *testing.T, srv *httptest.Server, method, path string, body an
 // createActiveGameOnServer creates a pending game as user1, has user2 join, then starts it.
 func createActiveGameOnServer(t *testing.T, srv *httptest.Server) gameResp {
 	t.Helper()
-	r := doOnServer(t, srv, http.MethodPost, "/api/games", map[string]any{"problem_id": "test-problem"}, token1)
+	r := doOnServer(t, srv, http.MethodPost, "/api/games", map[string]any{"problem_ids": []string{"test-problem"}}, token1)
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
 	decodeJSON(t, r, &g)

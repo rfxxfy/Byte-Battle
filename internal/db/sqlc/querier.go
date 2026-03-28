@@ -12,11 +12,14 @@ import (
 
 type Querier interface {
 	AddGameParticipant(ctx context.Context, arg AddGameParticipantParams) error
+	AddGameProblem(ctx context.Context, arg AddGameProblemParams) error
+	AdvanceGameProblem(ctx context.Context, arg AdvanceGameProblemParams) (Game, error)
 	CancelGame(ctx context.Context, id int32) (Game, error)
 	CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error)
 	CountGameParticipants(ctx context.Context, gameID int32) (int64, error)
+	CountGameProblems(ctx context.Context, gameID int32) (int64, error)
 	CountGames(ctx context.Context) (int64, error)
-	CreateGame(ctx context.Context, arg CreateGameParams) (Game, error)
+	CreateGame(ctx context.Context, creatorID uuid.UUID) (Game, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (User, error)
@@ -27,6 +30,9 @@ type Querier interface {
 	DeleteVerificationCode(ctx context.Context, email string) error
 	GetGameByID(ctx context.Context, id int32) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
+	GetGameProblemIDByIndex(ctx context.Context, arg GetGameProblemIDByIndexParams) (string, error)
+	GetGameProblemIDs(ctx context.Context, gameID int32) ([]string, error)
+	GetGameProblemIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetGameProblemIDsByGameIDsRow, error)
 	GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error)
 	GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)

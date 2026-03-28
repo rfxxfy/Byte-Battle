@@ -13,17 +13,27 @@ import (
 )
 
 type SubmissionResult struct {
-	Accepted   bool
-	FailedTest *int
-	Stdout     string
-	Stderr     string
-	WinnerID   uuid.UUID
+	Accepted        bool
+	AlreadyAdvanced bool
+	FailedTest      *int
+	Stdout          string
+	Stderr          string
+	WinnerID        uuid.UUID
+	ProblemID       string
+	ProblemIdx      int
 }
 
 type SubmissionService struct {
 	execSvc  *ExecutionService
 	gameSvc  *GameService
 	problems *problems.Loader
+}
+
+type executionOutcome struct {
+	accepted   bool
+	failedTest *int
+	stdout     string
+	stderr     string
 }
 
 func NewSubmissionService(execSvc *ExecutionService, gameSvc *GameService, loader *problems.Loader) *SubmissionService {
@@ -40,19 +50,50 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 		return SubmissionResult{}, err
 	}
 
+	problem, expectedProblemIndex, err := s.getCurrentProblemForSubmission(ctx, gameID)
+	if err != nil {
+		return SubmissionResult{}, err
+	}
+
+	outcome := s.executeAgainstProblem(ctx, problem, code, language)
+	if !outcome.accepted {
+		return SubmissionResult{
+			Accepted:   false,
+			FailedTest: outcome.failedTest,
+			Stdout:     outcome.stdout,
+			Stderr:     outcome.stderr,
+		}, nil
+	}
+
+	return s.completeAcceptedSubmission(ctx, gameID, userID, expectedProblemIndex)
+}
+
+func (s *SubmissionService) getCurrentProblemForSubmission(ctx context.Context, gameID int) (*problems.Problem, int32, error) {
 	game, err := s.gameSvc.GetGame(ctx, gameID)
 	if err != nil {
-		return SubmissionResult{}, fmt.Errorf("get game: %w", err)
+		return nil, 0, fmt.Errorf("get game: %w", err)
 	}
+	expectedProblemIndex := game.CurrentProblemIndex
 
-	problem, err := s.problems.Get(game.ProblemID)
+	problemID, err := s.gameSvc.GetGameProblemIDByIndex(ctx, int32(gameID), expectedProblemIndex)
 	if err != nil {
-		return SubmissionResult{}, fmt.Errorf("get problem: %w", err)
+		return nil, 0, fmt.Errorf("get game problem by index: %w", err)
 	}
 
-	accepted := true
-	var failedTest *int
-	var stdout, stderr string
+	problem, err := s.problems.Get(problemID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("get problem: %w", err)
+	}
+	return problem, expectedProblemIndex, nil
+}
+
+func (s *SubmissionService) executeAgainstProblem(
+	ctx context.Context,
+	problem *problems.Problem,
+	code string,
+	language executor.Language,
+) executionOutcome {
+	outcome := executionOutcome{accepted: true}
 
 	for i, tc := range problem.TestCases {
 		result, execErr := s.execSvc.Execute(ctx, executor.ExecutionRequest{
@@ -60,36 +101,48 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 			Language: language,
 			Stdin:    tc.Input,
 		})
-		stdout = result.Stdout
-		stderr = result.Stderr
+		outcome.stdout = result.Stdout
+		outcome.stderr = result.Stderr
 
 		if execErr != nil || !problems.Match(result.Stdout, tc.Expected) {
-			accepted = false
+			outcome.accepted = false
 			idx := i
-			failedTest = &idx
+			outcome.failedTest = &idx
 			break
 		}
 	}
 
-	if !accepted {
-		return SubmissionResult{
-			Accepted:   false,
-			FailedTest: failedTest,
-			Stdout:     stdout,
-			Stderr:     stderr,
-		}, nil
-	}
+	return outcome
+}
 
-	completed, err := s.gameSvc.CompleteGameAsWinner(ctx, gameID, userID)
+func (s *SubmissionService) completeAcceptedSubmission(
+	ctx context.Context,
+	gameID int,
+	userID uuid.UUID,
+	expectedProblemIndex int32,
+) (SubmissionResult, error) {
+	updatedGame, finished, err := s.gameSvc.HandleAcceptedSubmission(ctx, gameID, userID, expectedProblemIndex)
 	if err != nil {
 		var appErr *apierr.AppError
-		if errors.As(err, &appErr) && appErr.ErrorCode == apierr.ErrGameNotInProgress {
-			// Another player already won — submission is still accepted but we
-			// don't set WinnerID (the other player's submit already broadcast it).
-			return SubmissionResult{Accepted: true}, nil
+		if errors.As(err, &appErr) && (appErr.ErrorCode == apierr.ErrGameNotInProgress || appErr.ErrorCode == apierr.ErrRoundAlreadyAdvanced) {
+			// Another player already won or advanced the round — skip broadcast,
+			// the winner's goroutine already sent round_advanced / game_finished.
+			return SubmissionResult{Accepted: true, AlreadyAdvanced: true}, nil
 		}
 		return SubmissionResult{}, fmt.Errorf("complete game: %w", err)
 	}
 
-	return SubmissionResult{Accepted: true, WinnerID: completed.WinnerID.UUID}, nil
+	if !finished {
+		nextProblemID, nextProblemErr := s.gameSvc.GetGameProblemIDByIndex(ctx, int32(gameID), updatedGame.CurrentProblemIndex)
+		if nextProblemErr != nil {
+			return SubmissionResult{}, fmt.Errorf("get next game problem by index: %w", nextProblemErr)
+		}
+		return SubmissionResult{
+			Accepted:   true,
+			ProblemID:  nextProblemID,
+			ProblemIdx: int(updatedGame.CurrentProblemIndex),
+		}, nil
+	}
+
+	return SubmissionResult{Accepted: true, WinnerID: updatedGame.WinnerID.UUID}, nil
 }

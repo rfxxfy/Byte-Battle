@@ -118,7 +118,7 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	}
 
 	r := doFailing(http.MethodPost, "/api/games", map[string]any{
-		"problem_id": "test-problem",
+		"problem_ids": []string{"test-problem"},
 	})
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
@@ -180,7 +180,7 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 		return resp
 	}
 
-	r := doSrv(http.MethodPost, "/api/games", map[string]any{"problem_id": "test-problem"}, token1)
+	r := doSrv(http.MethodPost, "/api/games", map[string]any{"problem_ids": []string{"test-problem"}}, token1)
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
 	decodeJSON(t, r, &g)
@@ -230,6 +230,54 @@ func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 
 	finished := wsReadUntilType(t, conn, ws.TypeGameFinished)
 	assert.Equal(t, ws.TypeGameFinished, finished.Type)
+	assert.Equal(t, user1ID, finished.WinnerID)
+}
+
+func TestGameWS_AcceptedSubmitAdvancesRound(t *testing.T) {
+	// Use isolated server with unlimited rate to avoid shared token limiter flakiness.
+	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 100})
+
+	resp := doOnServer(t, srv, http.MethodPost, "/api/games", map[string]any{
+		"problem_ids": []string{"test-problem", "test-problem"},
+	}, token1)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	var g gameResp
+	decodeJSON(t, resp, &g)
+
+	joinResp := doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
+	require.Equal(t, http.StatusOK, joinResp.StatusCode)
+	joinResp.Body.Close()
+
+	startResp := doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/%d/start", g.Game.ID), nil, token1)
+	require.Equal(t, http.StatusOK, startResp.StatusCode)
+	startResp.Body.Close()
+
+	conn := wsConnectOnServer(t, srv, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
+	wsReadUntilType(t, conn, ws.TypePlayerJoined)
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "solution",
+		Language: "go",
+	}))
+
+	result := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
+	assert.True(t, result.Accepted)
+
+	round := wsReadUntilType(t, conn, ws.TypeRoundAdvanced)
+	assert.Equal(t, "test-problem", round.ProblemID)
+	assert.Equal(t, 1, round.ProblemIdx)
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "solution",
+		Language: "go",
+	}))
+
+	secondResult := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
+	assert.True(t, secondResult.Accepted)
+
+	finished := wsReadUntilType(t, conn, ws.TypeGameFinished)
 	assert.Equal(t, user1ID, finished.WinnerID)
 }
 
