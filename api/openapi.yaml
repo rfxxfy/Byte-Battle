@@ -625,6 +625,8 @@ components:
 
     CreateGameRequest:
       type: object
+      required:
+        - problem_ids
       properties:
         problem_ids:
           type: array

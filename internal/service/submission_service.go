@@ -13,13 +13,14 @@ import (
 )
 
 type SubmissionResult struct {
-	Accepted   bool
-	FailedTest *int
-	Stdout     string
-	Stderr     string
-	WinnerID   uuid.UUID
-	ProblemID  string
-	ProblemIdx int
+	Accepted        bool
+	AlreadyAdvanced bool
+	FailedTest      *int
+	Stdout          string
+	Stderr          string
+	WinnerID        uuid.UUID
+	ProblemID       string
+	ProblemIdx      int
 }
 
 type SubmissionService struct {
@@ -124,9 +125,9 @@ func (s *SubmissionService) completeAcceptedSubmission(
 	if err != nil {
 		var appErr *apierr.AppError
 		if errors.As(err, &appErr) && (appErr.ErrorCode == apierr.ErrGameNotInProgress || appErr.ErrorCode == apierr.ErrRoundAlreadyAdvanced) {
-			// Another player already won — submission is still accepted but we
-			// don't set WinnerID (the other player's submit already broadcast it).
-			return SubmissionResult{Accepted: true}, nil
+			// Another player already won or advanced the round — skip broadcast,
+			// the winner's goroutine already sent round_advanced / game_finished.
+			return SubmissionResult{Accepted: true, AlreadyAdvanced: true}, nil
 		}
 		return SubmissionResult{}, fmt.Errorf("complete game: %w", err)
 	}

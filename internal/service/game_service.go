@@ -23,7 +23,7 @@ const (
 	gameStatusActive    = "active"
 	gameStatusFinished  = "finished"
 	gameStatusCancelled = "cancelled"
-	maxGameProblems     = 20
+	maxGameProblems     = 20 // sync with CHECK (problem_index < 20) in migration 000009
 )
 
 type GameService struct {
@@ -172,10 +172,14 @@ func (s *GameService) GetGameProblemIDs(ctx context.Context, gameID int32) ([]st
 }
 
 func (s *GameService) GetGameProblemIDByIndex(ctx context.Context, gameID, problemIndex int32) (string, error) {
-	return s.q.GetGameProblemIDByIndex(ctx, sqlcdb.GetGameProblemIDByIndexParams{
+	id, err := s.q.GetGameProblemIDByIndex(ctx, sqlcdb.GetGameProblemIDByIndexParams{
 		GameID:       gameID,
 		ProblemIndex: problemIndex,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", apierr.New(apierr.ErrGameNotFound, "game problem not found")
+	}
+	return id, err
 }
 
 func (s *GameService) GetGameProblemIDsByGameIDs(ctx context.Context, gameIDs []int32) (map[int32][]string, error) {

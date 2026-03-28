@@ -3,7 +3,7 @@ ALTER TABLE games
 
 CREATE TABLE game_problems (
     game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-    problem_index INTEGER NOT NULL CHECK (problem_index >= 0 AND problem_index < 20),
+    problem_index INTEGER NOT NULL CHECK (problem_index >= 0 AND problem_index < 20), -- sync with maxGameProblems in game_service.go
     problem_id TEXT NOT NULL,
     PRIMARY KEY (game_id, problem_index)
 );

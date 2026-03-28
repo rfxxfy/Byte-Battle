@@ -108,12 +108,7 @@ func (s *HTTPServer) GetProblem(_ context.Context, req api.GetProblemRequestObje
 func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestObject) (api.CreateGameResponseObject, error) {
 	userID, _ := userIDFromContext(ctx)
 
-	problemIDs := []string{}
-	if req.Body.ProblemIds != nil {
-		problemIDs = append(problemIDs, *req.Body.ProblemIds...)
-	}
-
-	game, err := s.gameService.CreateGame(ctx, userID, problemIDs)
+	game, err := s.gameService.CreateGame(ctx, userID, req.Body.ProblemIds)
 	if err != nil {
 		return nil, err
 	}
@@ -405,6 +400,11 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		} else {
 			s.broadcastError(gameID, userID, "internal error")
 		}
+		return
+	}
+
+	if result.AlreadyAdvanced {
+		// Another goroutine already broadcast round_advanced / game_finished — nothing to do.
 		return
 	}
 
