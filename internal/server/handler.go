@@ -304,6 +304,7 @@ func toAPIProblem(p *problems.Problem) api.Problem {
 		TimeLimitMs:   p.Meta.TimeLimitMs,
 		MemoryLimitMb: p.Meta.MemoryLimitMb,
 		TestCount:     &testCount,
+		StarterCode:   p.Meta.StarterCode,
 	}
 }
 

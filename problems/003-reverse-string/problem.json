@@ -1,7 +1,12 @@
 {
   "title": "Reverse String",
-  "description": "Given a string, print it reversed.",
+  "description": "Given a string on a single line, print it reversed.\n\n**Example:**\n```\nhello\n```\n**Output:** `olleh`",
   "difficulty": "easy",
   "time_limit_ms": 1000,
-  "memory_limit_mb": 256
+  "memory_limit_mb": 256,
+  "starter_code": {
+    "python": "s = input()\n\n# your solution here\n",
+    "go": "package main\n\nimport (\n\t\"bufio\"\n\t\"fmt\"\n\t\"os\"\n)\n\nfunc main() {\n\treader := bufio.NewReader(os.Stdin)\n\tvar s string\n\tfmt.Fscan(reader, &s)\n\n\t// your solution here\n}\n",
+    "javascript": "const s = require('fs').readFileSync('/dev/stdin', 'utf8').trim()\n\n// your solution here\n"
+  }
 }

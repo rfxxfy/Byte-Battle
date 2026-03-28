@@ -170,6 +170,9 @@ type Problem struct {
 	Id            string            `json:"id"`
 	MemoryLimitMb int               `json:"memory_limit_mb"`
 
+	// StarterCode Starter code templates per language (python, go, javascript)
+	StarterCode map[string]string `json:"starter_code,omitempty"`
+
 	// TestCount Number of test cases
 	TestCount   *int   `json:"test_count,omitempty"`
 	TimeLimitMs int    `json:"time_limit_ms"`
