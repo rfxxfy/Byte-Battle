@@ -136,18 +136,7 @@ export function GamesPage() {
       )
     }
 
-    return (
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={(e) => {
-          e.stopPropagation()
-          navigate(`/games/${game.id}`)
-        }}
-      >
-        Просмотр
-      </Button>
-    )
+    return null
   }
 
   const toggleProblem = (problemId: string, checked: boolean) => {
