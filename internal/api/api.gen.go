@@ -159,6 +159,7 @@ type ListProblemsResponse struct {
 
 // MeResponse defines model for MeResponse.
 type MeResponse struct {
+	Email  string             `json:"email"`
 	Name   *string            `json:"name,omitempty"`
 	UserId openapi_types.UUID `json:"user_id"`
 }

@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 
 export function AppLayout() {
-  const { logout } = useAuth()
+  const { logout, email } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -47,14 +47,19 @@ export function AppLayout() {
               </NavLink>
             </nav>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="text-muted-foreground hover:text-foreground text-sm"
-          >
-            Выйти
-          </Button>
+          <div className="flex items-center gap-3">
+            {email && (
+              <span className="text-xs text-muted-foreground">{email}</span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-muted-foreground hover:text-foreground text-sm"
+            >
+              Выйти
+            </Button>
+          </div>
         </div>
       </header>
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
