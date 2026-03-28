@@ -16,9 +16,9 @@ const statusLabel: Record<Game['status'], string> = {
 
 const statusClass: Record<Game['status'], string> = {
   pending: 'text-yellow-400 bg-yellow-400/10',
-  active: 'text-green-400 bg-green-400/10',
-  finished: 'text-blue-400 bg-blue-400/10',
-  cancelled: 'text-muted-foreground bg-muted/40',
+  active: 'text-yellow-400 bg-yellow-400/10',
+  finished: 'text-red-400 bg-red-400/10',
+  cancelled: 'text-red-400 bg-red-400/10',
 }
 
 function formatDate(iso: string) {
