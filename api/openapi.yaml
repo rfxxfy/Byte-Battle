@@ -559,7 +559,6 @@ components:
       type: object
       required:
         - id
-        - problem_id
         - problem_ids
         - current_problem_index
         - creator_id
@@ -570,10 +569,6 @@ components:
       properties:
         id:
           type: integer
-        problem_id:
-          type: string
-          example: "001-two-sum"
-          description: Current problem ID (kept for backward compatibility)
         problem_ids:
           type: array
           minItems: 1
@@ -630,12 +625,7 @@ components:
 
     CreateGameRequest:
       type: object
-      description: Provide either problem_id or problem_ids, but not both.
       properties:
-        problem_id:
-          type: string
-          example: "001-two-sum"
-          description: Deprecated single-problem field; use problem_ids instead
         problem_ids:
           type: array
           minItems: 1

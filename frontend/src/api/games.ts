@@ -7,7 +7,6 @@ export interface GameParticipant {
 
 export interface Game {
   id: number
-  problem_id: string
   problem_ids: string[]
   current_problem_index: number
   creator_id: string

@@ -71,7 +71,7 @@ export function GamePage() {
     try {
       const res = await getGame(gameId)
       setGame(res.game)
-      const pRes = await getProblem(res.game.problem_id)
+      const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
       setProblem(pRes.problem)
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
@@ -117,7 +117,6 @@ export function GamePage() {
               if (!prev) return prev
               return {
                 ...prev,
-                problem_id: msg.problem_id,
                 current_problem_index: msg.problem_index,
               }
             })

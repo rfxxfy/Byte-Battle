@@ -118,7 +118,7 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	}
 
 	r := doFailing(http.MethodPost, "/api/games", map[string]any{
-		"problem_id": "test-problem",
+		"problem_ids": []string{"test-problem"},
 	})
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
@@ -180,7 +180,7 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 		return resp
 	}
 
-	r := doSrv(http.MethodPost, "/api/games", map[string]any{"problem_id": "test-problem"}, token1)
+	r := doSrv(http.MethodPost, "/api/games", map[string]any{"problem_ids": []string{"test-problem"}}, token1)
 	require.Equal(t, http.StatusCreated, r.StatusCode)
 	var g gameResp
 	decodeJSON(t, r, &g)

@@ -123,7 +123,7 @@ func (s *SubmissionService) completeAcceptedSubmission(
 	updatedGame, finished, err := s.gameSvc.HandleAcceptedSubmission(ctx, gameID, userID, expectedProblemIndex)
 	if err != nil {
 		var appErr *apierr.AppError
-		if errors.As(err, &appErr) && appErr.ErrorCode == apierr.ErrGameNotInProgress {
+		if errors.As(err, &appErr) && (appErr.ErrorCode == apierr.ErrGameNotInProgress || appErr.ErrorCode == apierr.ErrRoundAlreadyAdvanced) {
 			// Another player already won — submission is still accepted but we
 			// don't set WinnerID (the other player's submit already broadcast it).
 			return SubmissionResult{Accepted: true}, nil

@@ -200,7 +200,7 @@ export function GamesPage() {
                 >
                   <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{g.id}</td>
                   <td className="px-4 py-3 text-xs font-mono">
-                    {g.current_problem_index + 1}/{g.problem_ids.length} · {g.problem_id}
+                    {g.current_problem_index + 1}/{g.problem_ids.length} · {g.problem_ids[g.current_problem_index]}
                   </td>
                   <td className="px-4 py-3">
                     <span
