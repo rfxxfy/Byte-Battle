@@ -81,7 +81,6 @@ func TestGame_CreateWithTooManyProblems(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
 }
 
-
 func createActiveGame(t *testing.T) gameResp {
 	t.Helper()
 	g := createGame(t)
