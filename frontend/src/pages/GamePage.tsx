@@ -34,6 +34,8 @@ interface SubmissionResult {
   stderr: string
   failed_test?: number
   user_id: string
+  code?: string
+  language?: string
 }
 
 interface GameFinished {
@@ -69,6 +71,8 @@ export function GamePage() {
   const [submitting, setSubmitting] = useState(false)
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
   const [winner, setWinner] = useState<GameFinished | null>(null)
+  const [playerSolutions, setPlayerSolutions] = useState<Record<string, { code: string; language: LangValue }>>({})
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
 
@@ -122,6 +126,11 @@ export function GamePage() {
           if (msg.type === 'submission_result') {
             setSubmissionResult(msg)
             setSubmitting(false)
+            if (msg.code && msg.language) {
+              const uid = msg.user_id
+              const lang = msg.language as LangValue
+              setPlayerSolutions((prev) => ({ ...prev, [uid]: { code: msg.code!, language: lang } }))
+            }
           } else if (msg.type === 'round_advanced') {
             setGame((prev) => {
               if (!prev) return prev
@@ -142,6 +151,7 @@ export function GamePage() {
           } else if (msg.type === 'game_finished') {
             setWinner({ winner_id: msg.winner_id })
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
+            setViewingUserId(msg.winner_id)
           }
         } catch {
           // ignore malformed messages
@@ -345,7 +355,10 @@ export function GamePage() {
   }
 
   // Game / Finished
-  const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
+  const viewedSolution = viewingUserId !== null ? playerSolutions[viewingUserId] : null
+  const editorCode = viewingUserId !== null ? (viewedSolution?.code ?? '') : code
+  const editorLanguage = viewedSolution?.language ?? language
+  const monacoLang = LANGUAGES.find((l) => l.value === editorLanguage)?.monaco ?? 'python'
   const winnerParticipant = winner
     ? game.participants.find((p) => p.id === winner.winner_id)
     : null
@@ -409,7 +422,17 @@ export function GamePage() {
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Участники</p>
             <div className="flex flex-col divide-y divide-border">
               {game.participants.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0">
+                <div
+                  key={p.id}
+                  className={`flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0 rounded-md px-1 -mx-1 transition-colors ${
+                    isFinished
+                      ? `cursor-pointer hover:bg-muted/40 ${viewingUserId === p.id ? 'bg-muted/40 ring-1 ring-border/60' : ''}`
+                      : ''
+                  }`}
+                  onClick={() => {
+                    if (isFinished) setViewingUserId((prev) => (prev === p.id ? null : p.id))
+                  }}
+                >
                   <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
                   <span className={p.id === userId ? 'text-primary font-medium' : ''}>
                     {participantLabel(p)}
@@ -430,7 +453,11 @@ export function GamePage() {
         <div className="flex-1 flex flex-col gap-2 min-h-0">
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Select value={language} onValueChange={(val) => handleLangChange(val as LangValue)}>
+            <Select
+              value={editorLanguage}
+              onValueChange={(val) => handleLangChange(val as LangValue)}
+              disabled={isFinished}
+            >
               <SelectTrigger size="sm">
                 <SelectValue />
               </SelectTrigger>
@@ -442,6 +469,13 @@ export function GamePage() {
                 ))}
               </SelectContent>
             </Select>
+            {isFinished && (
+              <span className="text-xs text-muted-foreground bg-muted/40 border border-border/40 px-2 py-1 rounded-md">
+                {viewingUserId
+                  ? `Решение: ${participantLabel(game.participants.find((p) => p.id === viewingUserId) ?? { id: viewingUserId, name: null })}`
+                  : 'Завершена — только чтение'}
+              </span>
+            )}
             <div className="ml-auto flex items-center gap-2">
               <Button
                 size="sm"
@@ -466,15 +500,16 @@ export function GamePage() {
             <Editor
               height="100%"
               language={monacoLang}
-              value={code}
-              onChange={(val) => setCode(val ?? '')}
+              value={editorCode}
+              onChange={(val) => { if (!isFinished && viewingUserId === null) setCode(val ?? '') }}
               theme="vs-dark"
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
-                readOnly: isFinished,
+                readOnly: isFinished || viewingUserId !== null,
+                readOnlyMessage: { value: '' },
                 padding: { top: 12 },
               }}
             />
