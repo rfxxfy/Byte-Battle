@@ -23,6 +23,9 @@ const DEFAULT_CODE: Record<LangValue, string> = {
   javascript: '// Введи решение здесь\n',
 }
 
+const starterCode = (problem: Problem | null, lang: LangValue): string =>
+  problem?.starter_code?.[lang] ?? DEFAULT_CODE[lang]
+
 interface SubmissionResult {
   accepted: boolean
   stdout: string
@@ -72,7 +75,12 @@ export function GamePage() {
       const res = await getGame(gameId)
       setGame(res.game)
       const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
-      setProblem(pRes.problem)
+      setProblem((prev) => {
+        if (prev?.id !== pRes.problem.id) {
+          setCode(starterCode(pRes.problem, language))
+        }
+        return pRes.problem
+      })
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     } finally {
@@ -121,7 +129,11 @@ export function GamePage() {
               }
             })
             getProblem(msg.problem_id)
-              .then((res) => setProblem(res.problem))
+              .then((res) => {
+                setProblem(res.problem)
+                setCode(starterCode(res.problem, language))
+                setSubmissionResult(null)
+              })
               .catch(() => {
                 setActionError('Не удалось загрузить следующую задачу')
               })
@@ -229,7 +241,7 @@ export function GamePage() {
 
   const handleLangChange = (lang: LangValue) => {
     setLanguage(lang)
-    setCode(DEFAULT_CODE[lang])
+    setCode(starterCode(problem, lang))
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
