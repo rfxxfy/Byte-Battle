@@ -8,6 +8,7 @@ import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ProblemDescription } from '@/components/ProblemDescription'
 
 const LANGUAGES = [
@@ -429,17 +430,18 @@ export function GamePage() {
         <div className="flex-1 flex flex-col gap-2 min-h-0">
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <select
-              value={language}
-              onChange={(e) => handleLangChange(e.target.value as LangValue)}
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l.value} value={l.value} className="bg-background">
-                  {l.label}
-                </option>
-              ))}
-            </select>
+            <Select value={language} onValueChange={(val) => handleLangChange(val as LangValue)}>
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LANGUAGES.map((l) => (
+                  <SelectItem key={l.value} value={l.value}>
+                    {l.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="ml-auto flex items-center gap-2">
               <Button
                 size="sm"
