@@ -27,5 +27,5 @@ type ServerMessage struct {
 	Message    string    `json:"message,omitempty"`
 	FailedTest *int      `json:"failed_test,omitempty"`
 	ProblemID  string    `json:"problem_id,omitempty"`
-	ProblemIdx int       `json:"problem_index,omitempty"`
+	ProblemIdx int       `json:"problem_index"`
 }

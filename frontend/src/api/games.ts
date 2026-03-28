@@ -31,7 +31,6 @@ export const createGame = (problemIds: string[]) =>
     method: 'POST',
     body: JSON.stringify({
       problem_ids: problemIds.slice(0, 20),
-      problem_id: problemIds[0],
     }),
   })
 

@@ -267,6 +267,18 @@ func TestGameWS_AcceptedSubmitAdvancesRound(t *testing.T) {
 	round := wsReadUntilType(t, conn, ws.TypeRoundAdvanced)
 	assert.Equal(t, "test-problem", round.ProblemID)
 	assert.Equal(t, 1, round.ProblemIdx)
+
+	require.NoError(t, conn.WriteJSON(ws.ClientMessage{
+		Type:     ws.TypeSubmit,
+		Code:     "solution",
+		Language: "go",
+	}))
+
+	secondResult := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
+	assert.True(t, secondResult.Accepted)
+
+	finished := wsReadUntilType(t, conn, ws.TypeGameFinished)
+	assert.Equal(t, user1ID, finished.WinnerID)
 }
 
 func TestGameWS_ConcurrentSlotRejected(t *testing.T) {

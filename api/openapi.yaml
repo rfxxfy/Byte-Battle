@@ -630,6 +630,7 @@ components:
 
     CreateGameRequest:
       type: object
+      description: Provide either problem_id or problem_ids, but not both.
       properties:
         problem_id:
           type: string

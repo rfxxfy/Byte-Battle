@@ -60,10 +60,7 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 
 	qtx := s.q.WithTx(tx)
 
-	game, err := qtx.CreateGame(ctx, sqlcdb.CreateGameParams{
-		ProblemID: problemIDs[0],
-		CreatorID: creatorID,
-	})
+	game, err := qtx.CreateGame(ctx, creatorID)
 	if err != nil {
 		return sqlcdb.Game{}, err
 	}
@@ -174,6 +171,13 @@ func (s *GameService) GetGameProblemIDs(ctx context.Context, gameID int32) ([]st
 	return s.q.GetGameProblemIDs(ctx, gameID)
 }
 
+func (s *GameService) GetGameProblemIDByIndex(ctx context.Context, gameID, problemIndex int32) (string, error) {
+	return s.q.GetGameProblemIDByIndex(ctx, sqlcdb.GetGameProblemIDByIndexParams{
+		GameID:       gameID,
+		ProblemIndex: problemIndex,
+	})
+}
+
 func (s *GameService) GetGameProblemIDsByGameIDs(ctx context.Context, gameIDs []int32) (map[int32][]string, error) {
 	rows, err := s.q.GetGameProblemIDsByGameIDs(ctx, gameIDs)
 	if err != nil {
@@ -270,16 +274,35 @@ func (s *GameService) CompleteGameAsWinner(ctx context.Context, id int, winnerID
 	return s.completeGame(ctx, id, winnerID)
 }
 
-func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, bool, error) {
+func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, userID uuid.UUID, expectedProblemIndex int32) (sqlcdb.Game, bool, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, false, err
 	}
 	defer tx.Rollback(ctx)
 
+	game, finished, err := s.handleAcceptedSubmissionTx(ctx, tx, int32(id), userID, expectedProblemIndex)
+	if err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return sqlcdb.Game{}, false, err
+	}
+
+	return game, finished, nil
+}
+
+func (s *GameService) handleAcceptedSubmissionTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	id int32,
+	userID uuid.UUID,
+	expectedProblemIndex int32,
+) (sqlcdb.Game, bool, error) {
 	qtx := s.q.WithTx(tx)
 
-	game, err := qtx.GetGameForUpdate(ctx, int32(id))
+	game, err := qtx.GetGameForUpdate(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return sqlcdb.Game{}, false, apierr.New(apierr.ErrGameNotFound, "game not found")
 	}
@@ -291,17 +314,18 @@ func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, user
 	if err != nil {
 		return sqlcdb.Game{}, false, err
 	}
-
-	game, finished, err := finishOrAdvanceAfterAcceptedSubmit(ctx, qtx, game, userID, totalProblems)
-	if err != nil {
+	if err := validateAcceptedSubmissionRound(game.CurrentProblemIndex, expectedProblemIndex); err != nil {
 		return sqlcdb.Game{}, false, err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return sqlcdb.Game{}, false, err
-	}
+	return finishOrAdvanceAfterAcceptedSubmit(ctx, qtx, game, userID, totalProblems)
+}
 
-	return game, finished, nil
+func validateAcceptedSubmissionRound(currentProblemIndex, expectedProblemIndex int32) error {
+	if currentProblemIndex != expectedProblemIndex {
+		return apierr.New(apierr.ErrRoundAlreadyAdvanced, "round already advanced")
+	}
+	return nil
 }
 
 func validateAcceptedSubmissionState(ctx context.Context, qtx *sqlcdb.Queries, game sqlcdb.Game, userID uuid.UUID) (int64, error) {
@@ -350,18 +374,9 @@ func finishOrAdvanceAfterAcceptedSubmit(
 	}
 
 	nextIndex := game.CurrentProblemIndex + 1
-	nextProblemID, err := qtx.GetGameProblemIDByIndex(ctx, sqlcdb.GetGameProblemIDByIndexParams{
-		GameID:       game.ID,
-		ProblemIndex: nextIndex,
-	})
-	if err != nil {
-		return sqlcdb.Game{}, false, err
-	}
-
 	updated, err := qtx.AdvanceGameProblem(ctx, sqlcdb.AdvanceGameProblemParams{
 		ID:                  game.ID,
 		CurrentProblemIndex: nextIndex,
-		ProblemID:           nextProblemID,
 	})
 	if err != nil {
 		return sqlcdb.Game{}, false, err

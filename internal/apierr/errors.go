@@ -28,6 +28,7 @@ const (
 	ErrCodeRecentlySent     = "CODE_RECENTLY_SENT"
 	ErrExecutionRateLimited = "EXECUTION_RATE_LIMITED"
 	ErrExecutionInProgress  = "EXECUTION_IN_PROGRESS"
+	ErrRoundAlreadyAdvanced = "ROUND_ALREADY_ADVANCED"
 	ErrUserNotFound         = "USER_NOT_FOUND"
 
 	ErrValidation = "VALIDATION_ERROR"
@@ -48,7 +49,7 @@ func httpStatusCode(code string) int {
 	case ErrNotGameCreator, ErrCreatorCannotLeave:
 		return http.StatusForbidden
 	case ErrAlreadyParticipant, ErrGameAlreadyStarted, ErrGameNotInProgress,
-		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled:
+		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled, ErrRoundAlreadyAdvanced:
 		return http.StatusConflict
 	case ErrInvalidToken, ErrSessionExpired:
 		return http.StatusUnauthorized

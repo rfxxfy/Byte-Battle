@@ -16,7 +16,7 @@ UPDATE games
 SET status = 'cancelled',
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
 `
 
 func (q *Queries) CancelGame(ctx context.Context, id int32) (Game, error) {
@@ -24,7 +24,6 @@ func (q *Queries) CancelGame(ctx context.Context, id int32) (Game, error) {
 	var i Game
 	err := row.Scan(
 		&i.ID,
-		&i.ProblemID,
 		&i.CreatorID,
 		&i.WinnerID,
 		&i.Status,
@@ -44,7 +43,7 @@ SET status = 'finished',
     completed_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
 `
 
 type CompleteGameParams struct {
@@ -57,7 +56,6 @@ func (q *Queries) CompleteGame(ctx context.Context, arg CompleteGameParams) (Gam
 	var i Game
 	err := row.Scan(
 		&i.ID,
-		&i.ProblemID,
 		&i.CreatorID,
 		&i.WinnerID,
 		&i.Status,
@@ -82,22 +80,16 @@ func (q *Queries) CountGames(ctx context.Context) (int64, error) {
 }
 
 const createGame = `-- name: CreateGame :one
-INSERT INTO games (problem_id, creator_id, status)
-VALUES ($1, $2, 'pending')
-RETURNING id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
+INSERT INTO games (creator_id, status)
+VALUES ($1, 'pending')
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
 `
 
-type CreateGameParams struct {
-	ProblemID string    `json:"problem_id"`
-	CreatorID uuid.UUID `json:"creator_id"`
-}
-
-func (q *Queries) CreateGame(ctx context.Context, arg CreateGameParams) (Game, error) {
-	row := q.db.QueryRow(ctx, createGame, arg.ProblemID, arg.CreatorID)
+func (q *Queries) CreateGame(ctx context.Context, creatorID uuid.UUID) (Game, error) {
+	row := q.db.QueryRow(ctx, createGame, creatorID)
 	var i Game
 	err := row.Scan(
 		&i.ID,
-		&i.ProblemID,
 		&i.CreatorID,
 		&i.WinnerID,
 		&i.Status,
@@ -123,7 +115,7 @@ func (q *Queries) DeleteGame(ctx context.Context, id int32) (int64, error) {
 }
 
 const getGameByID = `-- name: GetGameByID :one
-SELECT id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index FROM games WHERE id = $1 LIMIT 1
+SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index FROM games WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetGameByID(ctx context.Context, id int32) (Game, error) {
@@ -131,7 +123,6 @@ func (q *Queries) GetGameByID(ctx context.Context, id int32) (Game, error) {
 	var i Game
 	err := row.Scan(
 		&i.ID,
-		&i.ProblemID,
 		&i.CreatorID,
 		&i.WinnerID,
 		&i.Status,
@@ -145,7 +136,7 @@ func (q *Queries) GetGameByID(ctx context.Context, id int32) (Game, error) {
 }
 
 const getGameForUpdate = `-- name: GetGameForUpdate :one
-SELECT id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index FROM games WHERE id = $1 LIMIT 1 FOR UPDATE
+SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index FROM games WHERE id = $1 LIMIT 1 FOR UPDATE
 `
 
 func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) {
@@ -153,7 +144,6 @@ func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) 
 	var i Game
 	err := row.Scan(
 		&i.ID,
-		&i.ProblemID,
 		&i.CreatorID,
 		&i.WinnerID,
 		&i.Status,
@@ -167,7 +157,7 @@ func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) 
 }
 
 const listGames = `-- name: ListGames :many
-SELECT id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index FROM games ORDER BY created_at DESC LIMIT $1 OFFSET $2
+SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index FROM games ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
 type ListGamesParams struct {
@@ -186,7 +176,6 @@ func (q *Queries) ListGames(ctx context.Context, arg ListGamesParams) ([]Game, e
 		var i Game
 		if err := rows.Scan(
 			&i.ID,
-			&i.ProblemID,
 			&i.CreatorID,
 			&i.WinnerID,
 			&i.Status,
@@ -212,7 +201,7 @@ SET status = 'active',
     started_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, problem_id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
 `
 
 func (q *Queries) StartGame(ctx context.Context, id int32) (Game, error) {
@@ -220,7 +209,6 @@ func (q *Queries) StartGame(ctx context.Context, id int32) (Game, error) {
 	var i Game
 	err := row.Scan(
 		&i.ID,
-		&i.ProblemID,
 		&i.CreatorID,
 		&i.WinnerID,
 		&i.Status,

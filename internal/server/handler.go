@@ -109,10 +109,16 @@ func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestOb
 	userID, _ := userIDFromContext(ctx)
 
 	problemIDs := []string{}
-	if req.Body.ProblemIds != nil {
+	hasProblemIDs := req.Body.ProblemIds != nil && len(*req.Body.ProblemIds) > 0
+	hasProblemID := req.Body.ProblemId != nil && *req.Body.ProblemId != ""
+	if hasProblemIDs && hasProblemID {
+		return nil, apierr.New(apierr.ErrValidation, "provide either problem_id or problem_ids, not both")
+	}
+
+	if hasProblemIDs {
 		problemIDs = append(problemIDs, *req.Body.ProblemIds...)
 	}
-	if len(problemIDs) == 0 && req.Body.ProblemId != nil && *req.Body.ProblemId != "" {
+	if len(problemIDs) == 0 && hasProblemID {
 		problemIDs = []string{*req.Body.ProblemId}
 	}
 
@@ -281,8 +287,11 @@ func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteReq
 }
 
 func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []string) api.Game {
-	if len(problemIDs) == 0 {
-		problemIDs = []string{g.ProblemID}
+	currentProblemID := ""
+	if idx := int(g.CurrentProblemIndex); idx >= 0 && idx < len(problemIDs) {
+		currentProblemID = problemIDs[idx]
+	} else if len(problemIDs) > 0 {
+		currentProblemID = problemIDs[0]
 	}
 	apiParticipants := make([]api.GameParticipant, len(participants))
 	for i, p := range participants {
@@ -290,7 +299,7 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 	}
 	result := api.Game{
 		Id:                  int(g.ID),
-		ProblemId:           g.ProblemID,
+		ProblemId:           currentProblemID,
 		ProblemIds:          problemIDs,
 		CurrentProblemIndex: int(g.CurrentProblemIndex),
 		CreatorId:           g.CreatorID,

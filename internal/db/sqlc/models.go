@@ -11,7 +11,6 @@ import (
 
 type Game struct {
 	ID                  int32              `json:"id"`
-	ProblemID           string             `json:"problem_id"`
 	CreatorID           uuid.UUID          `json:"creator_id"`
 	WinnerID            uuid.NullUUID      `json:"winner_id"`
 	Status              string             `json:"status"`

@@ -83,6 +83,16 @@ func TestGame_CreateWithTooManyProblems(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
 }
 
+func TestGame_CreateWithProblemIdAndProblemIdsReturnsValidationError(t *testing.T) {
+	resp := doAuth(t, http.MethodPost, "/api/games", map[string]any{
+		"problem_id":  "test-problem",
+		"problem_ids": []string{"test-problem", "test-problem"},
+	}, token1)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, "VALIDATION_ERROR", errCode(t, resp))
+}
+
 func createActiveGame(t *testing.T) gameResp {
 	t.Helper()
 	g := createGame(t)

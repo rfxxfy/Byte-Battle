@@ -28,7 +28,6 @@ LIMIT 1;
 -- name: AdvanceGameProblem :one
 UPDATE games
 SET current_problem_index = $2,
-    problem_id = $3,
     updated_at = NOW()
 WHERE id = $1
 RETURNING *;

@@ -1,6 +1,6 @@
 -- name: CreateGame :one
-INSERT INTO games (problem_id, creator_id, status)
-VALUES ($1, $2, 'pending')
+INSERT INTO games (creator_id, status)
+VALUES ($1, 'pending')
 RETURNING *;
 
 -- name: GetGameByID :one
