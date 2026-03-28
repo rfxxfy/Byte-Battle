@@ -8,6 +8,7 @@ export interface TokenResponse {
 
 export interface MeResponse {
   user_id: string
+  email: string
   name?: string
 }
 
