@@ -121,8 +121,8 @@ jobs:
               || echo "IMAGE=${IMAGE}" >> ${{ env.DEPLOY_DIR }}/.env
 
             # Pull new image and restart stack
-            docker compose -f ${{ env.DEPLOY_DIR }}/${{ env.COMPOSE_FILE }} pull app
-            docker compose -f ${{ env.DEPLOY_DIR }}/${{ env.COMPOSE_FILE }} up -d
+            docker compose -f /opt/bytebattle/${{ env.COMPOSE_FILE }} pull app
+            docker compose -f /opt/bytebattle/${{ env.COMPOSE_FILE }} up -d
 
             # Reload Caddy to pick up any Caddyfile changes
             docker compose -f /opt/bytebattle/docker-compose.prod.yaml exec -T caddy \
