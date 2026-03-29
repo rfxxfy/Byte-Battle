@@ -20,14 +20,8 @@
               <td style="padding:0 24px 20px 24px;font-size:15px;line-height:1.6;color:#9ca3af;">Введите этот код на странице входа. Код действует 15 минут.</td>
             </tr>
             <tr>
-              <td style="padding:0 24px 28px 24px;">
-                <table role="presentation" cellspacing="0" cellpadding="0">
-                  <tr>
-                    {{range $i, $c := .Digits}}<td style="padding:0 4px;">
-                      <div style="width:44px;height:52px;line-height:52px;text-align:center;border-radius:10px;border:1px solid #22c55e;background:#052e16;color:#4ade80;font-size:24px;font-weight:700;font-family:monospace;">{{$c}}</div>
-                    </td>{{end}}
-                  </tr>
-                </table>
+              <td style="padding:0 24px 28px 24px;text-align:center;">
+                <div style="display:inline-block;padding:16px 32px;border-radius:12px;border:1px solid #22c55e;background:#052e16;color:#4ade80;font-size:36px;font-weight:700;font-family:monospace;letter-spacing:0.2em;">{{.Code}}</div>
               </td>
             </tr>
             <tr>

@@ -119,6 +119,11 @@ export function LoginPage() {
             <form onSubmit={handleConfirm} className="flex flex-col gap-6">
               <div className="flex flex-col items-center gap-3">
                 <Label>Код из письма</Label>
+                <div onPaste={(e) => {
+                  e.preventDefault()
+                  const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                  setCode(text)
+                }}>
                 <InputOTP
                   maxLength={6}
                   value={code}
@@ -132,6 +137,7 @@ export function LoginPage() {
                     </InputOTPGroup>
                   ))}
                 </InputOTP>
+                </div>
               </div>
               {error && <p className="text-destructive text-sm text-center">{error}</p>}
               <Button
