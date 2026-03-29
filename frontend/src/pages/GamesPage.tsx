@@ -121,21 +121,6 @@ export function GamesPage() {
       )
     }
 
-    if ((game.status === 'pending' || game.status === 'active') && isParticipant) {
-      return (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/games/${game.id}`)
-          }}
-        >
-          Открыть
-        </Button>
-      )
-    }
-
     return null
   }
 
