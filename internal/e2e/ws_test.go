@@ -264,7 +264,7 @@ func TestGameWS_AcceptedSubmitAdvancesRound(t *testing.T) {
 	result := wsReadUntilType(t, conn, ws.TypeSubmissionResult)
 	assert.True(t, result.Accepted)
 
-	round := wsReadUntilType(t, conn, ws.TypeRoundAdvanced)
+	round := wsReadUntilType(t, conn, ws.TypePlayerAdvanced)
 	assert.Equal(t, "test-problem", round.ProblemID)
 	assert.Equal(t, 1, round.ProblemIdx)
 

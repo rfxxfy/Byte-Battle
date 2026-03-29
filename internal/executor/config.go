@@ -42,9 +42,12 @@ func DefaultConfig() *Config {
 				RunCmd:     []string{"python", "main.py"},
 			},
 			"go": {
-				Image:      "golang:1.26-alpine",
-				SourceFile: "main.go",
-				RunCmd:     []string{"go", "run", "main.go"},
+				Image:       "golang:1.26-alpine",
+				SourceFile:  "main.go",
+				CompileCmd:  []string{"go", "build", "-o", "solution", "main.go"},
+				RunCmd:      []string{"./solution"},
+				MemoryLimit: 512 * 1024 * 1024,
+				TimeLimit:   30,
 			},
 			"cpp": {
 				Image:      "gcc:15",

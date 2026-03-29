@@ -50,7 +50,7 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 		return SubmissionResult{}, err
 	}
 
-	problem, expectedProblemIndex, err := s.getCurrentProblemForSubmission(ctx, gameID)
+	problem, err := s.getCurrentProblemForSubmission(ctx, gameID, userID)
 	if err != nil {
 		return SubmissionResult{}, err
 	}
@@ -65,26 +65,34 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 		}, nil
 	}
 
-	return s.completeAcceptedSubmission(ctx, gameID, userID, expectedProblemIndex)
+	return s.completeAcceptedSubmission(ctx, gameID, userID)
 }
 
-func (s *SubmissionService) getCurrentProblemForSubmission(ctx context.Context, gameID int) (*problems.Problem, int32, error) {
+func (s *SubmissionService) getCurrentProblemForSubmission(ctx context.Context, gameID int, userID uuid.UUID) (*problems.Problem, error) {
 	game, err := s.gameSvc.GetGame(ctx, gameID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("get game: %w", err)
+		return nil, fmt.Errorf("get game: %w", err)
 	}
-	expectedProblemIndex := game.CurrentProblemIndex
+	if game.Status != "active" {
+		return nil, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
+	}
 
-	problemID, err := s.gameSvc.GetGameProblemIDByIndex(ctx, int32(gameID), expectedProblemIndex)
+	// Each player has their own current problem index.
+	playerIdx, err := s.gameSvc.GetParticipantProblemIndex(ctx, gameID, userID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("get game problem by index: %w", err)
+		return nil, fmt.Errorf("get participant problem index: %w", err)
+	}
+
+	problemID, err := s.gameSvc.GetGameProblemIDByIndex(ctx, int32(gameID), playerIdx)
+	if err != nil {
+		return nil, fmt.Errorf("get game problem by index: %w", err)
 	}
 
 	problem, err := s.problems.Get(problemID)
 	if err != nil {
-		return nil, 0, fmt.Errorf("get problem: %w", err)
+		return nil, fmt.Errorf("get problem: %w", err)
 	}
-	return problem, expectedProblemIndex, nil
+	return problem, nil
 }
 
 func (s *SubmissionService) executeAgainstProblem(
@@ -119,30 +127,33 @@ func (s *SubmissionService) completeAcceptedSubmission(
 	ctx context.Context,
 	gameID int,
 	userID uuid.UUID,
-	expectedProblemIndex int32,
 ) (SubmissionResult, error) {
-	updatedGame, finished, err := s.gameSvc.HandleAcceptedSubmission(ctx, gameID, userID, expectedProblemIndex)
+	updatedGame, finished, err := s.gameSvc.HandleAcceptedSubmission(ctx, gameID, userID)
 	if err != nil {
 		var appErr *apierr.AppError
 		if errors.As(err, &appErr) && (appErr.ErrorCode == apierr.ErrGameNotInProgress || appErr.ErrorCode == apierr.ErrRoundAlreadyAdvanced) {
-			// Another player already won or advanced the round — skip broadcast,
-			// the winner's goroutine already sent round_advanced / game_finished.
+			// Another player already won — suppress broadcast.
 			return SubmissionResult{Accepted: true, AlreadyAdvanced: true}, nil
 		}
 		return SubmissionResult{}, fmt.Errorf("complete game: %w", err)
 	}
 
-	if !finished {
-		nextProblemID, nextProblemErr := s.gameSvc.GetGameProblemIDByIndex(ctx, int32(gameID), updatedGame.CurrentProblemIndex)
-		if nextProblemErr != nil {
-			return SubmissionResult{}, fmt.Errorf("get next game problem by index: %w", nextProblemErr)
-		}
-		return SubmissionResult{
-			Accepted:   true,
-			ProblemID:  nextProblemID,
-			ProblemIdx: int(updatedGame.CurrentProblemIndex),
-		}, nil
+	if finished {
+		return SubmissionResult{Accepted: true, WinnerID: updatedGame.WinnerID.UUID}, nil
 	}
 
-	return SubmissionResult{Accepted: true, WinnerID: updatedGame.WinnerID.UUID}, nil
+	// Player advanced to their next problem.
+	playerIdx, err := s.gameSvc.GetParticipantProblemIndex(ctx, gameID, userID)
+	if err != nil {
+		return SubmissionResult{}, fmt.Errorf("get participant problem index: %w", err)
+	}
+	nextProblemID, err := s.gameSvc.GetGameProblemIDByIndex(ctx, int32(gameID), playerIdx)
+	if err != nil {
+		return SubmissionResult{}, fmt.Errorf("get next problem: %w", err)
+	}
+	return SubmissionResult{
+		Accepted:   true,
+		ProblemID:  nextProblemID,
+		ProblemIdx: int(playerIdx),
+	}, nil
 }

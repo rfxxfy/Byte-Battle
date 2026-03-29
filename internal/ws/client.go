@@ -27,6 +27,14 @@ func NewClient(conn *websocket.Conn) *Client {
 // Close signals WritePump to exit cleanly by closing the send channel.
 func (c *Client) Close() { close(c.send) }
 
+// Send enqueues a message for this client. Non-blocking; drops if buffer is full.
+func (c *Client) Send(msg []byte) {
+	select {
+	case c.send <- msg:
+	default:
+	}
+}
+
 // WritePump pumps messages from the send channel to the WebSocket connection.
 // Run in a separate goroutine; closes the connection when done.
 func (c *Client) WritePump() {
