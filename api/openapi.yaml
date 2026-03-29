@@ -472,13 +472,10 @@ components:
       type: object
       required:
         - user_id
-        - email
       properties:
         user_id:
           type: string
           format: uuid
-        email:
-          type: string
         name:
           type: string
           nullable: true
@@ -527,11 +524,6 @@ components:
         test_count:
           type: integer
           description: Number of test cases
-        starter_code:
-          type: object
-          additionalProperties:
-            type: string
-          description: Starter code templates per language (python, go, javascript)
 
     ProblemResponse:
       type: object

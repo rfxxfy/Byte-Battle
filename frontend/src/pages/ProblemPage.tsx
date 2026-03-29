@@ -6,7 +6,6 @@ import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { difficultyLabel, difficultyClass } from '@/lib/difficulty'
 import { Button } from '@/components/ui/button'
-import { ProblemDescription } from '@/components/ProblemDescription'
 
 export function ProblemPage() {
   const { id } = useParams<{ id: string }>()
@@ -84,7 +83,9 @@ export function ProblemPage() {
       </div>
 
       <div className="rounded-lg border border-border/60 bg-card/50 p-6">
-        <ProblemDescription content={problem.description} />
+        <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+          {problem.description}
+        </p>
       </div>
     </div>
   )
