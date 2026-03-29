@@ -12,11 +12,12 @@ import (
 )
 
 type ProblemMeta struct {
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	Difficulty    string `json:"difficulty"`
-	TimeLimitMs   int    `json:"time_limit_ms"`
-	MemoryLimitMb int    `json:"memory_limit_mb"`
+	Title         string            `json:"title"`
+	Description   string            `json:"description"`
+	Difficulty    string            `json:"difficulty"`
+	TimeLimitMs   int               `json:"time_limit_ms"`
+	MemoryLimitMb int               `json:"memory_limit_mb"`
+	StarterCode   map[string]string `json:"starter_code,omitempty"`
 }
 
 type TestCase struct {

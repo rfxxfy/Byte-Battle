@@ -1,7 +1,12 @@
 {
   "title": "Two Sum",
-  "description": "Given N, then N integers, then target. Print two 0-based indices i j (i<j) where a[i]+a[j]=target.",
+  "description": "Given an array of integers, find two indices `i < j` such that `a[i] + a[j] == target`.\n\nPrint the two 0-based indices separated by a space.\n\n**Input format:**\n- Line 1: integer `N` — array length\n- Line 2: `N` integers — the array\n- Line 3: integer `target`\n\n**Example:**\n```\n4\n2 7 11 15\n9\n```\n**Output:** `0 1`",
   "difficulty": "easy",
   "time_limit_ms": 2000,
-  "memory_limit_mb": 256
+  "memory_limit_mb": 256,
+  "starter_code": {
+    "python": "n = int(input())\na = list(map(int, input().split()))\ntarget = int(input())\n\n# your solution here\n",
+    "go": "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tvar n int\n\tfmt.Scan(&n)\n\ta := make([]int, n)\n\tfor i := range a {\n\t\tfmt.Scan(&a[i])\n\t}\n\tvar target int\n\tfmt.Scan(&target)\n\n\t// your solution here\n}\n",
+    "javascript": "const lines = require('fs').readFileSync('/dev/stdin', 'utf8').trim().split('\\n')\nconst n = parseInt(lines[0])\nconst a = lines[1].split(' ').map(Number)\nconst target = parseInt(lines[2])\n\n// your solution here\n"
+  }
 }
