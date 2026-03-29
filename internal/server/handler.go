@@ -364,6 +364,20 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	})
 	s.hub.Broadcast(int32(gameID), joinedMsg)
 
+	// Send initial problem state to the connecting player.
+	if playerIdx, err := s.gameService.GetParticipantProblemIndex(r.Context(), gameID, session.UserID); err == nil {
+		if problemID, err := s.gameService.GetGameProblemIDByIndex(r.Context(), int32(gameID), playerIdx); err == nil {
+			progress, _ := s.gameService.GetAllParticipantsProblemIndices(r.Context(), gameID)
+			stateMsg, _ := json.Marshal(ws.ServerMessage{
+				Type:       ws.TypePlayerState,
+				ProblemID:  problemID,
+				ProblemIdx: int(playerIdx),
+				Progress:   progress,
+			})
+			client.Send(stateMsg)
+		}
+	}
+
 	connCtx, connCancel := context.WithCancel(context.Background())
 	defer connCancel()
 
@@ -408,7 +422,6 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	}
 
 	if result.AlreadyAdvanced {
-		// Another goroutine already broadcast round_advanced / game_finished — nothing to do.
 		return
 	}
 
@@ -422,36 +435,34 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	})
 	s.hub.Broadcast(gameID, resultMsg)
 
-	if result.Accepted && result.WinnerID != uuid.Nil {
-		s.scores.Add(gameID, userID)
-		winnerID := s.scores.Winner(gameID, result.WinnerID)
-		if winnerID != result.WinnerID {
-			if err := s.gameService.SetWinner(ctx, int(gameID), winnerID); err != nil {
-				log.Printf("processSubmit: set winner: %v", err)
-			}
-		}
+	if !result.Accepted {
+		return
+	}
+
+	if result.WinnerID != uuid.Nil {
 		finMsg, _ := json.Marshal(ws.ServerMessage{
 			Type:     ws.TypeGameFinished,
-			WinnerID: winnerID,
-			SolverID: userID,
+			WinnerID: result.WinnerID,
 			Code:     msg.Code,
 			Language: msg.Language,
-			Scores:   s.scores.Snapshot(gameID),
 		})
 		s.hub.Broadcast(gameID, finMsg)
 		return
 	}
 
-	if result.Accepted && result.ProblemID != "" {
-		s.scores.Add(gameID, userID)
-		roundMsg, _ := json.Marshal(ws.ServerMessage{
-			Type:       ws.TypeRoundAdvanced,
+	if result.ProblemID != "" {
+		progress, err := s.gameService.GetAllParticipantsProblemIndices(ctx, int(gameID))
+		if err != nil {
+			log.Printf("processSubmit: get progress: %v", err)
+		}
+		advMsg, _ := json.Marshal(ws.ServerMessage{
+			Type:       ws.TypePlayerAdvanced,
+			UserID:     userID,
 			ProblemID:  result.ProblemID,
 			ProblemIdx: result.ProblemIdx,
-			SolverID:   userID,
-			Scores:     s.scores.Snapshot(gameID),
+			Progress:   progress,
 		})
-		s.hub.Broadcast(gameID, roundMsg)
+		s.hub.Broadcast(gameID, advMsg)
 	}
 }
 

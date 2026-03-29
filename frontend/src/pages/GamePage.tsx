@@ -40,17 +40,21 @@ interface SubmissionResult {
 
 interface GameFinished {
   winner_id: string
-  solver_id: string
   code?: string
   language?: string
-  scores: Record<string, number>
 }
 
-interface RoundAdvanced {
+interface PlayerAdvanced {
+  user_id: string
   problem_id: string
   problem_index: number
-  solver_id: string
-  scores: Record<string, number>
+  progress: Record<string, number>
+}
+
+interface PlayerState {
+  problem_id: string
+  problem_index: number
+  progress: Record<string, number>
 }
 
 const participantLabel = (p: GameParticipant) => p.name ?? p.id.slice(0, 8)
@@ -92,32 +96,21 @@ export function GamePage() {
   const [submitting, setSubmitting] = useState(false)
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
   const [winner, setWinner] = useState<GameFinished | null>(null)
-  const [scores, setScores] = useState<Record<string, number>>({})
-  const [roundTransition, setRoundTransition] = useState<{ from: number; to: number; solverId: string } | null>(null)
-  const [countdown, setCountdown] = useState(3)
+  const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({})
+  const [solvedTransition, setSolvedTransition] = useState(false)
   const [playerSolutions, setPlayerSolutions] = useState<Record<string, { code: string; language: LangValue }>>({})
   const [viewingUserId, setViewingUserId] = useState<string | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
+  const userIdRef = useRef<string | null>(userId)
 
   useEffect(() => {
     languageRef.current = language
   }, [language])
 
   useEffect(() => {
-    if (roundTransition === null) return
-    setCountdown(3)
-    const tid = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          setRoundTransition(null)
-          return 3
-        }
-        return c - 1
-      })
-    }, 1000)
-    return () => clearInterval(tid)
-  }, [roundTransition])
+    userIdRef.current = userId
+  }, [userId])
 
   const fetchGame = useCallback(async () => {
     try {
@@ -172,46 +165,50 @@ export function GamePage() {
 
       ws.onmessage = (e) => {
         try {
-          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & RoundAdvanced
+          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & PlayerAdvanced & PlayerState
           if (msg.type === 'submission_result') {
             setSubmissionResult(msg)
             setSubmitting(false)
-          } else if (msg.type === 'round_advanced') {
-            if (msg.scores) setScores(msg.scores)
-            setRoundTransition({ from: msg.problem_index - 1, to: msg.problem_index, solverId: msg.solver_id })
-            setGame((prev) => {
-              if (!prev) return prev
-              return {
-                ...prev,
-                current_problem_index: msg.problem_index,
-              }
-            })
-            getProblem(msg.problem_id)
-              .then((res) => {
-                setProblem(res.problem)
-                const fresh = {
-                  python: starterCode(res.problem, 'python'),
-                  go: starterCode(res.problem, 'go'),
-                  cpp: starterCode(res.problem, 'cpp'),
-                  javascript: starterCode(res.problem, 'javascript'),
+          } else if (msg.type === 'player_state') {
+            setPlayerProgress(msg.progress ?? {})
+            getProblem(msg.problem_id).then((res) => {
+              setProblem(res.problem)
+            }).catch(() => {})
+          } else if (msg.type === 'player_advanced') {
+            setPlayerProgress(msg.progress ?? {})
+            if (msg.user_id === userIdRef.current) {
+              setSolvedTransition(true)
+              ;(async () => {
+                try {
+                  const [, res] = await Promise.all([
+                    new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+                    getProblem(msg.problem_id),
+                  ])
+                  setProblem(res.problem)
+                  const fresh = {
+                    python: starterCode(res.problem, 'python'),
+                    go: starterCode(res.problem, 'go'),
+                    cpp: starterCode(res.problem, 'cpp'),
+                    javascript: starterCode(res.problem, 'javascript'),
+                  }
+                  try { localStorage.removeItem(storageKey) } catch {}
+                  setCodePerLang(fresh)
+                  setSubmissionResult(null)
+                } catch {
+                  setActionError('Не удалось загрузить следующую задачу')
+                } finally {
+                  setSolvedTransition(false)
                 }
-                try { localStorage.removeItem(storageKey) } catch {}
-                setCodePerLang(fresh)
-                setSubmissionResult(null)
-              })
-              .catch(() => {
-                setRoundTransition(null)
-                setActionError('Не удалось загрузить следующую задачу')
-              })
+              })()
+            }
           } else if (msg.type === 'game_finished') {
-            if (msg.scores) setScores(msg.scores)
             if (msg.code && msg.language) {
               setPlayerSolutions((prev) => ({
                 ...prev,
                 [msg.winner_id]: { code: msg.code!, language: msg.language as LangValue },
               }))
             }
-            setWinner({ winner_id: msg.winner_id, solver_id: msg.solver_id, scores: msg.scores ?? {} })
+            setWinner({ winner_id: msg.winner_id })
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
             setViewingUserId(msg.winner_id)
           }
@@ -326,6 +323,8 @@ export function GamePage() {
   const isActive = game.status === 'active'
   const isFinished = game.status === 'finished' || game.status === 'cancelled'
   const canStart = isCreator && game.participants.length >= 2
+  const totalProblems = game.problem_ids.length
+  const myProgress = playerProgress[userId ?? ''] ?? 0
 
   // Lobby (pending)
   if (game.status === 'pending') {
@@ -439,7 +438,7 @@ export function GamePage() {
           <span className="text-sm font-medium">{problem.title}</span>
           <span className="text-muted-foreground/40">|</span>
           <span className="text-xs text-muted-foreground">
-            {game.current_problem_index + 1}/{game.problem_ids.length}
+            {myProgress + 1}/{totalProblems}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -465,9 +464,6 @@ export function GamePage() {
         <div className="w-2/5 flex flex-col gap-3 overflow-y-auto">
           <div className="rounded-lg border border-border bg-card p-5 flex-shrink-0 shadow-sm">
             <h2 className="text-base font-semibold mb-3">{problem.title}</h2>
-            <p className="text-xs text-muted-foreground mb-3">
-              Прогресс: {game.current_problem_index + 1}/{game.problem_ids.length}
-            </p>
             <div className="flex items-center gap-2 flex-wrap mb-4">
               <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted border border-border">
                 {problem.time_limit_ms} мс
@@ -500,11 +496,9 @@ export function GamePage() {
                     {p.id === userId && ' (ты)'}
                   </span>
                   <div className="ml-auto flex items-center gap-2">
-                    {Object.keys(scores).length > 0 && (
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {scores[p.id] ?? 0}
-                      </span>
-                    )}
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {playerProgress[p.id] ?? 0}/{totalProblems}
+                    </span>
                     {game.winner_id === p.id && (
                       <span className="text-xs text-yellow-400 font-medium">Победитель</span>
                     )}
@@ -636,34 +630,20 @@ export function GamePage() {
         </div>
       </div>
 
-      {/* Round transition overlay */}
-      {roundTransition !== null && (() => {
-        const solver = game.participants.find((p) => p.id === roundTransition.solverId)
-        const solverName = solver ? participantLabel(solver) : roundTransition.solverId.slice(0, 8)
-        return (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/90 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-5 text-center">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
-                <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <p className="text-xl font-semibold">Задача {roundTransition.from + 1} решена!</p>
-                <p className="text-sm text-muted-foreground">
-                  {roundTransition.solverId === userId
-                    ? 'Ты решил первым!'
-                    : `Первым решил ${solverName}`}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Следующая задача через{' '}
-                  <span className="font-semibold text-foreground">{countdown}</span>...
-                </p>
-              </div>
+      {/* Solved transition overlay */}
+      {solvedTransition && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="animate-in fade-in zoom-in-95 duration-300 flex flex-col items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500/60 flex items-center justify-center">
+              <svg className="w-10 h-10 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
             </div>
+            <p className="text-lg font-semibold text-green-400">Задача решена!</p>
+            <p className="text-sm text-muted-foreground">Загружаем следующую...</p>
           </div>
-        )
-      })()}
+        </div>
+      )}
 
       {/* Winner modal */}
       {winner && (
@@ -674,32 +654,9 @@ export function GamePage() {
             </h2>
             <p className="text-sm text-muted-foreground mb-5">
               {winner.winner_id === userId
-                ? 'Ты набрал больше всех очков'
+                ? 'Ты решил все задачи первым!'
                 : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id.slice(0, 8)}`}
             </p>
-            {Object.keys(scores).length > 0 && (
-              <div className="mb-5 rounded-lg border border-border/40 overflow-hidden text-left">
-                {game.participants
-                  .slice()
-                  .sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0))
-                  .map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between px-3 py-2 text-sm border-b border-border/40 last:border-0"
-                    >
-                      <span className={p.id === userId ? 'text-primary font-medium' : ''}>
-                        {participantLabel(p)}
-                        {p.id === winner.winner_id && (
-                          <span className="ml-1.5 text-xs text-yellow-400">★</span>
-                        )}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {scores[p.id] ?? 0} очк.
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            )}
             <Button className="w-full" onClick={() => setWinner(null)}>
               Закрыть
             </Button>

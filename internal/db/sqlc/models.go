@@ -22,9 +22,10 @@ type Game struct {
 }
 
 type GameParticipant struct {
-	ID     int32     `json:"id"`
-	GameID int32     `json:"game_id"`
-	UserID uuid.UUID `json:"user_id"`
+	ID                  int32     `json:"id"`
+	GameID              int32     `json:"game_id"`
+	UserID              uuid.UUID `json:"user_id"`
+	CurrentProblemIndex int32     `json:"current_problem_index"`
 }
 
 type GameProblem struct {
