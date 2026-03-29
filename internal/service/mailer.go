@@ -28,27 +28,27 @@ var verificationEmailTemplate = template.Must(template.New("verification_email")
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>Код подтверждения</title>
   </head>
-  <body style="margin:0;padding:0;background:#0b1020;font-family:Inter,Arial,sans-serif;color:#e8ecff;">
+  <body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,Arial,sans-serif;color:#e5e7eb;">
 	<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 12px;">
 	  <tr>
 		<td align="center">
-		  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#131a33;border:1px solid #283463;border-radius:14px;overflow:hidden;">
+		  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#121212;border:1px solid #262626;border-radius:14px;overflow:hidden;">
 			<tr>
-			  <td style="padding:20px 24px;background:#1b2447;color:#8ea0ff;font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Byte Battle</td>
+			  <td style="padding:20px 24px;background:#0f0f0f;color:#4ade80;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Byte Battle</td>
 			</tr>
 			<tr>
-			  <td style="padding:28px 24px 8px 24px;font-size:24px;line-height:1.3;font-weight:700;color:#ffffff;">Ваш код подтверждения</td>
+			  <td style="padding:28px 24px 8px 24px;font-size:24px;line-height:1.3;font-weight:700;color:#f9fafb;">Ваш код подтверждения</td>
 			</tr>
 			<tr>
-			  <td style="padding:0 24px 16px 24px;font-size:15px;line-height:1.6;color:#c9d2ff;">Введите этот код на странице входа. Код действует 15 минут.</td>
+			  <td style="padding:0 24px 16px 24px;font-size:15px;line-height:1.6;color:#9ca3af;">Введите этот код на странице входа. Код действует 15 минут.</td>
 			</tr>
 			<tr>
 			  <td style="padding:0 24px 24px 24px;">
-				<div style="display:inline-block;padding:12px 20px;border-radius:10px;border:1px solid #3a4a87;background:#0d1430;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:0.24em;">{{.Code}}</div>
+				<div style="display:inline-block;padding:12px 20px;border-radius:10px;border:1px solid #22c55e;background:#052e16;color:#4ade80;font-size:28px;font-weight:700;letter-spacing:0.24em;">{{.Code}}</div>
 			  </td>
 			</tr>
 			<tr>
-			  <td style="padding:0 24px 24px 24px;font-size:13px;line-height:1.6;color:#9aa6db;">Если вы не запрашивали код, просто проигнорируйте это письмо.</td>
+			  <td style="padding:0 24px 24px 24px;font-size:13px;line-height:1.6;color:#6b7280;">Если вы не запрашивали код, просто проигнорируйте это письмо.</td>
 			</tr>
 		  </table>
 		</td>
