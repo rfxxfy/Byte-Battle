@@ -41,7 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const handler = () => setState({ token: null, userId: null, loading: false })
+    const handler = () => {
+      localStorage.removeItem('token')
+      setState({ token: null, userId: null, loading: false })
+    }
     window.addEventListener('unauthorized', handler)
     return () => window.removeEventListener('unauthorized', handler)
   }, [])
