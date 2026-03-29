@@ -56,8 +56,8 @@ EOF
 
 1. Зарегистрируйте аккаунт на Resend.
 2. Добавьте и верифицируйте домен отправителя.
-3. Создайте API key (отдельно для `production` и `staging`, если нужно).
-4. Добавьте ключ в `/opt/bytebattle/.env` (и `/opt/bytebattle-staging/.env` для staging).
+3. Создайте API key.
+4. Добавьте ключ в `/opt/bytebattle/.env`.
 
 ## 2. Настройка GitHub
 
