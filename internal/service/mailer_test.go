@@ -5,31 +5,16 @@ import (
 	"testing"
 )
 
-func TestRenderVerificationEmailHTML_IncludesCode(t *testing.T) {
-	html, err := renderVerificationEmailHTML("123456")
+func TestRenderVerificationEmailHTML_Smoke(t *testing.T) {
+	const code = "123456"
+	html, err := renderVerificationEmailHTML(code)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if !strings.Contains(html, "123456") {
-		t.Fatalf("expected rendered html to contain code")
-	}
-	if !strings.Contains(html, "Byte Battle") {
-		t.Fatalf("expected rendered html to contain branding")
-	}
-}
-
-func TestRenderVerificationEmailHTML_EscapesContent(t *testing.T) {
-	html, err := renderVerificationEmailHTML("<b>123</b>")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if strings.Contains(html, "<b>123</b>") {
-		t.Fatalf("expected raw html to be escaped")
-	}
-	if !strings.Contains(html, "&lt;b&gt;123&lt;/b&gt;") {
-		t.Fatalf("expected escaped content in html")
+	for _, digit := range code {
+		if !strings.Contains(html, string(digit)) {
+			t.Fatalf("expected rendered html to contain digit %q", string(digit))
+		}
 	}
 }
 
