@@ -29,7 +29,7 @@ bytebattle.online {
 
 	# API + WebSocket → Go
 	handle /api/* {
-		reverse_proxy app:8080
+		reverse_proxy bytebattle-app:8080
 	}
 
 	# SPA static files
