@@ -34,12 +34,12 @@ interface SubmissionResult {
   stderr: string
   failed_test?: number
   user_id: string
-  code?: string
-  language?: string
 }
 
 interface GameFinished {
   winner_id: string
+  code?: string
+  language?: string
 }
 
 interface RoundAdvanced {
@@ -62,6 +62,7 @@ export function GamePage() {
   const [actionError, setActionError] = useState('')
 
   const [language, setLanguage] = useState<LangValue>('python')
+  const languageRef = useRef<LangValue>('python')
   const [code, setCode] = useState(DEFAULT_CODE.python)
   const [stdin, setStdin] = useState('')
 
@@ -76,6 +77,10 @@ export function GamePage() {
 
   const wsRef = useRef<WebSocket | null>(null)
 
+  useEffect(() => {
+    languageRef.current = language
+  }, [language])
+
   const fetchGame = useCallback(async () => {
     try {
       const res = await getGame(gameId)
@@ -83,7 +88,7 @@ export function GamePage() {
       const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
       setProblem((prev) => {
         if (prev?.id !== pRes.problem.id) {
-          setCode(starterCode(pRes.problem, language))
+          setCode(starterCode(pRes.problem, languageRef.current))
         }
         return pRes.problem
       })
@@ -126,11 +131,6 @@ export function GamePage() {
           if (msg.type === 'submission_result') {
             setSubmissionResult(msg)
             setSubmitting(false)
-            if (msg.code && msg.language) {
-              const uid = msg.user_id
-              const lang = msg.language as LangValue
-              setPlayerSolutions((prev) => ({ ...prev, [uid]: { code: msg.code!, language: lang } }))
-            }
           } else if (msg.type === 'round_advanced') {
             setGame((prev) => {
               if (!prev) return prev
@@ -142,13 +142,19 @@ export function GamePage() {
             getProblem(msg.problem_id)
               .then((res) => {
                 setProblem(res.problem)
-                setCode(starterCode(res.problem, language))
+                setCode(starterCode(res.problem, languageRef.current))
                 setSubmissionResult(null)
               })
               .catch(() => {
                 setActionError('Не удалось загрузить следующую задачу')
               })
           } else if (msg.type === 'game_finished') {
+            if (msg.code && msg.language) {
+              setPlayerSolutions((prev) => ({
+                ...prev,
+                [msg.winner_id]: { code: msg.code!, language: msg.language as LangValue },
+              }))
+            }
             setWinner({ winner_id: msg.winner_id })
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
             setViewingUserId(msg.winner_id)
