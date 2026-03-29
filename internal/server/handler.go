@@ -423,21 +423,33 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	s.hub.Broadcast(gameID, resultMsg)
 
 	if result.Accepted && result.WinnerID != uuid.Nil {
+		s.scores.Add(gameID, userID)
+		winnerID := s.scores.Winner(gameID, result.WinnerID)
+		if winnerID != result.WinnerID {
+			if err := s.gameService.SetWinner(ctx, int(gameID), winnerID); err != nil {
+				log.Printf("processSubmit: set winner: %v", err)
+			}
+		}
 		finMsg, _ := json.Marshal(ws.ServerMessage{
 			Type:     ws.TypeGameFinished,
-			WinnerID: result.WinnerID,
+			WinnerID: winnerID,
+			SolverID: userID,
 			Code:     msg.Code,
 			Language: msg.Language,
+			Scores:   s.scores.Snapshot(gameID),
 		})
 		s.hub.Broadcast(gameID, finMsg)
 		return
 	}
 
 	if result.Accepted && result.ProblemID != "" {
+		s.scores.Add(gameID, userID)
 		roundMsg, _ := json.Marshal(ws.ServerMessage{
 			Type:       ws.TypeRoundAdvanced,
 			ProblemID:  result.ProblemID,
 			ProblemIdx: result.ProblemIdx,
+			SolverID:   userID,
+			Scores:     s.scores.Snapshot(gameID),
 		})
 		s.hub.Broadcast(gameID, roundMsg)
 	}

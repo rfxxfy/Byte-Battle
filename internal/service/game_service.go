@@ -536,6 +536,13 @@ func (s *GameService) LeaveGame(ctx context.Context, gameID int, userID uuid.UUI
 	return game, nil
 }
 
+func (s *GameService) SetWinner(ctx context.Context, gameID int, winnerID uuid.UUID) error {
+	return s.q.UpdateGameWinner(ctx, sqlcdb.UpdateGameWinnerParams{
+		ID:       int32(gameID),
+		WinnerID: uuid.NullUUID{UUID: winnerID, Valid: true},
+	})
+}
+
 func (s *GameService) DeleteGame(ctx context.Context, id int, userID uuid.UUID) error {
 	game, err := s.q.GetGameByID(ctx, int32(id))
 	if errors.Is(err, pgx.ErrNoRows) {
