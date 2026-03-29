@@ -110,4 +110,3 @@ func renderVerificationEmailHTML(code string) (string, error) {
 	}
 	return b.String(), nil
 }
-

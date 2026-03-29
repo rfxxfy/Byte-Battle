@@ -46,4 +46,3 @@ func TestNewMailer_SelectsResendMailerWithAPIKey(t *testing.T) {
 		t.Fatalf("expected resendMailer when api key is set")
 	}
 }
-
