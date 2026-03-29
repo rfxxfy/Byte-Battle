@@ -24,6 +24,11 @@ export function AppLayout() {
                   staging
                 </span>
               )}
+              {window.location.hostname === 'localhost' && (
+                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-400">
+                  local
+                </span>
+              )}
             </Link>
             <nav className="flex items-center gap-1">
               <NavLink
