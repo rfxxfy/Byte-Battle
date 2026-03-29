@@ -586,8 +586,8 @@ export function GamePage() {
                 ? 'Ты решил задачу первым'
                 : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id.slice(0, 8)}`}
             </p>
-            <Button className="w-full" onClick={() => navigate('/games')}>
-              В лобби
+            <Button className="w-full" onClick={() => setWinner(null)}>
+              Закрыть
             </Button>
           </div>
         </div>
