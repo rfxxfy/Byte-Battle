@@ -14,13 +14,20 @@ function RootRedirect() {
   return <Navigate to={token ? '/games' : '/login'} replace />
 }
 
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const { token, loading } = useAuth()
+  if (loading) return null
+  if (token) return <Navigate to="/games" replace />
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route
             element={
               <ProtectedRoute>
