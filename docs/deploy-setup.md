@@ -40,12 +40,24 @@ DB_NAME=bytebattle
 # HTTP
 HTTP_PORT=8080
 
+# Email verification via Resend
+RESEND_API_KEY=re_ВАШ_КЛЮЧ
+FROM_EMAIL=Byte Battle <noreply@yourdomain.com>
+
 # Задаётся автоматически при деплое (не менять вручную)
 IMAGE=ghcr.io/OWNER/byte-battle
 EOF
 ```
 
 > ⚠️ Пароль `DB_PASSWORD` должен быть уникальным. Сгенерировать: `openssl rand -base64 24`
+> ⚠️ Для отправки писем домен в `FROM_EMAIL` должен быть подтвержден в Resend.
+
+### Настроить Resend
+
+1. Зарегистрируйте аккаунт на Resend.
+2. Добавьте и верифицируйте домен отправителя.
+3. Создайте API key (отдельно для `production` и `staging`, если нужно).
+4. Добавьте ключ в `/opt/bytebattle/.env` (и `/opt/bytebattle-staging/.env` для staging).
 
 ## 2. Настройка GitHub
 

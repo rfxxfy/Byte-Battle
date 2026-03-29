@@ -43,6 +43,20 @@ Byte-Battle — это не просто кодинг, а азартные и п
 
 По умолчанию приложение подключается к `postgres://bytebattle:bytebattle@localhost:5432/bytebattle?sslmode=disable` — это значение `docker-compose.yaml`. Для другого окружения задайте переменную `DB_DSN` (или создайте `.env` на основе `.env.example`).
 
+## Email-коды входа (Resend)
+
+По умолчанию (без `RESEND_API_KEY`) коды подтверждения не отправляются во внешнюю почту и печатаются в логах сервера.
+
+Чтобы включить реальную отправку email:
+
+1. Создайте аккаунт в Resend и получите API ключ.
+2. Добавьте в `.env`:
+   - `RESEND_API_KEY=re_...`
+   - `FROM_EMAIL=Byte Battle <noreply@yourdomain.com>`
+3. Убедитесь, что домен отправителя верифицирован в Resend.
+
+После этого `SendCode` будет отправлять код на указанный email через Resend API.
+
 ## Запуск
 
 ```bash
@@ -121,6 +135,8 @@ sqlc.yaml                # Конфиг генератора sqlc
 | `HTTP_HOST` | `0.0.0.0` | Хост HTTP-сервера |
 | `HTTP_PORT` | `8080` | Порт HTTP-сервера |
 | `PROBLEMS_DIR` | `./problems` | Путь к каталогу задач |
+| `RESEND_API_KEY` | `` | API ключ Resend; если пустой, используется dev-mailer (код в логах) |
+| `FROM_EMAIL` | `noreply@bytebattle.dev` | Email отправителя для писем с кодом |
 
 Для dev-окружения значения по умолчанию совпадают с `docker-compose.yaml` — никаких `.env` не нужно.
 Для задания кастомных значений создайте `.env` на основе `.env.example` — он загружается автоматически.
