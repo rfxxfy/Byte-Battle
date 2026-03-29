@@ -238,7 +238,7 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 		CapDrop:     []string{"ALL"},
 		SecurityOpt: []string{"no-new-privileges:true"},
 		Tmpfs: map[string]string{
-			"/tmp": "",
+			"/tmp": "exec",
 			"/run": "",
 		},
 	}
@@ -400,7 +400,7 @@ func (e *DockerExecutor) createContainerWithLimits(ctx context.Context, langConf
 		CapDrop:     []string{"ALL"},
 		SecurityOpt: []string{"no-new-privileges:true"},
 		Tmpfs: map[string]string{
-			"/tmp": "",
+			"/tmp": "exec",
 			"/run": "",
 		},
 	}
