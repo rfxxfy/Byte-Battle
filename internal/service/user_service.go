@@ -25,6 +25,10 @@ func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (sqlcdb.User, e
 	return s.q.GetUserByID(ctx, id)
 }
 
+func (s *UserService) GetStats(ctx context.Context, id uuid.UUID) (sqlcdb.GetUserStatsRow, error) {
+	return s.q.GetUserStats(ctx, uuid.NullUUID{UUID: id, Valid: true})
+}
+
 func (s *UserService) UpdateName(ctx context.Context, id uuid.UUID, name string) (sqlcdb.User, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" || len(trimmed) > 100 {

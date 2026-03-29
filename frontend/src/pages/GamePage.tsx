@@ -20,6 +20,8 @@ const LANGUAGES = [
 
 type LangValue = (typeof LANGUAGES)[number]['value']
 
+const COUNTDOWN_S = 3
+
 const DEFAULT_CODE: Record<LangValue, string> = {
   python: 'print("Hello, ByteBattle!")\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, ByteBattle!")\n}\n',
@@ -103,6 +105,7 @@ export function GamePage() {
   const [soloTimeDisplay, setSoloTimeDisplay] = useState<string | null>(null)
   const [soloRemainingSeconds, setSoloRemainingSeconds] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
   const userIdRef = useRef<string | null>(userId)
@@ -151,6 +154,34 @@ export function GamePage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!game?.started_at || game.status !== 'active') {
+      setCountdown(null)
+      return
+    }
+
+    const startedAt = new Date(game.started_at).getTime()
+
+    const computeTick = (): number | null => {
+      const left = COUNTDOWN_S - (Date.now() - startedAt) / 1000
+      if (left <= -1) return null
+      if (left <= 0) return 0
+      return Math.ceil(left)
+    }
+
+    const initial = computeTick()
+    setCountdown(initial)
+    if (initial === null) return
+
+    const id = setInterval(() => {
+      const tick = computeTick()
+      setCountdown((prev) => (tick === prev ? prev : tick))
+      if (tick === null) clearInterval(id)
+    }, 100)
+
+    return () => clearInterval(id)
+  }, [game?.started_at, game?.status])
+
+  useEffect(() => {
     if (!game?.is_solo || game.status !== 'active') return
 
     if (!game.started_at || game.time_limit_minutes == null) return
@@ -159,7 +190,7 @@ export function GamePage() {
 
     const tick = () => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000)
-      const remaining = Math.max(0, timeLimitSeconds - elapsed)
+      const remaining = Math.max(0, timeLimitSeconds - Math.max(0, elapsed - COUNTDOWN_S))
       setSoloTimeDisplay(formatSeconds(remaining))
       setSoloRemainingSeconds(remaining)
       if (remaining === 0 && !timeoutCalledRef.current) {
@@ -426,7 +457,7 @@ export function GamePage() {
                 size="sm"
                 variant="outline"
                 onClick={handleRun}
-                disabled={!isActive || running || timedOut}
+                disabled={!isActive || running || timedOut || countdown !== null}
               >
                 {running ? 'Запуск...' : (
                   <span className="flex items-center gap-1.5">
@@ -440,7 +471,7 @@ export function GamePage() {
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={!isActive || submitting || timedOut}
+                disabled={!isActive || submitting || timedOut || countdown !== null}
               >
                 {submitting ? 'Проверяем...' : 'Отправить решение'}
               </Button>
@@ -534,6 +565,17 @@ export function GamePage() {
             <p className="text-lg font-semibold text-green-400">Задача решена!</p>
             <p className="text-sm text-muted-foreground">Загружаем следующую...</p>
           </div>
+        </div>
+      )}
+
+      {countdown !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-hidden">
+          <span
+            key={countdown}
+            className={`animate-count-tick font-bold tracking-tight select-none ${countdown === 0 ? 'text-4xl text-primary' : 'text-8xl'}`}
+          >
+            {countdown === 0 ? 'Начали!' : countdown}
+          </span>
         </div>
       )}
 

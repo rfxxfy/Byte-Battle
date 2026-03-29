@@ -23,6 +23,11 @@ const messages: Record<string, string> = {
 
   // Problems
   PROBLEM_NOT_FOUND: 'Задача не найдена',
+  NOT_PROBLEM_OWNER: 'Вы не являетесь владельцем этой задачи',
+  ARCHIVE_INVALID: 'Ошибка формата архива',
+  VERSION_LIMIT_REACHED: 'Достигнут лимит версий задачи (максимум 10)',
+  PROBLEM_LIMIT_REACHED: 'Достигнут лимит задач (максимум 20)',
+  EXECUTOR_NOT_READY: 'Система выполнения кода временно недоступна',
 
   // Generic
   VALIDATION_ERROR: 'Ошибка валидации',

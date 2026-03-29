@@ -5,12 +5,14 @@ import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { ProblemsPage } from './pages/ProblemsPage'
 import { ProblemPage } from './pages/ProblemPage'
+import { MyProblemsPage } from './pages/MyProblemsPage'
 import { GamesPage } from './pages/GamesPage'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { GameResultsPage } from './pages/GameResultsPage'
 import { GameLobbyPage } from './pages/GameLobbyPage'
 import { SoloLobbyPage } from './pages/SoloLobbyPage'
+import { NotFoundPage } from './pages/NotFoundPage'
 
 function RootRedirect() {
   const { token, loading } = useAuth()
@@ -40,6 +42,7 @@ export default function App() {
             }
           >
             <Route path="/problems" element={<ProblemsPage />} />
+            <Route path="/problems/mine" element={<MyProblemsPage />} />
             <Route path="/problems/:id" element={<ProblemPage />} />
             <Route path="/games" element={<GamesPage />} />
             <Route path="/games/:id" element={<GamePage />} />
@@ -50,6 +53,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/games/join/:token" element={<GameLobbyPage />} />
           </Route>
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

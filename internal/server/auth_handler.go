@@ -52,6 +52,22 @@ func (s *HTTPServer) GetAuthMe(ctx context.Context, _ api.GetAuthMeRequestObject
 	return resp, nil
 }
 
+func (s *HTTPServer) GetAuthMeStats(ctx context.Context, _ api.GetAuthMeStatsRequestObject) (api.GetAuthMeStatsResponseObject, error) {
+	userID, ok := userIDFromContext(ctx)
+	if !ok {
+		return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
+	}
+	stats, err := s.users.GetStats(ctx, userID)
+	if err != nil {
+		return nil, apierr.New(apierr.ErrInternal, "internal server error")
+	}
+	return api.GetAuthMeStats200JSONResponse{
+		Wins:           int(stats.Wins),
+		GamesPlayed:    int(stats.GamesPlayed),
+		ProblemsSolved: int(stats.ProblemsSolved),
+	}, nil
+}
+
 func (s *HTTPServer) PostAuthLogout(ctx context.Context, _ api.PostAuthLogoutRequestObject) (api.PostAuthLogoutResponseObject, error) {
 	if session, ok := sessionFromContext(ctx); ok {
 		if err := s.sessionService.EndSession(ctx, int(session.ID)); err != nil {

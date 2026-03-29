@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getGameByToken, joinGameByToken, startGame, cancelGame, leaveGame, type Game } from '@/api/games'
 import { ApiError } from '@/api/client'
@@ -17,9 +17,6 @@ export function GameLobbyPage() {
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [linkCopied, setLinkCopied] = useState(false)
-  const [countdown, setCountdown] = useState<3 | 2 | 1 | 0 | null>(null)
-
-  const prevStatusRef = useRef<string | undefined>(undefined)
 
   const fetchGame = useCallback(async () => {
     if (!token) return
@@ -28,17 +25,7 @@ export function GameLobbyPage() {
       const g = res.game
 
       if (g.status === 'active') {
-        if (prevStatusRef.current === 'pending') {
-          prevStatusRef.current = g.status
-          setGame(g)
-          setCountdown(3)
-          setTimeout(() => setCountdown(2), 1000)
-          setTimeout(() => setCountdown(1), 2000)
-          setTimeout(() => setCountdown(0), 3000)
-          setTimeout(() => { setCountdown(null); navigate(`/games/${g.id}`) }, 4000)
-        } else {
-          navigate(`/games/${g.id}`, { replace: true })
-        }
+        navigate(`/games/${g.id}`, { replace: true })
         return
       }
       if (g.status === 'finished' || g.status === 'cancelled') {
@@ -46,7 +33,6 @@ export function GameLobbyPage() {
         return
       }
 
-      prevStatusRef.current = g.status
       setGame(g)
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
@@ -217,16 +203,6 @@ export function GameLobbyPage() {
         )}
       </div>
 
-      {countdown !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-hidden">
-          <span
-            key={countdown}
-            className={`animate-count-tick font-bold tracking-tight select-none ${countdown === 0 ? 'text-4xl text-primary' : 'text-8xl'}`}
-          >
-            {countdown === 0 ? 'Начали!' : countdown}
-          </span>
-        </div>
-      )}
     </div>
   )
 }

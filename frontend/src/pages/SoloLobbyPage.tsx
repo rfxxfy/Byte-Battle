@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getGame, startGame, cancelGame, type Game } from '@/api/games'
 import { ApiError } from '@/api/client'
@@ -17,10 +17,6 @@ export function SoloLobbyPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
-  const [countdown, setCountdown] = useState<3 | 2 | 1 | 0 | null>(null)
-
-  const prevStatusRef = useRef<string | undefined>(undefined)
-
   const fetchGame = useCallback(async () => {
     try {
       const res = await getGame(gameId)
@@ -33,17 +29,7 @@ export function SoloLobbyPage() {
       }
 
       if (g.status === 'active') {
-        if (prevStatusRef.current === 'pending') {
-          prevStatusRef.current = g.status
-          setGame(g)
-          setCountdown(3)
-          setTimeout(() => setCountdown(2), 1000)
-          setTimeout(() => setCountdown(1), 2000)
-          setTimeout(() => setCountdown(0), 3000)
-          setTimeout(() => { setCountdown(null); navigate(`/games/${gameId}`) }, 4000)
-        } else {
-          navigate(`/games/${gameId}`, { replace: true })
-        }
+        navigate(`/games/${gameId}`, { replace: true })
         return
       }
       if (g.status === 'finished' || g.status === 'cancelled') {
@@ -51,7 +37,6 @@ export function SoloLobbyPage() {
         return
       }
 
-      prevStatusRef.current = g.status
       setGame(g)
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
@@ -116,7 +101,7 @@ export function SoloLobbyPage() {
         </Link>
 
         <div className="rounded-lg border border-border/60 bg-card/50 p-5">
-          <p className="text-xs text-muted-foreground mb-1">Соло · Игра #{game.id}</p>
+          <p className="text-xs text-muted-foreground mb-1">Одиночная · Игра #{game.id}</p>
           <p className="text-sm font-medium">
             {game.problem_ids.length} {pluralize(game.problem_ids.length, 'задача', 'задачи', 'задач')}
           </p>
@@ -141,16 +126,6 @@ export function SoloLobbyPage() {
         )}
       </div>
 
-      {countdown !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-hidden">
-          <span
-            key={countdown}
-            className={`animate-count-tick font-bold tracking-tight select-none ${countdown === 0 ? 'text-4xl text-primary' : 'text-8xl'}`}
-          >
-            {countdown === 0 ? 'Начали!' : countdown}
-          </span>
-        </div>
-      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { updateMe } from '@/api/auth'
+import { updateMe, getMyStats, type UserStats } from '@/api/auth'
 import { Button } from '@/components/ui/button'
 
 export function ProfilePage() {
@@ -10,6 +10,11 @@ export function ProfilePage() {
   const [inputName, setInputName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [stats, setStats] = useState<UserStats | null>(null)
+
+  useEffect(() => {
+    getMyStats().then(setStats).catch(() => {})
+  }, [])
 
   const handleEdit = () => {
     setInputName(name ?? '')
@@ -80,15 +85,15 @@ export function ProfilePage() {
         <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Статистика</p>
         <div className="grid grid-cols-3 gap-4">
           <div className="flex flex-col gap-1">
-            <p className="text-2xl font-semibold">—</p>
+            <p className="text-2xl font-semibold">{stats ? stats.wins : '—'}</p>
             <p className="text-xs text-muted-foreground">Побед</p>
           </div>
           <div className="flex flex-col gap-1">
-            <p className="text-2xl font-semibold">—</p>
+            <p className="text-2xl font-semibold">{stats ? stats.games_played : '—'}</p>
             <p className="text-xs text-muted-foreground">Игр сыграно</p>
           </div>
           <div className="flex flex-col gap-1">
-            <p className="text-2xl font-semibold">—</p>
+            <p className="text-2xl font-semibold">{stats ? stats.problems_solved : '—'}</p>
             <p className="text-xs text-muted-foreground">Задач решено</p>
           </div>
         </div>

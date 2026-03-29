@@ -93,6 +93,22 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
 
+  /auth/me/stats:
+    get:
+      operationId: GetAuthMeStats
+      summary: Get current user statistics
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStatsResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+
   /auth/logout:
     post:
       operationId: PostAuthLogout
@@ -629,6 +645,20 @@ components:
         email:
           type: string
           nullable: true
+
+    UserStatsResponse:
+      type: object
+      required:
+        - wins
+        - games_played
+        - problems_solved
+      properties:
+        wins:
+          type: integer
+        games_played:
+          type: integer
+        problems_solved:
+          type: integer
 
     DeletedResponse:
       type: object

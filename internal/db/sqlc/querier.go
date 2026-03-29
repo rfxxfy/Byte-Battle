@@ -55,6 +55,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserStats(ctx context.Context, userID uuid.NullUUID) (GetUserStatsRow, error)
 	GetVerificationCode(ctx context.Context, email string) (VerificationCode, error)
 	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error)
 	InsertSolution(ctx context.Context, arg InsertSolutionParams) error

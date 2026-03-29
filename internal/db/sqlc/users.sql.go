@@ -132,6 +132,30 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const getUserStats = `-- name: GetUserStats :one
+SELECT
+    COUNT(*) FILTER (WHERE g.winner_id = $1 AND g.is_solo = false)::int AS wins,
+    COUNT(*)::int AS games_played,
+    COALESCE(SUM(gp.current_problem_index), 0)::int AS problems_solved
+FROM game_participants gp
+JOIN games g ON g.id = gp.game_id
+WHERE gp.user_id = $1
+  AND g.status = 'finished'
+`
+
+type GetUserStatsRow struct {
+	Wins           int32 `json:"wins"`
+	GamesPlayed    int32 `json:"games_played"`
+	ProblemsSolved int32 `json:"problems_solved"`
+}
+
+func (q *Queries) GetUserStats(ctx context.Context, userID uuid.NullUUID) (GetUserStatsRow, error) {
+	row := q.db.QueryRow(ctx, getUserStats, userID)
+	var i GetUserStatsRow
+	err := row.Scan(&i.Wins, &i.GamesPlayed, &i.ProblemsSolved)
+	return i, err
+}
+
 const setEmailVerified = `-- name: SetEmailVerified :exec
 UPDATE users SET email_verified = true WHERE id = $1
 `

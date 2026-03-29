@@ -37,3 +37,11 @@ export const me = () => apiFetch<MeResponse>('/auth/me')
 
 export const logout = () =>
   apiFetch<{ status: string }>('/auth/logout', { method: 'POST' })
+
+export interface UserStats {
+  wins: number
+  games_played: number
+  problems_solved: number
+}
+
+export const getMyStats = () => apiFetch<UserStats>('/auth/me/stats')
