@@ -16,9 +16,14 @@ export function AppLayout() {
       <header className="sticky top-0 z-40 border-b border-border/60 bg-card/60 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link to="/problems" className="text-base font-semibold tracking-tight">
+            <Link to="/problems" className="text-base font-semibold tracking-tight flex items-center gap-2">
               <span className="text-primary">Byte</span>
               <span className="text-foreground"> Battle</span>
+              {window.location.hostname.startsWith('staging.') && (
+                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">
+                  staging
+                </span>
+              )}
             </Link>
             <nav className="flex items-center gap-1">
               <NavLink
