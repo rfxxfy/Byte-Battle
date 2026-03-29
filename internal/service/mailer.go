@@ -3,12 +3,16 @@ package service
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"html/template"
 	"log"
 
 	"github.com/resend/resend-go/v2"
 )
+
+//go:embed templates
+var emailTemplates embed.FS
 
 type Mailer interface {
 	SendVerificationCode(ctx context.Context, to, code string) error
@@ -21,41 +25,9 @@ type resendMailer struct {
 
 const verificationEmailSubject = "Ваш код входа в Byte Battle"
 
-var verificationEmailTemplate = template.Must(template.New("verification_email").Parse(`<!doctype html>
-<html lang="ru">
-  <head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Код подтверждения</title>
-  </head>
-  <body style="margin:0;padding:0;background:#0a0a0a;font-family:Inter,Arial,sans-serif;color:#e5e7eb;">
-	<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 12px;">
-	  <tr>
-		<td align="center">
-		  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#121212;border:1px solid #262626;border-radius:14px;overflow:hidden;">
-			<tr>
-			  <td style="padding:20px 24px;background:#0f0f0f;color:#4ade80;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Byte Battle</td>
-			</tr>
-			<tr>
-			  <td style="padding:28px 24px 8px 24px;font-size:24px;line-height:1.3;font-weight:700;color:#f9fafb;">Ваш код подтверждения</td>
-			</tr>
-			<tr>
-			  <td style="padding:0 24px 16px 24px;font-size:15px;line-height:1.6;color:#9ca3af;">Введите этот код на странице входа. Код действует 15 минут.</td>
-			</tr>
-			<tr>
-			  <td style="padding:0 24px 24px 24px;">
-				<div style="display:inline-block;padding:12px 20px;border-radius:10px;border:1px solid #22c55e;background:#052e16;color:#4ade80;font-size:28px;font-weight:700;letter-spacing:0.24em;">{{.Code}}</div>
-			  </td>
-			</tr>
-			<tr>
-			  <td style="padding:0 24px 24px 24px;font-size:13px;line-height:1.6;color:#6b7280;">Если вы не запрашивали код, просто проигнорируйте это письмо.</td>
-			</tr>
-		  </table>
-		</td>
-	  </tr>
-	</table>
-  </body>
-</html>`))
+var verificationEmailTemplate = template.Must(
+	template.ParseFS(emailTemplates, "templates/verification_email.html"),
+)
 
 func NewResendMailer(apiKey, fromEmail string) Mailer {
 	return &resendMailer{
@@ -104,8 +76,15 @@ func NewMailer(apiKey, fromEmail string) Mailer {
 }
 
 func renderVerificationEmailHTML(code string) (string, error) {
+	digits := make([]string, len(code))
+	for i, c := range code {
+		digits[i] = string(c)
+	}
 	var b bytes.Buffer
-	if err := verificationEmailTemplate.Execute(&b, struct{ Code string }{Code: code}); err != nil {
+	if err := verificationEmailTemplate.Execute(&b, struct {
+		Code   string
+		Digits []string
+	}{Code: code, Digits: digits}); err != nil {
 		return "", err
 	}
 	return b.String(), nil
