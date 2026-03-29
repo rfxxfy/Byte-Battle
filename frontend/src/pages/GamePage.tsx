@@ -65,7 +65,21 @@ export function GamePage() {
 
   const [language, setLanguage] = useState<LangValue>('python')
   const languageRef = useRef<LangValue>('python')
-  const [code, setCode] = useState(DEFAULT_CODE.python)
+  const storageKey = `bb_code_${gameId}`
+  const [codePerLang, setCodePerLang] = useState<Record<LangValue, string>>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) return { ...DEFAULT_CODE, ...JSON.parse(saved) }
+    } catch {}
+    return { ...DEFAULT_CODE }
+  })
+
+  const code = codePerLang[language]
+  const setCode = (val: string) => setCodePerLang((prev) => {
+    const next = { ...prev, [language]: val }
+    try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
+    return next
+  })
   const [stdin, setStdin] = useState('')
 
   const [running, setRunning] = useState(false)
@@ -89,8 +103,15 @@ export function GamePage() {
       setGame(res.game)
       const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
       setProblem((prev) => {
-        if (prev?.id !== pRes.problem.id) {
-          setCode(starterCode(pRes.problem, languageRef.current))
+        if (prev !== null && prev.id !== pRes.problem.id) {
+          const fresh = {
+            python: starterCode(pRes.problem, 'python'),
+            go: starterCode(pRes.problem, 'go'),
+            cpp: starterCode(pRes.problem, 'cpp'),
+            javascript: starterCode(pRes.problem, 'javascript'),
+          }
+          try { localStorage.removeItem(storageKey) } catch {}
+          setCodePerLang(fresh)
         }
         return pRes.problem
       })
@@ -144,7 +165,14 @@ export function GamePage() {
             getProblem(msg.problem_id)
               .then((res) => {
                 setProblem(res.problem)
-                setCode(starterCode(res.problem, languageRef.current))
+                const fresh = {
+                  python: starterCode(res.problem, 'python'),
+                  go: starterCode(res.problem, 'go'),
+                  cpp: starterCode(res.problem, 'cpp'),
+                  javascript: starterCode(res.problem, 'javascript'),
+                }
+                try { localStorage.removeItem(storageKey) } catch {}
+                setCodePerLang(fresh)
                 setSubmissionResult(null)
               })
               .catch(() => {
@@ -261,7 +289,6 @@ export function GamePage() {
 
   const handleLangChange = (lang: LangValue) => {
     setLanguage(lang)
-    setCode(starterCode(problem, lang))
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
