@@ -52,6 +52,7 @@ services:
       ALLOWED_ORIGINS: https://bytebattle.online
       HTTP_RATE_PER_MINUTE: ${HTTP_RATE_PER_MINUTE:-100}
       SESSION_TTL: ${SESSION_TTL:-168h}
+      EXECUTOR_INSTANCE: prod
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       FROM_EMAIL: ${FROM_EMAIL:-noreply@bytebattle.dev}
     volumes:

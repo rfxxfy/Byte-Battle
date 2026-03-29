@@ -119,6 +119,13 @@ jobs:
             sed -i "s|^IMAGE=.*|IMAGE=${{ env.IMAGE_LC }}:${{ env.COMMIT_SHA }}|" ${{ env.DEPLOY_DIR }}/.env \
               || echo "IMAGE=${{ env.IMAGE_LC }}:${{ env.COMMIT_SHA }}" >> ${{ env.DEPLOY_DIR }}/.env
 
+            # Reset staging DB before deploy to avoid migration conflicts from different branches
+            if [ "${{ inputs.target }}" = "staging" ]; then
+              DB_USER=$(grep '^DB_USER=' ${{ env.DEPLOY_DIR }}/.env | cut -d= -f2)
+              docker exec bytebattle-staging-postgres \
+                psql -U "$DB_USER" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+            fi
+
             # Pull new image and restart stack
             docker compose --env-file ${{ env.DEPLOY_DIR }}/.env -f /opt/bytebattle/${{ env.COMPOSE_FILE }} pull app
             docker compose --env-file ${{ env.DEPLOY_DIR }}/.env -f /opt/bytebattle/${{ env.COMPOSE_FILE }} up --wait

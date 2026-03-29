@@ -27,13 +27,14 @@ import (
 )
 
 const (
-	poolSize           = 3
-	queueMultiplier    = 4
-	nanoCPUs           = int64(1000000000)
-	pidsLimit          = int64(64)
-	defaultMemoryLimit = 100 * 1024 * 1024
-	poolLabelKey       = "bytebattle"
-	poolLabelVal       = "pool"
+	poolSize             = 3
+	queueMultiplier      = 4
+	nanoCPUs             = int64(1000000000)
+	pidsLimit            = int64(64)
+	defaultMemoryLimit   = 100 * 1024 * 1024
+	poolLabelKey         = "bytebattle"
+	poolLabelVal         = "pool"
+	poolInstanceLabelKey = "bytebattle-instance"
 )
 
 type workItem struct {
@@ -55,6 +56,7 @@ type langPool struct {
 type DockerExecutor struct {
 	cli           dockerClient
 	config        *Config
+	instanceID    string
 	pools         map[Language]*langPool
 	errChan       chan error
 	primedPerLang map[Language]*atomic.Bool
@@ -80,9 +82,16 @@ func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
 
 	shutdownCtx, shutdown := context.WithCancel(context.Background())
 
+	instanceID := os.Getenv("EXECUTOR_INSTANCE")
+	if instanceID == "" {
+		instanceID = "default"
+		log.Printf("warn: EXECUTOR_INSTANCE not set, using %q — multiple instances on the same daemon will conflict", instanceID)
+	}
+
 	e := &DockerExecutor{
 		cli:         cli,
 		config:      cfg,
+		instanceID:  instanceID,
 		pools:       make(map[Language]*langPool),
 		errChan:     make(chan error, 16),
 		shutdownCtx: shutdownCtx,
@@ -115,8 +124,12 @@ func (e *DockerExecutor) watchSignals() {
 }
 
 // cleanupPreviousPools removes warm containers left over from a previous crash or unclean shutdown.
+// Filters by both the pool label and the instance ID so prod and staging don't interfere.
 func (e *DockerExecutor) cleanupPreviousPools(ctx context.Context) {
-	f := filters.NewArgs(filters.Arg("label", poolLabelKey+"="+poolLabelVal))
+	f := filters.NewArgs(
+		filters.Arg("label", poolLabelKey+"="+poolLabelVal),
+		filters.Arg("label", poolInstanceLabelKey+"="+e.instanceID),
+	)
 	containers, err := e.cli.ContainerList(ctx, container.ListOptions{Filters: f, All: true})
 	if err != nil {
 		log.Printf("cleanup previous pools: %v", err)
@@ -399,7 +412,7 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 		Cmd:        []string{"tail", "-f", "/dev/null"},
 		Tty:        false,
 		WorkingDir: "/app",
-		Labels:     map[string]string{poolLabelKey: poolLabelVal},
+		Labels:     map[string]string{poolLabelKey: poolLabelVal, poolInstanceLabelKey: e.instanceID},
 	}
 
 	resp, err := e.cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
