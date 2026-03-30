@@ -40,7 +40,7 @@ export function ProfilePage() {
 
         <div className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground">Email</p>
-          <p className="text-sm font-medium">{email}</p>
+          <p className="text-sm font-medium">{email ?? '—'}</p>
         </div>
 
         <div className="flex flex-col gap-1">

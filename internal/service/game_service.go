@@ -299,7 +299,7 @@ func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, user
 	}
 
 	// 3. Not finished yet — return early.
-	if int64(newIdx) < totalProblems {
+	if totalProblems == 0 || int64(newIdx) < totalProblems {
 		game, err := s.q.GetGameByID(ctx, int32(id))
 		return game, false, err
 	}
