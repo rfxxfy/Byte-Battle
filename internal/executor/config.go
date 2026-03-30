@@ -15,6 +15,7 @@ type LangSettings struct {
 	SourceFile  string   `json:"source_file"`
 	CompileCmd  []string `json:"compile_cmd,omitempty"`
 	RunCmd      []string `json:"run_cmd"`
+	WarmupCmd   string   `json:"warmup_cmd,omitempty"`
 	MemoryLimit int64    `json:"memory_limit"`
 	TimeLimit   int64    `json:"time_limit"`
 }
@@ -47,6 +48,7 @@ func DefaultConfig() *Config {
 				Image:       "golang:1.26-alpine",
 				SourceFile:  "main.go",
 				RunCmd:      []string{"go", "run", "main.go"},
+				WarmupCmd:   `printf 'package main\nimport ("fmt";"bufio";"os";"sort";"strconv";"strings";"math")\nfunc main(){fmt.Sprint();bufio.NewReader(os.Stdin);sort.Ints(nil);strconv.Itoa(0);strings.Contains("","");math.Abs(0)}\n' > /tmp/w.go && go run /tmp/w.go && rm /tmp/w.go`,
 				MemoryLimit: 512 * 1024 * 1024,
 				TimeLimit:   30,
 			},
