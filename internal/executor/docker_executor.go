@@ -285,8 +285,15 @@ func (e *DockerExecutor) runWarmup(ctx context.Context, containerID, cmd string)
 		return err
 	}
 	defer attachResp.Close()
-	if _, err = io.Copy(io.Discard, attachResp.Reader); err != nil {
+	go func() {
+		<-ctx.Done()
+		attachResp.Close()
+	}()
+	if _, err = io.Copy(io.Discard, attachResp.Reader); err != nil && ctx.Err() == nil {
 		return err
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 	insp, err := e.cli.ContainerExecInspect(ctx, execResp.ID)
 	if err != nil {
