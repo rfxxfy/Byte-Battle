@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     me()
       .then((res) => {
-        setState((prev) => ({ ...prev, token, userId: res.user_id, name: res.name ?? null, loading: false }))
+        setState((prev) => ({ ...prev, token, userId: res.user_id, email: res.email ?? null, name: res.name ?? null, loading: false }))
       })
       .catch((err) => {
         if (err instanceof ApiError) {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, token, loading: true }))
     me()
       .then((res) => {
-        setState((prev) => ({ ...prev, token, userId: res.user_id, name: res.name ?? null, loading: false }))
+        setState((prev) => ({ ...prev, token, userId: res.user_id, email: res.email ?? null, name: res.name ?? null, loading: false }))
       })
       .catch(() => {
         setState((prev) => ({ ...prev, loading: false }))
