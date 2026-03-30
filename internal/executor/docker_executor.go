@@ -271,6 +271,9 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 }
 
 func (e *DockerExecutor) runWarmup(ctx context.Context, containerID, cmd string) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
 	execResp, err := e.cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{
 		Cmd: []string{"/bin/sh", "-c", cmd},
 	})
@@ -282,8 +285,17 @@ func (e *DockerExecutor) runWarmup(ctx context.Context, containerID, cmd string)
 		return err
 	}
 	defer attachResp.Close()
-	_, err = io.Copy(io.Discard, attachResp.Reader)
-	return err
+	if _, err = io.Copy(io.Discard, attachResp.Reader); err != nil {
+		return err
+	}
+	insp, err := e.cli.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		return err
+	}
+	if insp.ExitCode != 0 {
+		return fmt.Errorf("warmup exited with code %d", insp.ExitCode)
+	}
+	return nil
 }
 
 func (e *DockerExecutor) cleanupContainer(ctx context.Context, id string) {
