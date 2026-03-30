@@ -1,4 +1,4 @@
-# Production compose — used on VPS
+# Production compose, used on VPS
 # Requires .env with IMAGE, DB_*, HTTP_PORT variables
 #
 # IMAGE is set by the deploy workflow, e.g.:
@@ -27,7 +27,7 @@ services:
         condition: service_healthy
 
   migrate:
-    image: ${IMAGE}:latest
+    image: ${IMAGE}
     entrypoint: ["/usr/local/bin/migrate"]
     command: ["-path", "/app/migrations", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable", "up"]
     restart: "no"
@@ -36,7 +36,7 @@ services:
         condition: service_healthy
 
   app:
-    image: ${IMAGE}:latest
+    image: ${IMAGE}
     container_name: bytebattle-app
     restart: unless-stopped
     user: "${DEPLOY_UID}"
@@ -51,7 +51,7 @@ services:
       PROBLEMS_DIR: /app/problems
       ALLOWED_ORIGINS: https://bytebattle.online
       HTTP_RATE_PER_MINUTE: ${HTTP_RATE_PER_MINUTE:-100}
-      SESSION_TTL: ${SESSION_TTL:-24h}
+      SESSION_TTL: ${SESSION_TTL:-168h}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       FROM_EMAIL: ${FROM_EMAIL:-noreply@bytebattle.dev}
     volumes:
