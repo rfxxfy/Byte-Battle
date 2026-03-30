@@ -85,7 +85,7 @@ export function AppLayout() {
         <Outlet />
       </main>
       <footer className="border-t border-border/40 py-3">
-        <div className="max-w-6xl mx-auto px-6 flex justify-end">
+        <div className="max-w-6xl mx-auto px-6 flex justify-center">
           <span className="text-xs text-muted-foreground/50 font-mono">
             {import.meta.env.VITE_COMMIT_SHA
               ? import.meta.env.VITE_COMMIT_SHA.slice(0, 7)
