@@ -289,6 +289,12 @@ func (e *DockerExecutor) runWarmup(ctx context.Context, containerID, cmd string)
 		return err
 	}
 	defer attachResp.Close()
+	// SetDeadline lets io.Copy unblock exactly when the context expires,
+	// without relying on goroutine scheduling. The goroutine below is kept
+	// as a cleanup path for contexts cancelled without a deadline.
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = attachResp.Conn.SetDeadline(deadline)
+	}
 	go func() {
 		<-ctx.Done()
 		attachResp.Close()
