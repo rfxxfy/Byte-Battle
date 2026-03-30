@@ -113,7 +113,7 @@ func New(
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	if n := httpRatePerMinute(); n > 0 {
-		r.Use(httprate.LimitByIP(n, time.Minute))
+		r.Use(httprate.LimitByRealIP(n, time.Minute))
 	}
 	r.Use(s.optionalAuthMiddleware)
 

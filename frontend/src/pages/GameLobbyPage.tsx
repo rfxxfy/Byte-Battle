@@ -47,7 +47,7 @@ export function GameLobbyPage() {
 
   useEffect(() => {
     if (game?.status !== 'pending') return
-    const timer = setInterval(fetchGame, 1000)
+    const timer = setInterval(fetchGame, 3000)
     return () => clearInterval(timer)
   }, [game?.status, fetchGame])
 
