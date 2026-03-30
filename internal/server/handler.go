@@ -360,6 +360,9 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 	})
 	s.hub.Broadcast(int32(gameID), joinedMsg)
 
+	// Send initial problem state to the connecting player.
+	s.sendPlayerState(r.Context(), gameID, session.UserID, client)
+
 	connCtx, connCancel := context.WithCancel(context.Background())
 	defer connCancel()
 
@@ -404,7 +407,6 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	}
 
 	if result.AlreadyAdvanced {
-		// Another goroutine already broadcast round_advanced / game_finished — nothing to do.
 		return
 	}
 
@@ -418,7 +420,11 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 	})
 	s.hub.Broadcast(gameID, resultMsg)
 
-	if result.Accepted && result.WinnerID != uuid.Nil {
+	if !result.Accepted {
+		return
+	}
+
+	if result.WinnerID != uuid.Nil {
 		finMsg, _ := json.Marshal(ws.ServerMessage{
 			Type:     ws.TypeGameFinished,
 			WinnerID: result.WinnerID,
@@ -427,14 +433,39 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		return
 	}
 
-	if result.Accepted && result.ProblemID != "" {
-		roundMsg, _ := json.Marshal(ws.ServerMessage{
-			Type:       ws.TypeRoundAdvanced,
+	if result.ProblemID != "" {
+		progress, err := s.gameService.GetAllParticipantsProblemIndices(ctx, int(gameID))
+		if err != nil {
+			log.Printf("processSubmit: get progress: %v", err)
+		}
+		advMsg, _ := json.Marshal(ws.ServerMessage{
+			Type:       ws.TypePlayerAdvanced,
+			UserID:     userID,
 			ProblemID:  result.ProblemID,
 			ProblemIdx: result.ProblemIdx,
+			Progress:   progress,
 		})
-		s.hub.Broadcast(gameID, roundMsg)
+		s.hub.Broadcast(gameID, advMsg)
 	}
+}
+
+func (s *HTTPServer) sendPlayerState(ctx context.Context, gameID int, userID uuid.UUID, client *ws.Client) {
+	playerIdx, err := s.gameService.GetParticipantProblemIndex(ctx, gameID, userID)
+	if err != nil {
+		return
+	}
+	problemID, err := s.gameService.GetGameProblemIDByIndex(ctx, int32(gameID), playerIdx)
+	if err != nil {
+		return
+	}
+	progress, _ := s.gameService.GetAllParticipantsProblemIndices(ctx, gameID)
+	stateMsg, _ := json.Marshal(ws.ServerMessage{
+		Type:       ws.TypePlayerState,
+		ProblemID:  problemID,
+		ProblemIdx: int(playerIdx),
+		Progress:   progress,
+	})
+	client.Send(stateMsg)
 }
 
 func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {

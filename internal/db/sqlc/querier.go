@@ -14,6 +14,7 @@ type Querier interface {
 	AddGameParticipant(ctx context.Context, arg AddGameParticipantParams) error
 	AddGameProblem(ctx context.Context, arg AddGameProblemParams) error
 	AdvanceGameProblem(ctx context.Context, arg AdvanceGameProblemParams) (Game, error)
+	AdvanceParticipantProblem(ctx context.Context, arg AdvanceParticipantProblemParams) (int32, error)
 	CancelGame(ctx context.Context, id int32) (Game, error)
 	CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error)
 	CountGameParticipants(ctx context.Context, gameID int32) (int64, error)
@@ -28,11 +29,13 @@ type Querier interface {
 	DeleteSession(ctx context.Context, id int32) (int64, error)
 	DeleteSessionsByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
 	DeleteVerificationCode(ctx context.Context, email string) error
+	GetAllParticipantsProblemIndices(ctx context.Context, gameID int32) ([]GetAllParticipantsProblemIndicesRow, error)
 	GetGameByID(ctx context.Context, id int32) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
 	GetGameProblemIDByIndex(ctx context.Context, arg GetGameProblemIDByIndexParams) (string, error)
 	GetGameProblemIDs(ctx context.Context, gameID int32) ([]string, error)
 	GetGameProblemIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetGameProblemIDsByGameIDsRow, error)
+	GetParticipantProblemIndex(ctx context.Context, arg GetParticipantProblemIndexParams) (int32, error)
 	GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error)
 	GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
@@ -48,6 +51,7 @@ type Querier interface {
 	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	StartGame(ctx context.Context, id int32) (Game, error)
+	UpdateGameWinner(ctx context.Context, arg UpdateGameWinnerParams) error
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
 	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (User, error)
 	UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (VerificationCode, error)
