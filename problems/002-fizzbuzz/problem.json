@@ -1,6 +1,6 @@
 {
   "title": "FizzBuzz",
-  "description": "Print numbers from `1` to `N`, one per line. Replace multiples with words:\n\n- Multiple of **3** → `Fizz`\n- Multiple of **5** → `Buzz`\n- Multiple of **15** → `FizzBuzz`\n\n**Example** (`N = 5`):\n```\n1\n2\nFizz\n4\nBuzz\n```",
+  "description": "Given N, print 1..N. Multiples of 3 -> Fizz, 5 -> Buzz, both -> FizzBuzz.",
   "difficulty": "easy",
   "time_limit_ms": 2000,
   "memory_limit_mb": 256

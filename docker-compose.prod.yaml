@@ -51,6 +51,9 @@ services:
       PROBLEMS_DIR: /app/problems
       ALLOWED_ORIGINS: https://bytebattle.online
       HTTP_RATE_PER_MINUTE: ${HTTP_RATE_PER_MINUTE:-100}
+      SESSION_TTL: ${SESSION_TTL:-24h}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@bytebattle.dev}
     volumes:
       - ./problems:/app/problems:ro
       - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock

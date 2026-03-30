@@ -8,7 +8,6 @@ export interface Problem {
   time_limit_ms: number
   memory_limit_mb: number
   test_count?: number
-  starter_code?: Record<string, string>
 }
 
 export const listProblems = () =>

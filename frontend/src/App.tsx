@@ -7,12 +7,18 @@ import { ProblemsPage } from './pages/ProblemsPage'
 import { ProblemPage } from './pages/ProblemPage'
 import { GamesPage } from './pages/GamesPage'
 import { GamePage } from './pages/GamePage'
-import { ProfilePage } from './pages/ProfilePage'
 
 function RootRedirect() {
   const { token, loading } = useAuth()
   if (loading) return null
   return <Navigate to={token ? '/games' : '/login'} replace />
+}
+
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const { token, loading } = useAuth()
+  if (loading) return null
+  if (token) return <Navigate to="/games" replace />
+  return <>{children}</>
 }
 
 export default function App() {
@@ -21,7 +27,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route
             element={
               <ProtectedRoute>
@@ -33,7 +39,6 @@ export default function App() {
             <Route path="/problems/:id" element={<ProblemPage />} />
             <Route path="/games" element={<GamesPage />} />
             <Route path="/games/:id" element={<GamePage />} />
-            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Routes>
       </AuthProvider>

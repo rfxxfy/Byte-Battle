@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { enter, confirm, updateMe } from '../api/auth'
 import { ApiError } from '../api/client'
@@ -20,6 +20,28 @@ export function LoginPage() {
   const [step, setStep] = useState<'email' | 'code' | 'name'>('email')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resendCountdown, setResendCountdown] = useState(0)
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem('login_code_step')
+    if (!saved) return
+    try {
+      const { email: savedEmail, codeSentAt } = JSON.parse(saved)
+      const elapsed = Math.floor((Date.now() - codeSentAt) / 1000)
+      const remaining = Math.max(0, 60 - elapsed)
+      setEmail(savedEmail)
+      setStep('code')
+      setResendCountdown(remaining)
+    } catch {
+      sessionStorage.removeItem('login_code_step')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (resendCountdown <= 0) return
+    const timer = setTimeout(() => setResendCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [resendCountdown])
 
   const handleEnter = async (e: React.SyntheticEvent) => {
     e.preventDefault()
@@ -27,7 +49,34 @@ export function LoginPage() {
     setLoading(true)
     try {
       await enter(email)
+      sessionStorage.setItem('login_code_step', JSON.stringify({ email, codeSentAt: Date.now() }))
       setStep('code')
+      setResendCountdown(60)
+    } catch (err) {
+      if (err instanceof ApiError && err.errorCode === 'CODE_RECENTLY_SENT') {
+        const saved = sessionStorage.getItem('login_code_step')
+        if (saved) {
+          const { codeSentAt } = JSON.parse(saved)
+          const elapsed = Math.floor((Date.now() - codeSentAt) / 1000)
+          setResendCountdown(Math.max(0, 60 - elapsed))
+        }
+        setStep('code')
+      } else {
+        setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await enter(email)
+      sessionStorage.setItem('login_code_step', JSON.stringify({ email, codeSentAt: Date.now() }))
+      setCode('')
+      setResendCountdown(60)
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     } finally {
@@ -41,6 +90,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       const res = await confirm(email, code)
+      sessionStorage.removeItem('login_code_step')
       login(res.token, res.expires_at)
       if (!res.name) {
         setStep('name')
@@ -119,6 +169,11 @@ export function LoginPage() {
             <form onSubmit={handleConfirm} className="flex flex-col gap-6">
               <div className="flex flex-col items-center gap-3">
                 <Label>Код из письма</Label>
+                <div onPaste={(e) => {
+                  e.preventDefault()
+                  const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                  setCode(text)
+                }}>
                 <InputOTP
                   maxLength={6}
                   value={code}
@@ -132,6 +187,7 @@ export function LoginPage() {
                     </InputOTPGroup>
                   ))}
                 </InputOTP>
+                </div>
               </div>
               {error && <p className="text-destructive text-sm text-center">{error}</p>}
               <Button
@@ -141,13 +197,23 @@ export function LoginPage() {
               >
                 {loading ? 'Входим...' : 'Войти →'}
               </Button>
-              <button
-                type="button"
-                onClick={() => { setStep('email'); setCode(''); setError('') }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
-              >
-                ← Изменить email
-              </button>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={loading || resendCountdown > 0}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resendCountdown > 0 ? `Отправить повторно через ${resendCountdown}с` : 'Отправить повторно'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { sessionStorage.removeItem('login_code_step'); setStep('email'); setCode(''); setError('') }}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+                >
+                  ← Изменить email
+                </button>
+              </div>
             </form>
           )}
           {step === 'name' && (

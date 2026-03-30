@@ -237,7 +237,7 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
 		Tmpfs: map[string]string{
-			"/tmp": "",
+			"/tmp": "exec",
 			"/run": "",
 		},
 	}
@@ -260,7 +260,48 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 		return "", err
 	}
 
+	if langConfig.WarmupCmd != "" {
+		if err := e.runWarmup(ctx, resp.ID, langConfig.WarmupCmd); err != nil {
+			log.Printf("warmup failed for %s: %v", langConfig.Image, err)
+		}
+	}
+
 	return resp.ID, nil
+}
+
+func (e *DockerExecutor) runWarmup(ctx context.Context, containerID, cmd string) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	execResp, err := e.cli.ContainerExecCreate(ctx, containerID, container.ExecOptions{
+		Cmd: []string{"/bin/sh", "-c", cmd},
+	})
+	if err != nil {
+		return err
+	}
+	attachResp, err := e.cli.ContainerExecAttach(ctx, execResp.ID, container.ExecStartOptions{})
+	if err != nil {
+		return err
+	}
+	defer attachResp.Close()
+	go func() {
+		<-ctx.Done()
+		attachResp.Close()
+	}()
+	if _, err = io.Copy(io.Discard, attachResp.Reader); err != nil && ctx.Err() == nil {
+		return err
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	insp, err := e.cli.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		return err
+	}
+	if insp.ExitCode != 0 {
+		return fmt.Errorf("warmup exited with code %d", insp.ExitCode)
+	}
+	return nil
 }
 
 func (e *DockerExecutor) cleanupContainer(ctx context.Context, id string) {
@@ -398,7 +439,7 @@ func (e *DockerExecutor) createContainerWithLimits(ctx context.Context, langConf
 		NetworkMode: "none",
 		CapDrop:     []string{"ALL"},
 		Tmpfs: map[string]string{
-			"/tmp": "",
+			"/tmp": "exec",
 			"/run": "",
 		},
 	}
