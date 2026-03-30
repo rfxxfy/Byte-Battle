@@ -140,6 +140,15 @@ func (e *DockerExecutor) logPoolErrors() {
 	}
 }
 
+func (e *DockerExecutor) IsReady() bool {
+	for _, pool := range e.pools {
+		if len(pool) == 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (e *DockerExecutor) initPools() {
 	for lang, settings := range e.config.Languages {
 		size := settings.PoolSize

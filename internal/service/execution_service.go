@@ -74,6 +74,10 @@ func (s *ExecutionService) CheckRateLimit(userID uuid.UUID) error {
 	return nil
 }
 
+func (s *ExecutionService) IsReady() bool {
+	return s.executor.IsReady()
+}
+
 func (s *ExecutionService) Execute(ctx context.Context, req executor.ExecutionRequest) (executor.ExecutionResult, error) {
 	return s.executor.Run(ctx, req)
 }

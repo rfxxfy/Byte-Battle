@@ -23,6 +23,8 @@ func (stubExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executo
 	return executor.ExecutionResult{Stdout: "ok"}, nil
 }
 
+func (stubExecutor) IsReady() bool { return true }
+
 func newTestService(r rate.Limit, burst int) *ExecutionService {
 	return NewExecutionService(stubExecutor{}, RateLimitConfig{Rate: r, Burst: burst})
 }
