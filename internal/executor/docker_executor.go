@@ -142,7 +142,11 @@ func (e *DockerExecutor) logPoolErrors() {
 
 func (e *DockerExecutor) initPools() {
 	for lang, settings := range e.config.Languages {
-		e.pools[lang] = make(chan string, poolSize)
+		size := settings.PoolSize
+		if size <= 0 {
+			size = poolSize
+		}
+		e.pools[lang] = make(chan string, size)
 		go e.maintainPool(lang, &settings)
 	}
 }
@@ -180,7 +184,7 @@ func (e *DockerExecutor) maintainPoolIteration(ctx context.Context, lang Languag
 		e.sendPoolErr(ctx.Err())
 		return true
 	}
-	if len(e.pools[lang]) >= poolSize {
+	if len(e.pools[lang]) >= cap(e.pools[lang]) {
 		return false
 	}
 	return e.tryFillPool(ctx, lang, settings)
@@ -344,13 +348,33 @@ func (e *DockerExecutor) getOrCreateContainer(ctx context.Context, req Execution
 		reqMem = defaultMem
 	}
 	if reqMem == defaultMem {
-		select {
-		case id := <-e.pools[req.Language]:
+		if id := e.takeFromPool(ctx, req.Language); id != "" {
 			return id, nil
-		default:
 		}
 	}
 	return e.createContainerWithLimits(ctx, langConfig, reqMem)
+}
+
+func (e *DockerExecutor) takeFromPool(ctx context.Context, lang Language) string {
+	for {
+		select {
+		case id := <-e.pools[lang]:
+			if e.isContainerRunning(ctx, id) {
+				return id
+			}
+			go e.cleanupContainer(context.Background(), id)
+		default:
+			return ""
+		}
+	}
+}
+
+func (e *DockerExecutor) isContainerRunning(ctx context.Context, id string) bool {
+	info, err := e.cli.ContainerInspect(ctx, id)
+	if err != nil {
+		return false
+	}
+	return info.ContainerJSONBase != nil && info.State != nil && info.State.Running
 }
 
 func (e *DockerExecutor) execInContainer(ctx context.Context, containerID string, langConfig *LangSettings, hasStdin bool, timeLimit time.Duration) (ExecutionResult, error) {
