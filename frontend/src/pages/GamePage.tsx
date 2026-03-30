@@ -115,12 +115,7 @@ export function GamePage() {
       const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
       setProblem((prev) => {
         if (prev !== null && prev.id !== pRes.problem.id) {
-          const fresh = {
-            python: DEFAULT_CODE['python'],
-            go: DEFAULT_CODE['go'],
-            cpp: DEFAULT_CODE['cpp'],
-            java: DEFAULT_CODE['java'],
-          }
+          const fresh = { ...DEFAULT_CODE }
           try { localStorage.removeItem(storageKey) } catch {}
           setCodePerLang(fresh)
         }
@@ -181,12 +176,7 @@ export function GamePage() {
                     getProblem(msg.problem_id),
                   ])
                   setProblem(res.problem)
-                  const fresh = {
-                    python: starterCode(res.problem, 'python'),
-                    go: starterCode(res.problem, 'go'),
-                    cpp: starterCode(res.problem, 'cpp'),
-                    java: starterCode(res.problem, 'java'),
-                  }
+                  const fresh = { ...DEFAULT_CODE }
                   try { localStorage.removeItem(storageKey) } catch {}
                   setCodePerLang(fresh)
                   setSubmissionResult(null)
