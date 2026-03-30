@@ -13,7 +13,6 @@ type gameResp struct {
 	Game struct {
 		ID           int      `json:"id"`
 		ProblemIDs   []string `json:"problem_ids"`
-		ProblemIndex int      `json:"current_problem_index"`
 		CreatorID    string   `json:"creator_id"`
 		Status       string   `json:"status"`
 		WinnerID     *string  `json:"winner_id"`
@@ -64,7 +63,6 @@ func TestGame_CreateWithMultipleProblems(t *testing.T) {
 	var g gameResp
 	decodeJSON(t, resp, &g)
 
-	assert.Equal(t, 0, g.Game.ProblemIndex)
 	assert.Equal(t, []string{"test-problem", "test-problem"}, g.Game.ProblemIDs)
 }
 

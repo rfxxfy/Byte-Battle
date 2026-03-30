@@ -51,13 +51,14 @@ func TestGameWS_PendingGame(t *testing.T) {
 }
 
 func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
-	g := createActiveGame(t)
+	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 1000})
+	g := createActiveGameOnServer(t, srv)
 	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 
-	conn1 := wsConnect(t, wsPath, token1)
+	conn1 := wsConnectOnServer(t, srv, wsPath, token1)
 	joined1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
 	assert.Equal(t, user1ID, joined1.UserID)
-	conn2 := wsConnect(t, wsPath, token2)
+	conn2 := wsConnectOnServer(t, srv, wsPath, token2)
 	joined2ForConn1 := wsReadUntilType(t, conn1, ws.TypePlayerJoined)
 	assert.Equal(t, user2ID, joined2ForConn1.UserID)
 	joined2ForConn2 := wsReadUntilType(t, conn2, ws.TypePlayerJoined)
@@ -213,8 +214,9 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 }
 
 func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
-	g := createActiveGame(t)
-	conn := wsConnect(t, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
+	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 1000})
+	g := createActiveGameOnServer(t, srv)
+	conn := wsConnectOnServer(t, srv, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
 	joined := wsReadUntilType(t, conn, ws.TypePlayerJoined)
 	assert.Equal(t, user1ID, joined.UserID)
 
