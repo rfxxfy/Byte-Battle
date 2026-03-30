@@ -1,6 +1,6 @@
 module bytebattle
 
-go 1.25.4
+go 1.26.0
 
 require (
 	github.com/containerd/errdefs v1.0.0
