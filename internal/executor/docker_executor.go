@@ -355,6 +355,9 @@ func (e *DockerExecutor) getOrCreateContainer(ctx context.Context, req Execution
 	return e.createContainerWithLimits(ctx, langConfig, reqMem)
 }
 
+// takeFromPool drains the pool until it finds a running container or the pool
+// is empty. The health check happens here (not in the background maintainer)
+// to avoid a race where a container dies between the background check and use.
 func (e *DockerExecutor) takeFromPool(ctx context.Context, lang Language) string {
 	for {
 		select {
