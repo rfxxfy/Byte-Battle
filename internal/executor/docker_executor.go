@@ -142,7 +142,13 @@ func (e *DockerExecutor) logPoolErrors() {
 
 func (e *DockerExecutor) initPools() {
 	for lang, settings := range e.config.Languages {
-		e.pools[lang] = make(chan string, poolSize)
+		size := settings.PoolSize
+		if size <= 0 {
+			size = poolSize
+		}
+		e.pools[lang] = make(chan string, size)
+	}
+	for lang, settings := range e.config.Languages {
 		go e.maintainPool(lang, &settings)
 	}
 }
@@ -180,7 +186,7 @@ func (e *DockerExecutor) maintainPoolIteration(ctx context.Context, lang Languag
 		e.sendPoolErr(ctx.Err())
 		return true
 	}
-	if len(e.pools[lang]) >= poolSize {
+	if len(e.pools[lang]) >= cap(e.pools[lang]) {
 		return false
 	}
 	return e.tryFillPool(ctx, lang, settings)
@@ -285,6 +291,12 @@ func (e *DockerExecutor) runWarmup(ctx context.Context, containerID, cmd string)
 		return err
 	}
 	defer attachResp.Close()
+	// SetDeadline lets io.Copy unblock exactly when the context expires,
+	// without relying on goroutine scheduling. The goroutine below is kept
+	// as a cleanup path for contexts cancelled without a deadline.
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = attachResp.Conn.SetDeadline(deadline)
+	}
 	go func() {
 		<-ctx.Done()
 		attachResp.Close()
@@ -344,13 +356,36 @@ func (e *DockerExecutor) getOrCreateContainer(ctx context.Context, req Execution
 		reqMem = defaultMem
 	}
 	if reqMem == defaultMem {
-		select {
-		case id := <-e.pools[req.Language]:
+		if id := e.takeFromPool(ctx, req.Language); id != "" {
 			return id, nil
-		default:
 		}
 	}
 	return e.createContainerWithLimits(ctx, langConfig, reqMem)
+}
+
+// takeFromPool drains the pool until it finds a running container or the pool
+// is empty. The health check happens here (not in the background maintainer)
+// to avoid a race where a container dies between the background check and use.
+func (e *DockerExecutor) takeFromPool(ctx context.Context, lang Language) string {
+	for {
+		select {
+		case id := <-e.pools[lang]:
+			if e.isContainerRunning(ctx, id) {
+				return id
+			}
+			go e.cleanupContainer(context.Background(), id)
+		default:
+			return ""
+		}
+	}
+}
+
+func (e *DockerExecutor) isContainerRunning(ctx context.Context, id string) bool {
+	info, err := e.cli.ContainerInspect(ctx, id)
+	if err != nil {
+		return false
+	}
+	return info.ContainerJSONBase != nil && info.State != nil && info.State.Running
 }
 
 func (e *DockerExecutor) execInContainer(ctx context.Context, containerID string, langConfig *LangSettings, hasStdin bool, timeLimit time.Duration) (ExecutionResult, error) {

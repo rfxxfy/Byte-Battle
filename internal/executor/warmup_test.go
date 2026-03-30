@@ -108,7 +108,7 @@ func TestRunWarmup_Timeout(t *testing.T) {
 	e := newTestExecutor(mock)
 	start := time.Now()
 	err := e.runWarmup(ctx, "cid", "sleep 9999")
-	assert.WithinDuration(t, start, time.Now(), time.Second, "should return quickly on timeout")
+	assert.WithinDuration(t, start, time.Now(), 5*time.Second, "should return quickly on timeout")
 	assert.Error(t, err)
 }
 

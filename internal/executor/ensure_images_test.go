@@ -29,6 +29,7 @@ type mockDockerClient struct {
 	containerExecCreateFn  func(ctx context.Context, id string, config container.ExecOptions) (container.ExecCreateResponse, error)
 	containerExecAttachFn  func(ctx context.Context, execID string, config container.ExecStartOptions) (dockertypes.HijackedResponse, error)
 	containerExecInspectFn func(ctx context.Context, execID string) (container.ExecInspect, error)
+	containerInspectFn     func(ctx context.Context, containerID string) (container.InspectResponse, error)
 }
 
 func (m *mockDockerClient) ImageInspect(ctx context.Context, imageID string, opts ...client.ImageInspectOption) (image.InspectResponse, error) {
@@ -81,6 +82,17 @@ func (m *mockDockerClient) ContainerExecInspect(ctx context.Context, execID stri
 	}
 	return container.ExecInspect{ExitCode: 0}, nil
 }
+func (m *mockDockerClient) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
+	if m.containerInspectFn != nil {
+		return m.containerInspectFn(ctx, containerID)
+	}
+	return container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
+			State: &container.State{Running: true},
+		},
+	}, nil
+}
+
 func (m *mockDockerClient) CopyToContainer(_ context.Context, _, _ string, _ io.Reader, _ container.CopyToContainerOptions) error {
 	return nil
 }
