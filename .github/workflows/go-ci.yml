@@ -64,6 +64,14 @@ jobs:
         run: |
           go test -v -json -race -count=1 -timeout 300s ./internal/e2e/... 2>>test-stderr.log | tee -a test-output.json | go-junit-report -set-exit-code >> report.xml
 
+      - name: Print failures
+        if: failure()
+        run: |
+          echo "=== stderr ==="
+          cat test-stderr.log || true
+          echo "=== failed tests ==="
+          jq -r 'select(.Action=="fail" and .Test != null) | "FAIL \(.Package) \(.Test)"' test-output.json || true
+
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
