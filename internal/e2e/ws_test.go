@@ -13,11 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 
 	"bytebattle/internal/app"
 	"bytebattle/internal/config"
-	"bytebattle/internal/service"
 	"bytebattle/internal/ws"
 )
 
