@@ -20,8 +20,8 @@ import (
 func hijackedFromString(data string) dockertypes.HijackedResponse {
 	server, client := net.Pipe()
 	go func() {
-		server.Write([]byte(data))
-		server.Close()
+		_, _ = server.Write([]byte(data))
+		_ = server.Close()
 	}()
 	return dockertypes.HijackedResponse{
 		Conn:   client,
@@ -30,12 +30,12 @@ func hijackedFromString(data string) dockertypes.HijackedResponse {
 }
 
 // hijackedBlocking returns a HijackedResponse that blocks forever (never sends EOF).
-func hijackedBlocking() (dockertypes.HijackedResponse, func()) {
+func hijackedBlocking() (resp dockertypes.HijackedResponse, cleanup func()) {
 	server, client := net.Pipe()
 	return dockertypes.HijackedResponse{
 		Conn:   client,
 		Reader: bufio.NewReader(client),
-	}, func() { server.Close(); client.Close() }
+	}, func() { _ = server.Close(); _ = client.Close() }
 }
 
 func TestRunWarmup_Success(t *testing.T) {
@@ -206,8 +206,8 @@ func TestRunWarmup_LargeOutput(t *testing.T) {
 		containerExecAttachFn: func(_ context.Context, _ string, _ container.ExecStartOptions) (dockertypes.HijackedResponse, error) {
 			server, client := net.Pipe()
 			go func() {
-				io.WriteString(server, large)
-				server.Close()
+				_, _ = io.WriteString(server, large)
+				_ = server.Close()
 			}()
 			return dockertypes.HijackedResponse{
 				Conn:   client,
