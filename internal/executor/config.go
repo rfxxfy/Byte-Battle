@@ -18,6 +18,7 @@ type LangSettings struct {
 	WarmupCmd   string   `json:"warmup_cmd,omitempty"`
 	MemoryLimit int64    `json:"memory_limit"`
 	TimeLimit   int64    `json:"time_limit"`
+	PoolSize    int      `json:"pool_size,omitempty"`
 }
 
 func LoadConfig(path string) (*Config, error) {
