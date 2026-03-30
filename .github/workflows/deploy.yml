@@ -84,6 +84,8 @@ jobs:
 
       - name: Build frontend
         run: cd frontend && npm ci && npm run build
+        env:
+          VITE_COMMIT_SHA: ${{ github.sha }}
 
       # ─── Deploy to VPS ─────────────────────────────────────────────────
       - name: Copy compose and Caddyfile to prod dir
