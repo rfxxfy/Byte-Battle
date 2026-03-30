@@ -147,6 +147,8 @@ func (e *DockerExecutor) initPools() {
 			size = poolSize
 		}
 		e.pools[lang] = make(chan string, size)
+	}
+	for lang, settings := range e.config.Languages {
 		go e.maintainPool(lang, &settings)
 	}
 }
