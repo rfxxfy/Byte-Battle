@@ -8,20 +8,24 @@ import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
+import { ProblemDescription } from '@/components/ProblemDescription'
 
 const LANGUAGES = [
   { value: 'python', label: 'Python', monaco: 'python' },
   { value: 'go', label: 'Go', monaco: 'go' },
+  { value: 'cpp', label: 'C++', monaco: 'cpp' },
   { value: 'java', label: 'Java', monaco: 'java' },
 ] as const
 
 type LangValue = (typeof LANGUAGES)[number]['value']
 
 const DEFAULT_CODE: Record<LangValue, string> = {
-  python: '# Введи решение здесь\n',
+  python: '\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\t\n}\n',
+  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n\t\n\treturn 0;\n}\n',
   java: 'public class Main {\n    public static void main(String[] args) {\n        \n    }\n}\n',
 }
+
 
 interface SubmissionResult {
   accepted: boolean
@@ -33,11 +37,21 @@ interface SubmissionResult {
 
 interface GameFinished {
   winner_id: string
+  code?: string
+  language?: string
 }
 
-interface RoundAdvanced {
+interface PlayerAdvanced {
+  user_id: string
   problem_id: string
   problem_index: number
+  progress: Record<string, number>
+}
+
+interface PlayerState {
+  problem_id: string
+  problem_index: number
+  progress: Record<string, number>
 }
 
 const participantLabel = (p: GameParticipant) => p.name ?? p.id.slice(0, 8)
@@ -55,7 +69,22 @@ export function GamePage() {
   const [actionError, setActionError] = useState('')
 
   const [language, setLanguage] = useState<LangValue>('python')
-  const [code, setCode] = useState(DEFAULT_CODE.python)
+  const languageRef = useRef<LangValue>('python')
+  const storageKey = `bb_code_${gameId}`
+  const [codePerLang, setCodePerLang] = useState<Record<LangValue, string>>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) return { ...DEFAULT_CODE, ...JSON.parse(saved) }
+    } catch {}
+    return { ...DEFAULT_CODE }
+  })
+
+  const code = codePerLang[language]
+  const setCode = (val: string) => setCodePerLang((prev) => {
+    const next = { ...prev, [language]: val }
+    try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
+    return next
+  })
   const [stdin, setStdin] = useState('')
 
   const [running, setRunning] = useState(false)
@@ -64,15 +93,35 @@ export function GamePage() {
   const [submitting, setSubmitting] = useState(false)
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
   const [winner, setWinner] = useState<GameFinished | null>(null)
+  const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({})
+  const [solvedTransition, setSolvedTransition] = useState(false)
+  const [playerSolutions, setPlayerSolutions] = useState<Record<string, { code: string; language: LangValue }>>({})
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
+  const userIdRef = useRef<string | null>(userId)
+
+  useEffect(() => {
+    languageRef.current = language
+  }, [language])
+
+  useEffect(() => {
+    userIdRef.current = userId
+  }, [userId])
 
   const fetchGame = useCallback(async () => {
     try {
       const res = await getGame(gameId)
       setGame(res.game)
       const pRes = await getProblem(res.game.problem_ids[res.game.current_problem_index])
-      setProblem(pRes.problem)
+      setProblem((prev) => {
+        if (prev !== null && prev.id !== pRes.problem.id) {
+          const fresh = { ...DEFAULT_CODE }
+          try { localStorage.removeItem(storageKey) } catch {}
+          setCodePerLang(fresh)
+        }
+        return pRes.problem
+      })
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     } finally {
@@ -108,26 +157,48 @@ export function GamePage() {
 
       ws.onmessage = (e) => {
         try {
-          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & RoundAdvanced
+          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & PlayerAdvanced & PlayerState
           if (msg.type === 'submission_result') {
             setSubmissionResult(msg)
             setSubmitting(false)
-          } else if (msg.type === 'round_advanced') {
-            setGame((prev) => {
-              if (!prev) return prev
-              return {
-                ...prev,
-                current_problem_index: msg.problem_index,
-              }
-            })
-            getProblem(msg.problem_id)
-              .then((res) => setProblem(res.problem))
-              .catch(() => {
-                setActionError('Не удалось загрузить следующую задачу')
-              })
+          } else if (msg.type === 'player_state') {
+            setPlayerProgress(msg.progress ?? {})
+            getProblem(msg.problem_id).then((res) => {
+              setProblem(res.problem)
+            }).catch(() => {})
+          } else if (msg.type === 'player_advanced') {
+            setPlayerProgress(msg.progress ?? {})
+            if (msg.user_id === userIdRef.current) {
+              setSolvedTransition(true)
+              ;(async () => {
+                try {
+                  const [, res] = await Promise.all([
+                    new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+                    getProblem(msg.problem_id),
+                  ])
+                  setProblem(res.problem)
+                  const fresh = { ...DEFAULT_CODE }
+                  try { localStorage.removeItem(storageKey) } catch {}
+                  setCodePerLang(fresh)
+                  setSubmissionResult(null)
+                } catch {
+                  setActionError('Не удалось загрузить следующую задачу')
+                } finally {
+                  setSolvedTransition(false)
+                }
+              })()
+            }
           } else if (msg.type === 'game_finished') {
+            if (msg.code && msg.language) {
+              setPlayerSolutions((prev) => ({
+                ...prev,
+                [msg.winner_id]: { code: msg.code!, language: msg.language as LangValue },
+              }))
+              setViewingUserId(msg.winner_id)
+            }
             setWinner({ winner_id: msg.winner_id })
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
+            setSubmitting(false)
           }
         } catch {
           // ignore malformed messages
@@ -229,7 +300,6 @@ export function GamePage() {
 
   const handleLangChange = (lang: LangValue) => {
     setLanguage(lang)
-    setCode(DEFAULT_CODE[lang])
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
@@ -241,6 +311,8 @@ export function GamePage() {
   const isActive = game.status === 'active'
   const isFinished = game.status === 'finished' || game.status === 'cancelled'
   const canStart = isCreator && game.participants.length >= 2
+  const totalProblems = game.problem_ids.length
+  const myProgress = playerProgress[userId ?? ''] ?? 0
 
   // Lobby (pending)
   if (game.status === 'pending') {
@@ -331,7 +403,10 @@ export function GamePage() {
   }
 
   // Game / Finished
-  const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
+  const viewedSolution = viewingUserId !== null ? playerSolutions[viewingUserId] : null
+  const editorCode = viewingUserId !== null ? (viewedSolution?.code ?? '') : code
+  const editorLanguage = viewedSolution?.language ?? language
+  const monacoLang = LANGUAGES.find((l) => l.value === editorLanguage)?.monaco ?? 'python'
   const winnerParticipant = winner
     ? game.participants.find((p) => p.id === winner.winner_id)
     : null
@@ -351,7 +426,7 @@ export function GamePage() {
           <span className="text-sm font-medium">{problem.title}</span>
           <span className="text-muted-foreground/40">|</span>
           <span className="text-xs text-muted-foreground">
-            {game.current_problem_index + 1}/{game.problem_ids.length}
+            {myProgress + 1}/{totalProblems}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -375,39 +450,47 @@ export function GamePage() {
       <div className="flex gap-4 flex-1 min-h-0">
         {/* Left: problem + participants */}
         <div className="w-2/5 flex flex-col gap-3 overflow-y-auto">
-          <div className="rounded-lg border border-border/60 bg-card/50 p-5 flex-shrink-0">
+          <div className="rounded-lg border border-border bg-card p-5 flex-shrink-0 shadow-sm">
             <h2 className="text-base font-semibold mb-3">{problem.title}</h2>
-            <p className="text-xs text-muted-foreground mb-3">
-              Прогресс: {game.current_problem_index + 1}/{game.problem_ids.length}
-            </p>
             <div className="flex items-center gap-2 flex-wrap mb-4">
-              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted border border-border">
                 {problem.time_limit_ms} мс
               </span>
-              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted/50 border border-border/40">
+              <span className="px-2 py-0.5 rounded-full text-xs text-muted-foreground bg-muted border border-border">
                 {problem.memory_limit_mb} МБ
               </span>
             </div>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-              {problem.description}
-            </p>
+            <ProblemDescription content={problem.description} />
           </div>
 
-          <div className="rounded-lg border border-border/60 bg-card/50 p-4 flex-shrink-0">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Участники</p>
-            <div className="flex flex-col gap-1.5">
+          <div className="rounded-lg border border-border bg-card p-4 flex-shrink-0 shadow-sm">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Участники</p>
+            <div className="flex flex-col divide-y divide-border">
               {game.participants.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 text-sm">
+                <div
+                  key={p.id}
+                  className={`flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0 rounded-md px-1 -mx-1 transition-colors ${
+                    isFinished
+                      ? `cursor-pointer hover:bg-muted/40 ${viewingUserId === p.id ? 'bg-muted/40 ring-1 ring-border/60' : ''}`
+                      : ''
+                  }`}
+                  onClick={() => {
+                    if (isFinished) setViewingUserId((prev) => (prev === p.id ? null : p.id))
+                  }}
+                >
                   <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
                   <span className={p.id === userId ? 'text-primary font-medium' : ''}>
                     {participantLabel(p)}
                     {p.id === userId && ' (ты)'}
                   </span>
-                  {game.winner_id === p.id && (
-                    <span className="ml-auto text-xs text-yellow-400 font-medium">
-                      Победитель
+                  <div className="ml-auto flex items-center gap-2">
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {playerProgress[p.id] ?? 0}/{totalProblems}
                     </span>
-                  )}
+                    {game.winner_id === p.id && (
+                      <span className="text-xs text-yellow-400 font-medium">Победитель</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -419,9 +502,10 @@ export function GamePage() {
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <select
-              value={language}
+              value={editorLanguage}
               onChange={(e) => handleLangChange(e.target.value as LangValue)}
-              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              disabled={isFinished}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.value} value={l.value} className="bg-background">
@@ -429,6 +513,13 @@ export function GamePage() {
                 </option>
               ))}
             </select>
+            {isFinished && (
+              <span className="text-xs text-muted-foreground bg-muted/40 border border-border/40 px-2 py-1 rounded-md">
+                {viewingUserId
+                  ? `Решение: ${participantLabel(game.participants.find((p) => p.id === viewingUserId) ?? { id: viewingUserId, name: null })}`
+                  : 'Завершена — только чтение'}
+              </span>
+            )}
             <div className="ml-auto flex items-center gap-2">
               <Button
                 size="sm"
@@ -449,19 +540,20 @@ export function GamePage() {
           </div>
 
           {/* Monaco editor */}
-          <div className="flex-1 rounded-lg border border-border/60 overflow-hidden min-h-0">
+          <div className="flex-1 rounded-lg border border-border overflow-hidden min-h-0 shadow-sm">
             <Editor
               height="100%"
               language={monacoLang}
-              value={code}
-              onChange={(val) => setCode(val ?? '')}
+              value={editorCode}
+              onChange={(val) => { if (!isFinished && viewingUserId === null) setCode(val ?? '') }}
               theme="vs-dark"
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
-                readOnly: isFinished,
+                readOnly: isFinished || viewingUserId !== null,
+                readOnlyMessage: { value: '' },
                 padding: { top: 12 },
               }}
             />
@@ -479,7 +571,7 @@ export function GamePage() {
 
           {/* Run output */}
           {runOutput && (
-            <div className="flex-shrink-0 rounded-md border border-border/60 bg-muted/20 p-3 text-xs font-mono max-h-32 overflow-y-auto">
+            <div className="flex-shrink-0 rounded-md border border-border bg-muted/30 p-3 text-xs font-mono max-h-32 overflow-y-auto">
               {runOutput.stdout && (
                 <pre className="whitespace-pre-wrap">{runOutput.stdout}</pre>
               )}
@@ -520,20 +612,35 @@ export function GamePage() {
         </div>
       </div>
 
+      {/* Solved transition overlay */}
+      {solvedTransition && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="animate-in fade-in zoom-in-95 duration-300 flex flex-col items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500/60 flex items-center justify-center">
+              <svg className="w-10 h-10 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-lg font-semibold text-green-400">Задача решена!</p>
+            <p className="text-sm text-muted-foreground">Загружаем следующую...</p>
+          </div>
+        </div>
+      )}
+
       {/* Winner modal */}
       {winner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-card border border-border/60 rounded-xl p-8 w-full max-w-sm shadow-2xl shadow-black/40 mx-4 text-center">
-            <h2 className="text-xl font-semibold mb-2">
+            <h2 className="text-xl font-semibold mb-1">
               {winner.winner_id === userId ? 'Победа!' : 'Игра завершена'}
             </h2>
-            <p className="text-sm text-muted-foreground mb-6">
+            <p className="text-sm text-muted-foreground mb-5">
               {winner.winner_id === userId
-                ? 'Ты решил задачу первым'
+                ? 'Ты решил все задачи первым!'
                 : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id.slice(0, 8)}`}
             </p>
-            <Button className="w-full" onClick={() => navigate('/games')}>
-              В лобби
+            <Button className="w-full" onClick={() => setWinner(null)}>
+              Закрыть
             </Button>
           </div>
         </div>

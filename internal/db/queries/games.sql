@@ -39,5 +39,8 @@ SET status = 'cancelled',
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateGameWinner :exec
+UPDATE games SET winner_id = $2, updated_at = NOW() WHERE id = $1;
+
 -- name: DeleteGame :execrows
 DELETE FROM games WHERE id = $1;

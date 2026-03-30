@@ -220,3 +220,17 @@ func (q *Queries) StartGame(ctx context.Context, id int32) (Game, error) {
 	)
 	return i, err
 }
+
+const updateGameWinner = `-- name: UpdateGameWinner :exec
+UPDATE games SET winner_id = $2, updated_at = NOW() WHERE id = $1
+`
+
+type UpdateGameWinnerParams struct {
+	ID       int32         `json:"id"`
+	WinnerID uuid.NullUUID `json:"winner_id"`
+}
+
+func (q *Queries) UpdateGameWinner(ctx context.Context, arg UpdateGameWinnerParams) error {
+	_, err := q.db.Exec(ctx, updateGameWinner, arg.ID, arg.WinnerID)
+	return err
+}

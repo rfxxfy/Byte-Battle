@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,6 +16,7 @@ const (
 type Client struct {
 	send chan []byte
 	conn *websocket.Conn
+	once sync.Once
 }
 
 func NewClient(conn *websocket.Conn) *Client {
@@ -25,7 +27,18 @@ func NewClient(conn *websocket.Conn) *Client {
 }
 
 // Close signals WritePump to exit cleanly by closing the send channel.
-func (c *Client) Close() { close(c.send) }
+func (c *Client) Close() {
+	c.once.Do(func() { close(c.send) })
+}
+
+// Send enqueues a message for this client. Non-blocking; drops if buffer is full or client is closed.
+func (c *Client) Send(msg []byte) {
+	defer func() { recover() }() //nolint:errcheck // panic means channel is closed; drop silently
+	select {
+	case c.send <- msg:
+	default:
+	}
+}
 
 // WritePump pumps messages from the send channel to the WebSocket connection.
 // Run in a separate goroutine; closes the connection when done.
