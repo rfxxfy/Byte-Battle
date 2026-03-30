@@ -15,7 +15,7 @@ import (
 func TestExecute_Auth(t *testing.T) {
 	// Use a dedicated server with unlimited rate to avoid burst exhaustion
 	// when the test runs multiple times (e.g. -count=10).
-	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 1000})
+	srv := newGameServer(t, correctExecutor{})
 
 	execute := func(auth string) *http.Response {
 		req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/execute",

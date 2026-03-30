@@ -51,7 +51,7 @@ func TestGameWS_PendingGame(t *testing.T) {
 }
 
 func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
-	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 1000})
+	srv := newGameServer(t, correctExecutor{})
 	g := createActiveGameOnServer(t, srv)
 	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 
@@ -214,7 +214,7 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 }
 
 func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
-	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 1000})
+	srv := newGameServer(t, correctExecutor{})
 	g := createActiveGameOnServer(t, srv)
 	conn := wsConnectOnServer(t, srv, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
 	joined := wsReadUntilType(t, conn, ws.TypePlayerJoined)
@@ -237,7 +237,7 @@ func TestGameWS_AcceptedSubmitFinishesGame(t *testing.T) {
 
 func TestGameWS_AcceptedSubmitAdvancesRound(t *testing.T) {
 	// Use isolated server with unlimited rate to avoid shared token limiter flakiness.
-	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 100})
+	srv := newGameServer(t, correctExecutor{})
 
 	resp := doOnServer(t, srv, http.MethodPost, "/api/games", map[string]any{
 		"problem_ids": []string{"test-problem", "test-problem"},
@@ -306,7 +306,7 @@ func TestGameWS_ConcurrentSlotRejected(t *testing.T) {
 
 func TestGameWS_TwoPlayersRace_OnlyOneWins(t *testing.T) {
 	// Use a custom server with unlimited rate to avoid cross-test token exhaustion.
-	srv := newGameServer(t, correctExecutor{}, service.RateLimitConfig{Rate: rate.Inf, Burst: 100})
+	srv := newGameServer(t, correctExecutor{})
 	g := createActiveGameOnServer(t, srv)
 	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
 
