@@ -19,6 +19,7 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/time/rate"
 
 	"bytebattle/internal/app"
 	"bytebattle/internal/config"
@@ -325,10 +326,16 @@ func (e *blockingExecutor) Run(ctx context.Context, _ executor.ExecutionRequest)
 	}
 }
 
-// newGameServer creates a test HTTP server with the given executor and optional rate limit config.
+// newGameServer creates a test HTTP server. Rate limiting is disabled by default
+// (rate.Inf) so tests don't need to worry about burst exhaustion; pass an explicit
+// RateLimitConfig to test rate-limiting behaviour.
 func newGameServer(t *testing.T, exec executor.Executor, rlCfg ...service.RateLimitConfig) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, exec, testLoader, config.Load(), rlCfg...))
+	cfg := service.RateLimitConfig{Rate: rate.Inf, Burst: 1}
+	if len(rlCfg) > 0 {
+		cfg = rlCfg[0]
+	}
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, exec, testLoader, config.Load(), cfg))
 	t.Cleanup(srv.Close)
 	return srv
 }
