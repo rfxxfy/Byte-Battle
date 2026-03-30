@@ -13,7 +13,6 @@ import (
 type Querier interface {
 	AddGameParticipant(ctx context.Context, arg AddGameParticipantParams) error
 	AddGameProblem(ctx context.Context, arg AddGameProblemParams) error
-	AdvanceGameProblem(ctx context.Context, arg AdvanceGameProblemParams) (Game, error)
 	AdvanceParticipantProblem(ctx context.Context, arg AdvanceParticipantProblemParams) (int32, error)
 	CancelGame(ctx context.Context, id int32) (Game, error)
 	CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error)

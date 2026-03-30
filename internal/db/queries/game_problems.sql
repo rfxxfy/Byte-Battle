@@ -25,9 +25,3 @@ FROM game_problems
 WHERE game_id = $1 AND problem_index = $2
 LIMIT 1;
 
--- name: AdvanceGameProblem :one
-UPDATE games
-SET current_problem_index = $2,
-    updated_at = NOW()
-WHERE id = $1
-RETURNING *;

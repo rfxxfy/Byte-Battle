@@ -25,36 +25,6 @@ func (q *Queries) AddGameProblem(ctx context.Context, arg AddGameProblemParams) 
 	return err
 }
 
-const advanceGameProblem = `-- name: AdvanceGameProblem :one
-UPDATE games
-SET current_problem_index = $2,
-    updated_at = NOW()
-WHERE id = $1
-RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, current_problem_index
-`
-
-type AdvanceGameProblemParams struct {
-	ID                  int32 `json:"id"`
-	CurrentProblemIndex int32 `json:"current_problem_index"`
-}
-
-func (q *Queries) AdvanceGameProblem(ctx context.Context, arg AdvanceGameProblemParams) (Game, error) {
-	row := q.db.QueryRow(ctx, advanceGameProblem, arg.ID, arg.CurrentProblemIndex)
-	var i Game
-	err := row.Scan(
-		&i.ID,
-		&i.CreatorID,
-		&i.WinnerID,
-		&i.Status,
-		&i.StartedAt,
-		&i.CompletedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.CurrentProblemIndex,
-	)
-	return i, err
-}
-
 const countGameProblems = `-- name: CountGameProblems :one
 SELECT count(*)
 FROM game_problems

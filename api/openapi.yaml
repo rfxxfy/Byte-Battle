@@ -563,7 +563,6 @@ components:
       required:
         - id
         - problem_ids
-        - current_problem_index
         - creator_id
         - status
         - participants
@@ -579,10 +578,6 @@ components:
           items:
             type: string
           example: ["001-two-sum", "002-fizzbuzz"]
-        current_problem_index:
-          type: integer
-          minimum: 0
-          example: 0
         creator_id:
           type: string
           format: uuid

@@ -278,10 +278,9 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 		apiParticipants[i] = api.GameParticipant{Id: p.ID, Name: p.Name}
 	}
 	result := api.Game{
-		Id:                  int(g.ID),
-		ProblemIds:          problemIDs,
-		CurrentProblemIndex: int(g.CurrentProblemIndex),
-		CreatorId:           g.CreatorID,
+		Id:         int(g.ID),
+		ProblemIds: problemIDs,
+		CreatorId:  g.CreatorID,
 		Status:              api.GameStatus(g.Status),
 		Participants:        apiParticipants,
 		CreatedAt:           g.CreatedAt.Time,

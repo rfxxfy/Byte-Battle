@@ -10,15 +10,14 @@ import (
 )
 
 type Game struct {
-	ID                  int32              `json:"id"`
-	CreatorID           uuid.UUID          `json:"creator_id"`
-	WinnerID            uuid.NullUUID      `json:"winner_id"`
-	Status              string             `json:"status"`
-	StartedAt           pgtype.Timestamptz `json:"started_at"`
-	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt           pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
-	CurrentProblemIndex int32              `json:"current_problem_index"`
+	ID          int32              `json:"id"`
+	CreatorID   uuid.UUID          `json:"creator_id"`
+	WinnerID    uuid.NullUUID      `json:"winner_id"`
+	Status      string             `json:"status"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type GameParticipant struct {
