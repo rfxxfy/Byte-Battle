@@ -16,16 +16,16 @@ export function AppLayout() {
       <header className="sticky top-0 z-40 border-b border-border/60 bg-card/60 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link to="/games" className="text-base font-semibold tracking-tight flex items-center gap-1">
+            <Link to="/games" className="text-base font-semibold tracking-tight flex items-center gap-0">
               <span className="text-primary">Byte</span>
               <span className="text-foreground">Battle</span>
               {window.location.hostname.startsWith('staging.') && (
-                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">
+                <span className="ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-600 dark:text-yellow-400">
                   staging
                 </span>
               )}
               {window.location.hostname === 'localhost' && (
-                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-400">
+                <span className="ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-400">
                   local
                 </span>
               )}
@@ -84,6 +84,15 @@ export function AppLayout() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
         <Outlet />
       </main>
+      <footer className="border-t border-border/40 py-3">
+        <div className="max-w-6xl mx-auto px-6 flex justify-end">
+          <span className="text-xs text-muted-foreground/50 font-mono">
+            {import.meta.env.VITE_COMMIT_SHA
+              ? import.meta.env.VITE_COMMIT_SHA.slice(0, 7)
+              : 'dev'}
+          </span>
+        </div>
+      </footer>
     </div>
   )
 }
