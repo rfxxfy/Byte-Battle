@@ -145,6 +145,22 @@ type GameResponse struct {
 	Game Game `json:"game"`
 }
 
+// GameSolution defines model for GameSolution.
+type GameSolution struct {
+	Code      string             `json:"code"`
+	Language  string             `json:"language"`
+	Name      *string            `json:"name,omitempty"`
+	ProblemId string             `json:"problem_id"`
+	SolvedAt  time.Time          `json:"solved_at"`
+	UserId    openapi_types.UUID `json:"user_id"`
+	Username  string             `json:"username"`
+}
+
+// GameSolutionsResponse defines model for GameSolutionsResponse.
+type GameSolutionsResponse struct {
+	Solutions []GameSolution `json:"solutions"`
+}
+
 // ListGamesResponse defines model for ListGamesResponse.
 type ListGamesResponse struct {
 	Games []Game `json:"games"`
@@ -275,6 +291,9 @@ type ServerInterface interface {
 	// Leave a pending game as a participant
 	// (POST /games/{id}/leave)
 	LeaveGame(w http.ResponseWriter, r *http.Request, id GameID)
+	// Get passed solutions for a game
+	// (GET /games/{id}/solutions)
+	GetGameSolutions(w http.ResponseWriter, r *http.Request, id GameID)
 	// Start a pending game
 	// (POST /games/{id}/start)
 	StartGame(w http.ResponseWriter, r *http.Request, id GameID)
@@ -371,6 +390,12 @@ func (_ Unimplemented) JoinGame(w http.ResponseWriter, r *http.Request, id GameI
 // Leave a pending game as a participant
 // (POST /games/{id}/leave)
 func (_ Unimplemented) LeaveGame(w http.ResponseWriter, r *http.Request, id GameID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get passed solutions for a game
+// (GET /games/{id}/solutions)
+func (_ Unimplemented) GetGameSolutions(w http.ResponseWriter, r *http.Request, id GameID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -756,6 +781,37 @@ func (siw *ServerInterfaceWrapper) LeaveGame(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetGameSolutions operation middleware
+func (siw *ServerInterfaceWrapper) GetGameSolutions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id GameID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGameSolutions(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StartGame operation middleware
 func (siw *ServerInterfaceWrapper) StartGame(w http.ResponseWriter, r *http.Request) {
 
@@ -980,6 +1036,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/games/{id}/leave", wrapper.LeaveGame)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/games/{id}/solutions", wrapper.GetGameSolutions)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/games/{id}/start", wrapper.StartGame)
@@ -1521,6 +1580,41 @@ func (response LeaveGame409JSONResponse) VisitLeaveGameResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetGameSolutionsRequestObject struct {
+	Id GameID `json:"id"`
+}
+
+type GetGameSolutionsResponseObject interface {
+	VisitGetGameSolutionsResponse(w http.ResponseWriter) error
+}
+
+type GetGameSolutions200JSONResponse GameSolutionsResponse
+
+func (response GetGameSolutions200JSONResponse) VisitGetGameSolutionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGameSolutions401JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetGameSolutions401JSONResponse) VisitGetGameSolutionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGameSolutions404JSONResponse ErrorResponse
+
+func (response GetGameSolutions404JSONResponse) VisitGetGameSolutionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type StartGameRequestObject struct {
 	Id GameID `json:"id"`
 }
@@ -1651,6 +1745,9 @@ type StrictServerInterface interface {
 	// Leave a pending game as a participant
 	// (POST /games/{id}/leave)
 	LeaveGame(ctx context.Context, request LeaveGameRequestObject) (LeaveGameResponseObject, error)
+	// Get passed solutions for a game
+	// (GET /games/{id}/solutions)
+	GetGameSolutions(ctx context.Context, request GetGameSolutionsRequestObject) (GetGameSolutionsResponseObject, error)
 	// Start a pending game
 	// (POST /games/{id}/start)
 	StartGame(ctx context.Context, request StartGameRequestObject) (StartGameResponseObject, error)
@@ -2083,6 +2180,32 @@ func (sh *strictHandler) LeaveGame(w http.ResponseWriter, r *http.Request, id Ga
 	}
 }
 
+// GetGameSolutions operation middleware
+func (sh *strictHandler) GetGameSolutions(w http.ResponseWriter, r *http.Request, id GameID) {
+	var request GetGameSolutionsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGameSolutions(ctx, request.(GetGameSolutionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGameSolutions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetGameSolutionsResponseObject); ok {
+		if err := validResponse.VisitGetGameSolutionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // StartGame operation middleware
 func (sh *strictHandler) StartGame(w http.ResponseWriter, r *http.Request, id GameID) {
 	var request StartGameRequestObject
@@ -2162,38 +2285,39 @@ func (sh *strictHandler) GetProblem(w http.ResponseWriter, r *http.Request, prob
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"6XHLBEUtAAA=",
+	"H4sIAAAAAAAC/9RaW1PrOBL+KyrtPhoSONRWTd4OHJZiC85Qw8y+UFRKsduJztiSjyQDgcp/39LFd9mJ",
+	"dwgT3giW+/J93a12S2845GnGGTAl8ewNZ0SQFBQI8+uKpHD9Tf9FGZ7hjKgVDjAjKeAZphEOsICfORUQ",
+	"4ZkSOQRYhitIiX5DrTOziilYgsCbzUavlhlnEozwSyG40H+EnClgSv9JsiyhIVGUs8kPyZn+XyXynwJi",
+	"PMP/mFQ2T+xTOTHSfnPyrbYIZChopoXhmVWHRLWiMNYYc8HTLAEF2uPf4GcO0tiTCZ6BUNRa/EwZAzGn",
+	"kf4Rc5EShWc4zw0Szl+pBGVLbL0tsHmovfpYLuWLHxAqvAnwBWcxFWmv4pBHUMO00BFgSAlNPE9a2u2y",
+	"wMrxGiCAbHE+E3yRQDqnkfkJL0QjpqVPpydH6pkfyTzFAZ5OT49i+vq6yF9ftS6qIJVe41Pycm0fnk4D",
+	"nFLmfp2UBhIhyLrjTd0SnzPfQDMZlcHQcSWyC2pGLThPgLCOqmKlT80lUyB64RrFjFd8I6C78vXjeREY",
+	"JRv46uvt5fz7r7/P//3rH9+/deMywClISZat15YkBcS4QjHP2fZwrmmvBHq9eIEwVzA+sinLcuV9khC2",
+	"zJ0Dw1Y6+8oXCqmDhvYC/kLVvGVuWdwCLFUEQngNliriPb4omsI8lxDNGzlSFc2mQ05SqS2oWdUS5vPx",
+	"yhTuDgUm96M5UY2yFhEFR1qkL4bMO3zHUhhgGvlBy4hQNKQZcbtPWSuGKr324q560cDYKBfB31mrNDdE",
+	"5VYvy1NTsIBFWk6ASajok0Y0pozKFWi0QsJCSJJGlakU51k0mp3BfYrlSUIWGg27Yw+nkHmlDmeD+9LZ",
+	"FpVBPagaPvSFZZ3QToTuGGXMhfdoD/uM6i8GS6dqW5x2tJkX+/Td8yS33crOZXKgGO4MSJ1gfwHjydPI",
+	"EMwl7Fwd9NrC1GGuCqm1dxrGB56SXxm/DXbZz7csloyqUiWfmy0dTSXeZ+MNlUqLk8PxOM42X9lUXJGk",
+	"QRll6l9nFWd9+5JVXwjo8+HOEjXghqNyd0+cyK0Al4J9tt0O7fpFG7c1h3ZOtt1Toyf6fT4UQHh63dpH",
+	"kCe3IxrHNMwTta7vWEDk2nR2ETUb5YoI//Zk/aj6yOb+6uk9Uy7W84SmVM3Thb8rUCB1T5PbraD5Ffc9",
+	"TxcgEI+RXoVCIm3gdYXoZsjpkT16qEp2KDqWGbO2+U3ZAK+tsevrAG1bM2LnPPDHvVf3vdm6B2pe1ceU",
+	"9PI/t0ape82n8Xf+J7ChDjujAuSofWbnrFNa93ay7bKgbovPkz9MR3Pb/11T2JWSlxtgS7XCs5Op7RzL",
+	"39uQZP5eQW/IEOaCqvW9pt8qPAciQHzNtWQ3MzEftubfFXIrpTI7HaEs5gYPmwX4fK0AnROlEkBf765x",
+	"gJ9ASJt10+OT46n2m2fASEbxDH85nh5/MX2fWhkDJiRXq0loJxkGEG6B0bCYic51hGf4jkulrXQjDzdC",
+	"AqnOebR+t2lQa6CyaUKrQ6Q9jTqdTt9NezPOPbMoDQAwpaVDpHE9s9p9Qksr7YjLrj4bs/r0l51X12IL",
+	"zx4eAyzzNCVijWf4vyBovEYpWdIQ6TYLERahJSgkQeo4QTZ3tAwbC8AUiO2RYOYoe4qDxozmg6OgVV89",
+	"YXChUZRgv2HHhMAATc5ZROpMPVGCbCdTsZPwpZtKDNNzY9f9rUDd8OUSIqTtMEid/J9INcvkw+OmAd0l",
+	"i1CYCwGsjOkaXraeL8ED1RUYpG5hnyjVulRfKDm7dY+4T4yuQJUYkXoVKzVnRIUrTzjpf9dQev9cb+/J",
+	"H5zuw/xY46IaP+MK/n7YtFaVhGrjUCZ4TBM7uZiAnYoOVwk3Ot1XCW9OkD+Y1fZY2HewZJboDVCAzBN1",
+	"OPQ646vdWoDKBdN1NMttJzkpJwfeylaOHuyErzwafHAngj9zEOvqSNB86+D6KWAEMdGYzE6mvimCXwyP",
+	"Ywk9cnxiHvcYAN3hi29/olLpb1IL5sHwb8wyNqFnqlYoI0vKSDGR8id0dRK4r9a8c9S4U0qfvJsBjcmu",
+	"h0z9HLn59eFwaWFDBDF4NpzW0nfyRqNNdbDZJdWeiDpSW3nss7RaMnFXAPaaY+0D2z5SitPYkTCP+2Aa",
+	"Q4o13NCBFmukcQp6W8SDhX+nhLDnwgeDvO5D67A3c2Fiz9T625YL8/xzM1KdG+61SO2PQ0sCIt5yZrQU",
+	"1ayHxNqdnb9G4z4GUN37RB/cuu4WRM7OzxtEzgEXRrbRIcgegXeC6genrD+g/sMp+7Q1QRsPkculw+FS",
+	"r/5lL8xrhxFB7nKFZZ9I/Z/65ZBWACRAngZKyo1+/GlD4AZiVQuAcZR++XQBYMgaHQGNo/yhXq28FnCw",
+	"sdC9uDDwbVr5fVBNXEakhKiyDsVc9LUEUhExMLG+148/d09nPPy8m7FhoJWRlsX6zY7eSVNxQQTveZ7T",
+	"uYgykDal4UOHLmYxSRJEngg159DN90r3J2/VbaXNUAEqDvQ7kdx31cJzQb9xMWrrRf3yEHqfSdC+7+AB",
+	"3i2pf3CevcfBmCk2Tnbx0WiWi6cC21wkeIYnJKN487j5XwAAAP//WaW99RsxAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

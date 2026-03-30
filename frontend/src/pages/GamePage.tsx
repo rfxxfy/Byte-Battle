@@ -20,7 +20,7 @@ const LANGUAGES = [
 type LangValue = (typeof LANGUAGES)[number]['value']
 
 const DEFAULT_CODE: Record<LangValue, string> = {
-  python: '\n',
+  python: '',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\t\n}\n',
   cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n\t\n\treturn 0;\n}\n',
   java: 'public class Main {\n    public static void main(String[] args) {\n        \n    }\n}\n',
@@ -437,7 +437,12 @@ export function GamePage() {
             </div>
           )}
           {isFinished && (
-            <span className="text-sm text-muted-foreground">Завершена</span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-amber-400/90">Завершена</span>
+              <Button size="sm" variant="outline" className="border-amber-400/40 text-amber-400/90 hover:bg-amber-400/10 hover:text-amber-400" onClick={() => navigate(`/games/${gameId}/results`)}>
+                Смотреть решения
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -639,9 +644,14 @@ export function GamePage() {
                 ? 'Ты решил все задачи первым!'
                 : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id.slice(0, 8)}`}
             </p>
-            <Button className="w-full" onClick={() => setWinner(null)}>
-              Закрыть
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button className="w-full" onClick={() => navigate(`/games/${gameId}/results`)}>
+                Смотреть решения
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => setWinner(null)}>
+                Закрыть
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listGames, createGame, joinGame, type Game } from '@/api/games'
+import { listGames, createGame, type Game, type GameParticipant } from '@/api/games'
+
+function avatarInitials(p: GameParticipant): string {
+  if (p.name) return p.name.slice(0, 2).toUpperCase()
+  return p.id.slice(0, 2).toUpperCase()
+}
 import { listProblems, type Problem } from '@/api/problems'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
@@ -31,9 +36,38 @@ function formatDate(iso: string) {
   })
 }
 
+
+const MAX_DOTS = 6
+
+function ProblemDots({ game }: { game: Game }) {
+  const total = game.problem_ids.length
+  const visible = Math.min(total, MAX_DOTS)
+  const overflow = total - MAX_DOTS
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {Array.from({ length: visible }).map((_, i) => (
+        <span
+          key={i}
+          className={
+            game.status === 'finished'
+              ? 'w-2 h-2 rounded-full bg-primary/70'
+              : game.status === 'active'
+                ? 'w-2 h-2 rounded-full bg-muted-foreground/40 animate-pulse'
+                : 'w-2 h-2 rounded-full bg-muted-foreground/25'
+          }
+        />
+      ))}
+      {overflow > 0 && (
+        <span className="text-xs text-muted-foreground/50 leading-none">+{overflow}</span>
+      )}
+    </div>
+  )
+}
+
 export function GamesPage() {
   const navigate = useNavigate()
-  const { userId } = useAuth()
+  useAuth()
 
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,39 +125,6 @@ export function GamesPage() {
     }
   }
 
-  const handleJoin = async (id: number) => {
-    setActionError('')
-    try {
-      await joinGame(id)
-      navigate(`/games/${id}`)
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err),
-      )
-    }
-  }
-
-  const rowAction = (game: Game) => {
-    const isParticipant = userId != null && game.participants.some((p) => p.id === userId)
-
-    if (game.status === 'pending' && !isParticipant) {
-      return (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation()
-            handleJoin(game.id)
-          }}
-        >
-          Войти
-        </Button>
-      )
-    }
-
-    return null
-  }
-
   const toggleProblem = (problemId: string, checked: boolean) => {
     setSelectedProblemIds((prev) => {
       if (checked) {
@@ -147,50 +148,63 @@ export function GamesPage() {
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
       <div className="rounded-lg border border-border/60 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
           <thead>
-            <tr className="border-b border-border/60 bg-muted/30">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-16">#</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Задачи</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-32">Статус</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-28">Участники</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-40">Дата</th>
-              <th className="px-4 py-3 w-28" />
+            <tr className="border-b border-border/60 bg-muted/30 text-xs font-medium text-muted-foreground">
+              <th className="px-4 py-3 text-left w-12">#</th>
+              <th className="pl-3 pr-4 py-3 text-left w-24">Задачи</th>
+              <th className="pl-[26px] pr-4 py-3 text-left w-36">Статус</th>
+              <th className="px-4 py-3 text-left">Участники</th>
+              <th className="pl-[34px] pr-4 py-3 text-left w-40">Дата</th>
             </tr>
           </thead>
           <tbody>
             {games.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   Игр пока нет — создай первую
                 </td>
               </tr>
             ) : (
               games.map((g) => (
-                <tr
-                  key={g.id}
-                  onClick={() => navigate(`/games/${g.id}`)}
-                  className="border-b border-border/40 last:border-0 hover:bg-muted/10 cursor-pointer transition-colors"
-                >
-                  <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{g.id}</td>
-                  <td className="px-4 py-3 text-xs font-mono">
-                    {g.problem_ids.length} задач
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusClass[g.status]}`}
-                    >
-                      {statusLabel[g.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{g.participants.length}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {formatDate(g.created_at)}
-                  </td>
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    {rowAction(g)}
-                  </td>
-                </tr>
+                  <tr
+                    key={g.id}
+                    onClick={() => navigate(g.status === 'finished' ? `/games/${g.id}/results` : `/games/${g.id}`)}
+                    className="border-b border-border/40 last:border-0 hover:bg-muted/10 cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40">{g.id}</td>
+                    <td className="px-4 py-4"><ProblemDots game={g} /></td>
+                    <td className="px-4 py-4">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass[g.status]}`}>
+                        {statusLabel[g.status]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-1">
+                        {g.participants.slice(0, 4).map((p, idx) => (
+                          <div
+                            key={p.id}
+                            title={p.name ?? undefined}
+                            style={{ zIndex: g.participants.length - idx, marginLeft: idx === 0 ? 0 : '-6px' }}
+                            className="w-7 h-7 rounded-full bg-muted border-2 border-card flex items-center justify-center text-[10px] font-semibold text-muted-foreground"
+                          >
+                            {avatarInitials(p)}
+                          </div>
+                        ))}
+                        {g.participants.length > 4 && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            +{g.participants.length - 4}
+                          </span>
+                        )}
+                        {g.participants.length === 0 && (
+                          <span className="text-xs text-muted-foreground/40">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-left text-xs text-muted-foreground/60">
+                      {formatDate(g.created_at)}
+                    </td>
+                  </tr>
               ))
             )}
           </tbody>

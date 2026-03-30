@@ -6,8 +6,9 @@ import (
 )
 
 type Config struct {
-	DockerHost string                    `json:"docker_host"`
-	Languages  map[Language]LangSettings `json:"languages"`
+	DockerHost               string                    `json:"docker_host"`
+	Languages                map[Language]LangSettings `json:"languages"`
+	DisableSecurityHardening bool                      `json:"disable_security_hardening,omitempty"`
 }
 
 type LangSettings struct {

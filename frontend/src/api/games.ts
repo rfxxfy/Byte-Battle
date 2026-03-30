@@ -43,3 +43,16 @@ export const startGame = (id: number) =>
 
 export const cancelGame = (id: number) =>
   apiFetch<{ game: Game }>(`/games/${id}/cancel`, { method: 'POST' })
+
+export interface GameSolution {
+  user_id: string
+  username: string
+  name?: string | null
+  problem_id: string
+  code: string
+  language: string
+  solved_at: string
+}
+
+export const getGameSolutions = (id: number) =>
+  apiFetch<{ solutions: GameSolution[] }>(`/games/${id}/solutions`)

@@ -388,12 +388,14 @@ func (e *DockerExecutor) createWarmContainer(ctx context.Context, langConfig *La
 			PidsLimit: &pidsLimitPtr,
 		},
 		NetworkMode: "none",
-		CapDrop:     []string{"ALL"},
-		SecurityOpt: []string{"no-new-privileges:true"},
 		Tmpfs: map[string]string{
 			"/tmp": "exec",
 			"/run": "",
 		},
+	}
+	if !e.config.DisableSecurityHardening {
+		hostConfig.CapDrop = []string{"ALL"}
+		hostConfig.SecurityOpt = []string{"no-new-privileges:true"}
 	}
 
 	containerConfig := &container.Config{
