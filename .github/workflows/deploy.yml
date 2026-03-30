@@ -33,6 +33,10 @@ jobs:
       - name: Set deployment config
         run: |
           TARGET="${{ inputs.target || 'production' }}"
+          if [ "$TARGET" = "production" ] && [ "${{ github.ref_name }}" != "main" ]; then
+            echo "ERROR: production deploys are only allowed from main (got ${{ github.ref_name }})"
+            exit 1
+          fi
           if [ "$TARGET" = "staging" ]; then
             echo "DEPLOY_DIR=/opt/bytebattle-staging" >> $GITHUB_ENV
             echo "COMPOSE_FILE=docker-compose.staging.yaml" >> $GITHUB_ENV
