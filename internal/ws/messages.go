@@ -26,6 +26,7 @@ type ServerMessage struct {
 	Stdout     string           `json:"stdout,omitempty"`
 	Stderr     string           `json:"stderr,omitempty"`
 	Message    string           `json:"message,omitempty"`
+	ErrorCode  string           `json:"error_code,omitempty"`
 	FailedTest *int             `json:"failed_test,omitempty"`
 	ProblemID  string           `json:"problem_id,omitempty"`
 	ProblemIdx int              `json:"problem_index"`

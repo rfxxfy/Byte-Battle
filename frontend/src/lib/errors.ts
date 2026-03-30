@@ -28,6 +28,9 @@ const messages: Record<string, string> = {
   VERSION_LIMIT_REACHED: 'Достигнут лимит версий задачи (максимум 10)',
   PROBLEM_LIMIT_REACHED: 'Достигнут лимит задач (максимум 20)',
   EXECUTOR_NOT_READY: 'Система выполнения кода временно недоступна',
+  EXECUTION_RATE_LIMITED: 'Слишком часто, подождите немного перед следующей попыткой',
+  EXECUTION_IN_PROGRESS: 'Решение уже проверяется, подождите',
+  EXECUTOR_OVERLOADED: 'Сервер перегружен, попробуйте через секунду',
 
   // Generic
   VALIDATION_ERROR: 'Ошибка валидации',

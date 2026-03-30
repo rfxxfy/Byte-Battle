@@ -28,7 +28,7 @@ import (
 
 const (
 	poolSize             = 3
-	queueMultiplier      = 4
+	queueMultiplier      = 6
 	nanoCPUs             = int64(1000000000)
 	pidsLimit            = int64(64)
 	defaultMemoryLimit   = 100 * 1024 * 1024

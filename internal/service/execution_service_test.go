@@ -65,26 +65,26 @@ func TestExecutionService_TryAcquireSlot_OnlyOneAtATime(t *testing.T) {
 	svc := newTestService(rate.Inf, 100)
 	userID := uuid.New()
 
-	assert.True(t, svc.TryAcquireSlot(userID))
-	assert.False(t, svc.TryAcquireSlot(userID), "second acquire should fail while slot is held")
+	assert.True(t, svc.TryAcquireSlot(userID, "execute"))
+	assert.False(t, svc.TryAcquireSlot(userID, "execute"), "second acquire should fail while slot is held")
 
-	svc.ReleaseSlot(userID)
-	assert.True(t, svc.TryAcquireSlot(userID), "acquire should succeed after release")
+	svc.ReleaseSlot(userID, "execute")
+	assert.True(t, svc.TryAcquireSlot(userID, "execute"), "acquire should succeed after release")
 }
 
 func TestExecutionService_TryAcquireSlot_IndependentPerUser(t *testing.T) {
 	svc := newTestService(rate.Inf, 100)
 	user1, user2 := uuid.New(), uuid.New()
 
-	assert.True(t, svc.TryAcquireSlot(user1))
-	assert.True(t, svc.TryAcquireSlot(user2), "user2 slot should be independent of user1")
-	assert.False(t, svc.TryAcquireSlot(user1))
+	assert.True(t, svc.TryAcquireSlot(user1, "execute"))
+	assert.True(t, svc.TryAcquireSlot(user2, "execute"), "user2 slot should be independent of user1")
+	assert.False(t, svc.TryAcquireSlot(user1, "execute"))
 }
 
 func TestExecutionService_ReleaseSlot_NoopWhenNotHeld(t *testing.T) {
 	svc := newTestService(rate.Inf, 100)
 	// should not panic or block when no slot was ever acquired
-	svc.ReleaseSlot(uuid.New())
+	svc.ReleaseSlot(uuid.New(), "execute")
 }
 
 // TestExecutionService_SlotConcurrency verifies the core invariant: at most one
@@ -102,7 +102,7 @@ func TestExecutionService_SlotConcurrency(t *testing.T) {
 	for range goroutines {
 		go func() {
 			defer wg.Done()
-			if !svc.TryAcquireSlot(userID) {
+			if !svc.TryAcquireSlot(userID, "execute") {
 				return
 			}
 			cur := concurrent.Add(1)
@@ -114,7 +114,7 @@ func TestExecutionService_SlotConcurrency(t *testing.T) {
 			}
 			time.Sleep(time.Millisecond)
 			concurrent.Add(-1)
-			svc.ReleaseSlot(userID)
+			svc.ReleaseSlot(userID, "execute")
 		}()
 	}
 	wg.Wait()
@@ -140,8 +140,8 @@ func TestExecutionService_Cleanup_RemovesIdleEntriesWhenLimiterReplenished(t *te
 	userID := uuid.New()
 
 	_ = svc.limiter(userID) // create limiter entry
-	svc.TryAcquireSlot(userID)
-	svc.ReleaseSlot(userID)
+	svc.TryAcquireSlot(userID, "execute")
+	svc.ReleaseSlot(userID, "execute")
 
 	time.Sleep(5 * time.Millisecond) // let limiter replenish
 	svc.runCleanup()
@@ -162,12 +162,12 @@ func TestExecutionService_Cleanup_PreservesSlotWhenExecutionInFlight(t *testing.
 	userID := uuid.New()
 
 	_ = svc.limiter(userID)
-	svc.TryAcquireSlot(userID) // slot is now held (not released)
+	svc.TryAcquireSlot(userID, "execute") // slot is now held (not released)
 
 	time.Sleep(5 * time.Millisecond) // limiter replenishes
 	svc.runCleanup()
 
-	_, slotExists := svc.slots.Load(userID)
+	_, slotExists := svc.slots.Load(slotKey{userID, "execute"})
 	assert.True(t, slotExists, "slot must be preserved while execution is in flight")
 }
 
@@ -179,19 +179,19 @@ func TestExecutionService_Cleanup_RemovesOrphanedSlot(t *testing.T) {
 	userID := uuid.New()
 
 	_ = svc.limiter(userID)
-	svc.TryAcquireSlot(userID) // slot held during first cleanup
+	svc.TryAcquireSlot(userID, "execute") // slot held during first cleanup
 
 	time.Sleep(5 * time.Millisecond) // limiter replenishes
 	svc.runCleanup()                 // limiter deleted, slot preserved (still in flight)
 
 	_, limiterExists := svc.limiters.Load(userID)
-	_, slotExists := svc.slots.Load(userID)
+	_, slotExists := svc.slots.Load(slotKey{userID, "execute"})
 	require.False(t, limiterExists, "limiter should be gone after first cleanup")
 	require.True(t, slotExists, "slot should survive while in flight")
 
-	svc.ReleaseSlot(userID) // execution finishes
-	svc.runCleanup()        // second cleanup: orphaned slot should now be removed
+	svc.ReleaseSlot(userID, "execute") // execution finishes
+	svc.runCleanup()                   // second cleanup: orphaned slot should now be removed
 
-	_, slotExists = svc.slots.Load(userID)
+	_, slotExists = svc.slots.Load(slotKey{userID, "execute"})
 	assert.False(t, slotExists, "orphaned slot must be removed on second cleanup")
 }

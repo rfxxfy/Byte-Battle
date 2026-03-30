@@ -18,15 +18,20 @@ type RateLimitConfig struct {
 }
 
 var DefaultRateLimitConfig = RateLimitConfig{
-	Rate:  rate.Every(10 * time.Second),
-	Burst: 3,
+	Rate:  rate.Every(5 * time.Second),
+	Burst: 10,
+}
+
+type slotKey struct {
+	userID uuid.UUID
+	kind   string // execute/submit
 }
 
 type ExecutionService struct {
 	executor executor.Executor
 	rl       RateLimitConfig
 	limiters sync.Map // uuid.UUID -> *rate.Limiter
-	slots    sync.Map // uuid.UUID -> chan struct{} (per-user concurrency slot)
+	slots    sync.Map // slotKey -> chan struct{} (per-user per-kind concurrency slot)
 }
 
 func NewExecutionService(exec executor.Executor, cfg ...RateLimitConfig) *ExecutionService {
@@ -51,14 +56,12 @@ func (s *ExecutionService) runCleanup() {
 	s.limiters.Range(func(k, v any) bool {
 		if v.(*rate.Limiter).Tokens() >= float64(s.rl.Burst) {
 			s.limiters.Delete(k)
-			if ch, ok := s.slots.Load(k); ok && len(ch.(chan struct{})) == 0 {
-				s.slots.Delete(k)
-			}
 		}
 		return true
 	})
 	s.slots.Range(func(k, v any) bool {
-		if _, hasLimiter := s.limiters.Load(k); !hasLimiter {
+		userID := k.(slotKey).userID
+		if _, hasLimiter := s.limiters.Load(userID); !hasLimiter {
 			if len(v.(chan struct{})) == 0 {
 				s.slots.Delete(k)
 			}
@@ -86,8 +89,9 @@ func (s *ExecutionService) Execute(ctx context.Context, req executor.ExecutionRe
 	return s.executor.Run(ctx, req)
 }
 
-func (s *ExecutionService) TryAcquireSlot(userID uuid.UUID) bool {
-	ch, _ := s.slots.LoadOrStore(userID, make(chan struct{}, 1))
+func (s *ExecutionService) TryAcquireSlot(userID uuid.UUID, kind string) bool {
+	k := slotKey{userID, kind}
+	ch, _ := s.slots.LoadOrStore(k, make(chan struct{}, 1))
 	select {
 	case ch.(chan struct{}) <- struct{}{}:
 		return true
@@ -96,8 +100,8 @@ func (s *ExecutionService) TryAcquireSlot(userID uuid.UUID) bool {
 	}
 }
 
-func (s *ExecutionService) ReleaseSlot(userID uuid.UUID) {
-	if ch, ok := s.slots.Load(userID); ok {
+func (s *ExecutionService) ReleaseSlot(userID uuid.UUID, kind string) {
+	if ch, ok := s.slots.Load(slotKey{userID, kind}); ok {
 		<-ch.(chan struct{})
 	}
 }

@@ -54,6 +54,11 @@ interface PlayerState {
   progress: Record<string, number>
 }
 
+interface ServerError {
+  error_code: string
+  message: string
+}
+
 
 function formatSeconds(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
@@ -96,6 +101,7 @@ export function GamePage() {
   const [runOutput, setRunOutput] = useState<{ stdout: string; stderr: string } | null>(null)
 
   const [submitting, setSubmitting] = useState(false)
+  const [submitCooldown, setSubmitCooldown] = useState(0)
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
   const [winner, setWinner] = useState<GameFinished | null>(null)
   const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({})
@@ -221,7 +227,7 @@ export function GamePage() {
 
       ws.onmessage = (e) => {
         try {
-          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & PlayerAdvanced & PlayerState
+          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & PlayerAdvanced & PlayerState & ServerError
           if (msg.type === 'submission_result') {
             setSubmissionResult(msg)
             setSubmitting(false)
@@ -264,6 +270,18 @@ export function GamePage() {
             }
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
             setSubmitting(false)
+          } else if (msg.type === 'error') {
+            setSubmitting(false)
+            setActionError(errorMessage(msg.error_code, msg.message))
+            if (msg.error_code === 'EXECUTION_RATE_LIMITED') {
+              setSubmitCooldown(5)
+              const iv = setInterval(() => {
+                setSubmitCooldown((s) => {
+                  if (s <= 1) { clearInterval(iv); return 0 }
+                  return s - 1
+                })
+              }, 1000)
+            }
           }
         } catch { /* ignore malformed */ }
       }
@@ -471,9 +489,9 @@ export function GamePage() {
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={!isActive || submitting || timedOut || countdown !== null}
+                disabled={!isActive || submitting || timedOut || countdown !== null || submitCooldown > 0}
               >
-                {submitting ? 'Проверяем...' : 'Отправить решение'}
+                {submitting ? 'Проверяем...' : submitCooldown > 0 ? `Подождите ${submitCooldown}с` : 'Отправить решение'}
               </Button>
             </div>
           </div>

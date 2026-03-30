@@ -50,10 +50,10 @@ func NewSubmissionService(execSvc *ExecutionService, gameSvc *GameService, store
 }
 
 func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.UUID, code string, language executor.Language) (SubmissionResult, error) {
-	if !s.execSvc.TryAcquireSlot(userID) {
+	if !s.execSvc.TryAcquireSlot(userID, "submit") {
 		return SubmissionResult{}, apierr.New(apierr.ErrExecutionInProgress, "execution already in progress")
 	}
-	defer s.execSvc.ReleaseSlot(userID)
+	defer s.execSvc.ReleaseSlot(userID, "submit")
 
 	if err := s.execSvc.CheckRateLimit(userID); err != nil {
 		return SubmissionResult{}, err

@@ -277,10 +277,10 @@ func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestOb
 
 func (s *HTTPServer) PostExecute(ctx context.Context, request api.PostExecuteRequestObject) (api.PostExecuteResponseObject, error) {
 	userID, _ := userIDFromContext(ctx)
-	if !s.executionService.TryAcquireSlot(userID) {
+	if !s.executionService.TryAcquireSlot(userID, "execute") {
 		return nil, apierr.New(apierr.ErrExecutionInProgress, "execution already in progress")
 	}
-	defer s.executionService.ReleaseSlot(userID)
+	defer s.executionService.ReleaseSlot(userID, "execute")
 	if err := s.executionService.CheckRateLimit(userID); err != nil {
 		return nil, err
 	}
@@ -543,9 +543,9 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		log.Printf("processSubmit: %v", err)
 		var appErr *apierr.AppError
 		if errors.As(err, &appErr) {
-			s.broadcastError(gameID, userID, appErr.Message)
+			s.broadcastError(gameID, userID, appErr.ErrorCode, appErr.Message)
 		} else {
-			s.broadcastError(gameID, userID, "internal error")
+			s.broadcastError(gameID, userID, apierr.ErrInternal, "internal error")
 		}
 		return
 	}
@@ -745,11 +745,12 @@ func mapUploadError(err error) error {
 	return apierr.New(apierr.ErrInternal, "upload failed")
 }
 
-func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {
+func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, code, msg string) {
 	errMsg, _ := json.Marshal(ws.ServerMessage{
-		Type:    ws.TypeError,
-		UserID:  userID,
-		Message: msg,
+		Type:      ws.TypeError,
+		UserID:    userID,
+		ErrorCode: code,
+		Message:   msg,
 	})
 	s.hub.SendToUser(gameID, userID, errMsg)
 }

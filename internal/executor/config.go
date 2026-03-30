@@ -44,7 +44,7 @@ func DefaultConfig() *Config {
 				RunCmd:      []string{"python", "main.py"},
 				MemoryLimit: 256 * 1024 * 1024,
 				TimeLimit:   10,
-				PoolSize:    5,
+				PoolSize:    10,
 			},
 			"go": {
 				Image:       "golang:1.26-alpine",
@@ -71,6 +71,7 @@ func DefaultConfig() *Config {
 				RunCmd:      []string{"java", "Main"},
 				MemoryLimit: 512 * 1024 * 1024,
 				TimeLimit:   30,
+				PoolSize:    5,
 			},
 		},
 	}
