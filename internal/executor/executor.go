@@ -26,4 +26,5 @@ type ExecutionResult struct {
 
 type Executor interface {
 	Run(ctx context.Context, req ExecutionRequest) (ExecutionResult, error)
+	IsReady() bool
 }

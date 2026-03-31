@@ -27,6 +27,10 @@ func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	if !s.executionService.IsReady() {
+		http.Error(w, "executor not ready", http.StatusServiceUnavailable)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }

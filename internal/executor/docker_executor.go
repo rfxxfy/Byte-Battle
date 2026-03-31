@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -33,10 +34,13 @@ const (
 )
 
 type DockerExecutor struct {
-	cli     dockerClient
-	config  *Config
-	pools   map[Language]chan string
-	errChan chan error
+	cli           dockerClient
+	config        *Config
+	pools         map[Language]chan string
+	errChan       chan error
+	primedPerLang map[Language]*atomic.Bool
+	primedCount   atomic.Int32
+	ready         atomic.Bool
 }
 
 func NewDockerExecutor(cfg *Config) (*DockerExecutor, error) {
@@ -140,13 +144,27 @@ func (e *DockerExecutor) logPoolErrors() {
 	}
 }
 
+func (e *DockerExecutor) IsReady() bool {
+	return len(e.pools) > 0 && e.ready.Load()
+}
+
+func (e *DockerExecutor) notifyPoolPrimed(lang Language) {
+	if e.primedPerLang[lang].CompareAndSwap(false, true) {
+		if e.primedCount.Add(1) == int32(len(e.pools)) {
+			e.ready.Store(true)
+		}
+	}
+}
+
 func (e *DockerExecutor) initPools() {
+	e.primedPerLang = make(map[Language]*atomic.Bool, len(e.config.Languages))
 	for lang, settings := range e.config.Languages {
 		size := settings.PoolSize
 		if size <= 0 {
 			size = poolSize
 		}
 		e.pools[lang] = make(chan string, size)
+		e.primedPerLang[lang] = new(atomic.Bool)
 	}
 	for lang, settings := range e.config.Languages {
 		go e.maintainPool(lang, &settings)
@@ -215,6 +233,7 @@ func (e *DockerExecutor) tryFillPool(ctx context.Context, lang Language, setting
 	}
 	select {
 	case e.pools[lang] <- id:
+		e.notifyPoolPrimed(lang)
 		return false
 	case <-ctx.Done():
 		e.cleanupContainer(context.Background(), id)

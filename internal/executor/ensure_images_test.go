@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -97,13 +98,22 @@ func (m *mockDockerClient) CopyToContainer(_ context.Context, _, _ string, _ io.
 	return nil
 }
 
-func newTestExecutor(mock dockerClient) *DockerExecutor {
-	return &DockerExecutor{
-		cli:     mock,
-		config:  &Config{Languages: map[Language]LangSettings{"python": {Image: "python:3.14-slim"}}},
-		pools:   make(map[Language]chan string),
-		errChan: make(chan error, 16),
+func newTestExecutorWithLangs(mock dockerClient, langs map[Language]LangSettings) *DockerExecutor {
+	primedPerLang := make(map[Language]*atomic.Bool, len(langs))
+	for lang := range langs {
+		primedPerLang[lang] = new(atomic.Bool)
 	}
+	return &DockerExecutor{
+		cli:           mock,
+		config:        &Config{Languages: langs},
+		pools:         make(map[Language]chan string),
+		errChan:       make(chan error, 16),
+		primedPerLang: primedPerLang,
+	}
+}
+
+func newTestExecutor(mock dockerClient) *DockerExecutor {
+	return newTestExecutorWithLangs(mock, map[Language]LangSettings{"python": {Image: "python:3.14-slim"}})
 }
 
 func TestEnsureImages_AlreadyPresent(t *testing.T) {
