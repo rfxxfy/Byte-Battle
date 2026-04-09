@@ -33,7 +33,9 @@ jobs:
           key: ${{ runner.os }}-go-tools-${{ hashFiles('Makefile', '.github/workflows/go-ci.yml') }}
 
       - name: Install tools
-        run: make tools
+        run: |
+          make tools
+          go install gotest.tools/gotestsum@v1.12.1
 
       - name: Generate API
         run: make generate-api
