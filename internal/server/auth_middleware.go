@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -28,7 +29,11 @@ func (s *HTTPServer) strictAuthMiddleware(publicOps map[string]bool) api.StrictM
 			token := bearerToken(r)
 			session, err := s.sessionService.ValidateToken(ctx, token)
 			if err != nil {
-				return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
+				var ae *apierr.AppError
+				if errors.As(err, &ae) {
+					return nil, apierr.New(apierr.ErrInvalidToken, "unauthorized")
+				}
+				return nil, apierr.New(apierr.ErrInternal, "internal server error")
 			}
 			ctx = context.WithValue(ctx, contextKeyUserID, session.UserID)
 			ctx = context.WithValue(ctx, contextKeySession, session)
