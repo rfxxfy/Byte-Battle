@@ -26,17 +26,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Cache Go tool binaries
-        uses: actions/cache@v5
-        with:
-          path: ~/go/bin
-          key: ${{ runner.os }}-go-tools-${{ hashFiles('Makefile', '.github/workflows/go-ci.yml') }}
-
-      - name: Install tools
-        run: |
-          make tools
-          go install gotest.tools/gotestsum@v1.12.1
-
       - name: Generate API
         run: make generate-api
 
@@ -60,10 +49,10 @@ jobs:
       - name: Run unit tests
         run: |
           PKGS=$(go list ./... | grep -v /e2e)
-          gotestsum --junitfile report.xml --format github-actions -- -race -count=1 $PKGS
+          go tool gotestsum --junitfile report.xml --format github-actions -- -race -count=1 $PKGS
 
       - name: Run e2e tests
-        run: gotestsum --junitfile report-e2e.xml --format github-actions -- -race -count=1 -timeout 300s ./internal/e2e/...
+        run: go tool gotestsum --junitfile report-e2e.xml --format github-actions -- -race -count=1 -timeout 300s ./internal/e2e/...
 
       - name: Upload test report
         if: always()
