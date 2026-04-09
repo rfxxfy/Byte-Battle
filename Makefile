@@ -4,12 +4,11 @@ MODULE_NAME := bytebattle
 -include .env
 export
 
-OAPI_CODEGEN := $(shell go env GOPATH)/bin/oapi-codegen
 MIGRATE_VERSION := v4.19.1
 
 GOBIN := $(shell go env GOPATH)/bin
 
-.PHONY: tidy tools generate generate-api generate-sqlc clean frontend-install frontend-build frontend-dev
+.PHONY: tidy generate generate-api generate-sqlc clean frontend-install frontend-build frontend-dev
 
 tidy:
 	go mod tidy
@@ -18,22 +17,17 @@ tidy:
 # Code generation
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Install dev tools (oapi-codegen, sqlc)
-tools:
-	@test -f $(OAPI_CODEGEN) || go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.6.0
-	@command -v sqlc >/dev/null 2>&1 || go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
-
 # Generate API types and server interface from openapi.yaml (no DB required)
 generate-api:
 	mkdir -p internal/api
-	cd api && $(OAPI_CODEGEN) -config oapi-codegen.yaml openapi.yaml
+	cd api && go tool oapi-codegen -config oapi-codegen.yaml openapi.yaml
 
 # Generate sqlc query code from SQL files (no DB required)
 generate-sqlc:
-	sqlc generate
+	go tool sqlc generate
 
-# Generate everything (auto-installs tools if missing)
-generate: tools generate-api generate-sqlc
+# Generate everything
+generate: generate-api generate-sqlc
 
 # Remove generated files and binaries
 clean:

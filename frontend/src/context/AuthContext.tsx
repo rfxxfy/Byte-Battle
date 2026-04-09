@@ -38,10 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState((prev) => ({ ...prev, token, userId: res.user_id, email: res.email ?? null, name: res.name ?? null, loading: false }))
       })
       .catch((err) => {
-        if (err instanceof ApiError) {
+        if (err instanceof ApiError && err.status === 401) {
           localStorage.removeItem('token')
+          setState({ token: null, userId: null, email: null, name: null, loading: false })
+        } else {
+          setState((prev) => ({ ...prev, userId: null, loading: false }))
         }
-        setState({ token: null, userId: null, email: null, name: null, loading: false })
       })
   }, [])
 
