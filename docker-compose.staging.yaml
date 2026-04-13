@@ -1,4 +1,4 @@
-# Staging stack — runs on the same VPS alongside production.
+# Staging stack, runs on the same VPS alongside production.
 # Requires a shared Docker network to exist (created once on the VPS):
 #   docker network create bytebattle-shared
 #
@@ -32,6 +32,7 @@ services:
       PROBLEMS_DIR: /app/problems
       ALLOWED_ORIGINS: https://staging.bytebattle.online
       HTTP_RATE_PER_MINUTE: ${HTTP_RATE_PER_MINUTE:-100}
+      SESSION_TTL: ${SESSION_TTL:-168h}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       FROM_EMAIL: ${FROM_EMAIL:-noreply@bytebattle.dev}
     volumes:
