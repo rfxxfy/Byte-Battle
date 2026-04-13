@@ -14,9 +14,11 @@ const (
 )
 
 type Client struct {
-	send chan []byte
-	conn *websocket.Conn
-	once sync.Once
+	send   chan []byte
+	conn   *websocket.Conn
+	mu     sync.Mutex
+	closed bool
+	once   sync.Once
 }
 
 func NewClient(conn *websocket.Conn) *Client {
@@ -28,12 +30,21 @@ func NewClient(conn *websocket.Conn) *Client {
 
 // Close signals WritePump to exit cleanly by closing the send channel.
 func (c *Client) Close() {
-	c.once.Do(func() { close(c.send) })
+	c.once.Do(func() {
+		c.mu.Lock()
+		c.closed = true
+		close(c.send)
+		c.mu.Unlock()
+	})
 }
 
 // Send enqueues a message for this client. Non-blocking; drops if buffer is full or client is closed.
 func (c *Client) Send(msg []byte) {
-	defer func() { recover() }() //nolint:errcheck // panic means channel is closed; drop silently
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return
+	}
 	select {
 	case c.send <- msg:
 	default:
