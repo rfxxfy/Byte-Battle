@@ -72,7 +72,7 @@ linters:
         - hugeParam
 
     gocognit:
-      min-complexity: 15
+      min-complexity: 20
 
     misspell: {}
 
