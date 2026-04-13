@@ -549,6 +549,7 @@ export function GamePage() {
                 scrollBeyondLastLine: false,
                 readOnly: isFinished,
                 domReadOnly: isFinished,
+                mouseStyle: isFinished ? 'default' : 'text',
                 renderLineHighlight: isFinished ? 'none' : 'line',
                 padding: { top: 12 },
               }}

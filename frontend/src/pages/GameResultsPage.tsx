@@ -154,6 +154,7 @@ export function GameResultsPage() {
                           options={{
                             readOnly: true,
                             domReadOnly: true,
+                            mouseStyle: 'default',
                             minimap: { enabled: false },
                             fontSize: 14,
                             lineNumbers: 'on',
