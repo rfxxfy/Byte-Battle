@@ -199,13 +199,21 @@ func (e *DockerExecutor) initPools() {
 		if size <= 0 {
 			size = poolSize
 		}
-		lp := &langPool{
+		e.pools[lang] = &langPool{
 			queue:    make(chan workItem, size*queueMultiplier),
 			settings: settings,
 		}
-		e.pools[lang] = lp
 		e.primedPerLang[lang] = new(atomic.Bool)
-
+	}
+	// Spawn workers only after both maps are fully populated so that
+	// notifyPoolPrimed (which reads e.primedPerLang and e.pools) does not
+	// race with the writes above.
+	for lang := range e.config.Languages {
+		lp := e.pools[lang]
+		size := lp.settings.PoolSize
+		if size <= 0 {
+			size = poolSize
+		}
 		for range size {
 			go e.runWorker(lang, lp)
 		}
