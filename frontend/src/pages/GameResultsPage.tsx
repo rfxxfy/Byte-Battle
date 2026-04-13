@@ -153,11 +153,12 @@ export function GameResultsPage() {
                           theme="vs-dark"
                           options={{
                             readOnly: true,
-                            readOnlyMessage: { value: '' },
+                            domReadOnly: true,
                             minimap: { enabled: false },
                             fontSize: 14,
                             lineNumbers: 'on',
                             scrollBeyondLastLine: false,
+                            renderLineHighlight: 'none',
                             padding: { top: 12 },
                           }}
                         />

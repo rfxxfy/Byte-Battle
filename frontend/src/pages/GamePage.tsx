@@ -75,14 +75,14 @@ export function GamePage() {
     try {
       const saved = localStorage.getItem(storageKey)
       if (saved) return { ...DEFAULT_CODE, ...JSON.parse(saved) }
-    } catch {}
+    } catch { /* ignore */ }
     return { ...DEFAULT_CODE }
   })
 
   const code = codePerLang[language]
   const setCode = (val: string) => setCodePerLang((prev) => {
     const next = { ...prev, [language]: val }
-    try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {}
+    try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch { /* ignore */ }
     return next
   })
   const [stdin, setStdin] = useState('')
@@ -95,8 +95,6 @@ export function GamePage() {
   const [winner, setWinner] = useState<GameFinished | null>(null)
   const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({})
   const [solvedTransition, setSolvedTransition] = useState(false)
-  const [playerSolutions, setPlayerSolutions] = useState<Record<string, { code: string; language: LangValue }>>({})
-  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
   const userIdRef = useRef<string | null>(userId)
@@ -117,7 +115,7 @@ export function GamePage() {
       setProblem((prev) => {
         if (prev !== null && prev.id !== pRes.problem.id) {
           const fresh = { ...DEFAULT_CODE }
-          try { localStorage.removeItem(storageKey) } catch {}
+          try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
           setCodePerLang(fresh)
         }
         return pRes.problem
@@ -127,7 +125,7 @@ export function GamePage() {
     } finally {
       setLoading(false)
     }
-  }, [gameId])
+  }, [gameId, storageKey])
 
   // Initial load
   useEffect(() => {
@@ -178,7 +176,7 @@ export function GamePage() {
                   ])
                   setProblem(res.problem)
                   const fresh = { ...DEFAULT_CODE }
-                  try { localStorage.removeItem(storageKey) } catch {}
+                  try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
                   setCodePerLang(fresh)
                   setSubmissionResult(null)
                 } catch {
@@ -189,13 +187,6 @@ export function GamePage() {
               })()
             }
           } else if (msg.type === 'game_finished') {
-            if (msg.code && msg.language) {
-              setPlayerSolutions((prev) => ({
-                ...prev,
-                [msg.winner_id]: { code: msg.code!, language: msg.language as LangValue },
-              }))
-              setViewingUserId(msg.winner_id)
-            }
             setWinner({ winner_id: msg.winner_id })
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
             setSubmitting(false)
@@ -226,7 +217,7 @@ export function GamePage() {
       if (retryTimeout) clearTimeout(retryTimeout)
       wsRef.current?.close()
     }
-  }, [game?.status, token, gameId])
+  }, [game?.status, token, gameId, storageKey])
 
   const handleStart = async () => {
     setActionError('')
@@ -403,10 +394,7 @@ export function GamePage() {
   }
 
   // Game / Finished
-  const viewedSolution = viewingUserId !== null ? playerSolutions[viewingUserId] : null
-  const editorCode = viewingUserId !== null ? (viewedSolution?.code ?? '') : code
-  const editorLanguage = viewedSolution?.language ?? language
-  const monacoLang = LANGUAGES.find((l) => l.value === editorLanguage)?.monaco ?? 'python'
+  const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
   const winnerParticipant = winner
     ? game.participants.find((p) => p.id === winner.winner_id)
     : null
@@ -474,14 +462,7 @@ export function GamePage() {
               {game.participants.map((p) => (
                 <div
                   key={p.id}
-                  className={`flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0 rounded-md px-1 -mx-1 transition-colors ${
-                    isFinished
-                      ? `cursor-pointer hover:bg-muted/40 ${viewingUserId === p.id ? 'bg-muted/40 ring-1 ring-border/60' : ''}`
-                      : ''
-                  }`}
-                  onClick={() => {
-                    if (isFinished) setViewingUserId((prev) => (prev === p.id ? null : p.id))
-                  }}
+                  className="flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0 rounded-md px-1 -mx-1"
                 >
                   <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
                   <span className={p.id === userId ? 'text-primary font-medium' : ''}>
@@ -507,7 +488,7 @@ export function GamePage() {
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <select
-              value={editorLanguage}
+              value={language}
               onChange={(e) => handleLangChange(e.target.value as LangValue)}
               disabled={isFinished}
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
@@ -520,9 +501,7 @@ export function GamePage() {
             </select>
             {isFinished && (
               <span className="text-xs text-muted-foreground bg-muted/40 border border-border/40 px-2 py-1 rounded-md">
-                {viewingUserId
-                  ? `Решение: ${participantLabel(game.participants.find((p) => p.id === viewingUserId) ?? { id: viewingUserId, name: null })}`
-                  : 'Завершена — только чтение'}
+                Завершена — только чтение
               </span>
             )}
             <div className="ml-auto flex items-center gap-2">
@@ -549,16 +528,17 @@ export function GamePage() {
             <Editor
               height="100%"
               language={monacoLang}
-              value={editorCode}
-              onChange={(val) => { if (!isFinished && viewingUserId === null) setCode(val ?? '') }}
+              value={code}
+              onChange={(val) => { if (!isFinished) setCode(val ?? '') }}
               theme="vs-dark"
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
-                readOnly: isFinished || viewingUserId !== null,
-                readOnlyMessage: { value: '' },
+                readOnly: isFinished,
+                domReadOnly: isFinished,
+                renderLineHighlight: isFinished ? 'none' : 'line',
                 padding: { top: 12 },
               }}
             />
