@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { getGame, startGame, cancelGame, leaveGame, joinGame, type Game, type GameParticipant } from '@/api/games'
+import { getGame, getGameSolutions, startGame, cancelGame, leaveGame, joinGame, type Game, type GameParticipant } from '@/api/games'
 import { getProblem, type Problem } from '@/api/problems'
 import { runCode } from '@/api/execute'
 import { ApiError } from '@/api/client'
@@ -138,6 +138,17 @@ export function GamePage() {
     const timer = setInterval(fetchGame, 2000)
     return () => clearInterval(timer)
   }, [game?.status, fetchGame])
+
+  useEffect(() => {
+    if (game?.status !== 'finished') return
+    getGameSolutions(gameId).then((res) => {
+      const progress: Record<string, number> = {}
+      for (const s of res.solutions) {
+        progress[s.user_id] = (progress[s.user_id] ?? 0) + 1
+      }
+      setPlayerProgress(progress)
+    }).catch(() => {})
+  }, [game?.status, gameId])
 
   // Connect WebSocket when game is active, reconnect on unexpected close
   useEffect(() => {
