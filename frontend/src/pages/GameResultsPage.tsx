@@ -27,7 +27,7 @@ export function GameResultsPage() {
 
   // Selected problem + user for code viewer
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null)
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [manualUserId, setManualUserId] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([getGame(gameId), getGameSolutions(gameId)])
@@ -44,12 +44,9 @@ export function GameResultsPage() {
       .finally(() => setLoading(false))
   }, [gameId])
 
-  // When problem changes, auto-select first solver
-  useEffect(() => {
-    if (!selectedProblemId) return
-    const first = solutions.find((s) => s.problem_id === selectedProblemId)
-    setSelectedUserId(first?.user_id ?? null)
-  }, [selectedProblemId, solutions])
+  // Auto-select first solver; null means "auto" (manual override stored in manualUserId)
+  const effectiveUserId =
+    manualUserId ?? solutions.find((s) => s.problem_id === selectedProblemId)?.user_id ?? null
 
   if (loading) {
     return (
@@ -72,7 +69,7 @@ export function GameResultsPage() {
     solutions.filter((s) => s.problem_id === problemId)
 
   const activeSolution = solutions.find(
-    (s) => s.problem_id === selectedProblemId && s.user_id === selectedUserId,
+    (s) => s.problem_id === selectedProblemId && s.user_id === effectiveUserId,
   ) ?? null
 
   return (
@@ -96,7 +93,7 @@ export function GameResultsPage() {
             return (
               <button
                 key={pid}
-                onClick={() => setSelectedProblemId(pid)}
+                onClick={() => { setSelectedProblemId(pid); setManualUserId(null) }}
                 className={`w-full text-left rounded-lg px-3 py-2.5 text-sm transition-colors border ${
                   isSelected
                     ? 'bg-primary/10 border-primary/30 text-foreground'
@@ -134,9 +131,9 @@ export function GameResultsPage() {
                       {solvers.map((s) => (
                         <button
                           key={s.user_id}
-                          onClick={() => setSelectedUserId(s.user_id)}
+                          onClick={() => setManualUserId(s.user_id)}
                           className={`shrink-0 px-3 py-1.5 rounded-md text-sm transition-colors border ${
-                            s.user_id === selectedUserId
+                            s.user_id === effectiveUserId
                               ? 'bg-primary text-primary-foreground border-primary'
                               : 'border-border/60 hover:bg-muted/50 text-muted-foreground hover:text-foreground'
                           }`}

@@ -21,9 +21,6 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 		if c.DockerHost != "" {
 			execCfg.DockerHost = c.DockerHost
 		}
-		if c.DisableSecurityHardening {
-			execCfg.DisableSecurityHardening = true
-		}
 		if len(c.Languages) > 0 {
 			execCfg.Languages = c.Languages
 		}

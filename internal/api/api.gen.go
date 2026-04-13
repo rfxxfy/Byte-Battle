@@ -1606,6 +1606,15 @@ func (response GetGameSolutions401JSONResponse) VisitGetGameSolutionsResponse(w 
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetGameSolutions403JSONResponse ErrorResponse
+
+func (response GetGameSolutions403JSONResponse) VisitGetGameSolutionsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetGameSolutions404JSONResponse ErrorResponse
 
 func (response GetGameSolutions404JSONResponse) VisitGetGameSolutionsResponse(w http.ResponseWriter) error {
@@ -2315,9 +2324,9 @@ var swaggerSpec = []string{
 	"Q4o13NCBFmukcQp6W8SDhX+nhLDnwgeDvO5D67A3c2Fiz9T625YL8/xzM1KdG+61SO2PQ0sCIt5yZrQU",
 	"1ayHxNqdnb9G4z4GUN37RB/cuu4WRM7OzxtEzgEXRrbRIcgegXeC6genrD+g/sMp+7Q1QRsPkculw+FS",
 	"r/5lL8xrhxFB7nKFZZ9I/Z/65ZBWACRAngZKyo1+/GlD4AZiVQuAcZR++XQBYMgaHQGNo/yhXq28FnCw",
-	"sdC9uDDwbVr5fVBNXEakhKiyDsVc9LUEUhExMLG+148/d09nPPy8m7FhoJWRlsX6zY7eSVNxQQTveZ7T",
-	"uYgykDal4UOHLmYxSRJEngg159DN90r3J2/VbaXNUAEqDvQ7kdx31cJzQb9xMWrrRf3yEHqfSdC+7+AB",
-	"3i2pf3CevcfBmCk2Tnbx0WiWi6cC21wkeIYnJKN487j5XwAAAP//WaW99RsxAAA=",
+	"sdC9uDDwbVr5fUDBMbbly4iUEFW+oJiLvgZCKiIG5tv3+vHn7gCNh5936zYMtPLXsli/B9I7lyquk+A9",
+	"T38611YGkqw0fOiIxiwmSYLIE6Hm1Lr5Xun+5K2627QZKlfF8X8nkvsuZniu8zeuUW291l8eWe8zCdq3",
+	"IzzAuyX1z9Oz9zhGM8XGyS4+Mc1y8VRgm4sEz/CEZBRvHjf/CwAA//+caZw9STEAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

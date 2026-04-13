@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listGames, createGame, type Game, type GameParticipant } from '@/api/games'
-
-function avatarInitials(p: GameParticipant): string {
-  if (p.name) return p.name.slice(0, 2).toUpperCase()
-  return p.id.slice(0, 2).toUpperCase()
-}
 import { listProblems, type Problem } from '@/api/problems'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
+
+function avatarInitials(p: GameParticipant): string {
+  if (p.name) return p.name.slice(0, 2).toUpperCase()
+  return p.id.slice(0, 2).toUpperCase()
+}
 
 const statusLabel: Record<Game['status'], string> = {
   pending: 'Ожидание',
@@ -80,7 +80,6 @@ export function GamesPage() {
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    setLoading(true)
     listGames(50, 0)
       .then((res) => setGames(res.games))
       .catch((err) =>
