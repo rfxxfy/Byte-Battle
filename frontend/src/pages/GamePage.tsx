@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { getGame, getGameSolutions, startGame, cancelGame, leaveGame, joinGame, type Game, type GameParticipant } from '@/api/games'
+import { getGame, startGame, cancelGame, leaveGame, joinGame, type Game, type GameParticipant } from '@/api/games'
 import { getProblem, type Problem } from '@/api/problems'
 import { runCode } from '@/api/execute'
 import { ApiError } from '@/api/client'
@@ -110,6 +110,10 @@ export function GamePage() {
   const fetchGame = useCallback(async () => {
     try {
       const res = await getGame(gameId)
+      if (res.game.status === 'finished') {
+        navigate(`/games/${gameId}/results`)
+        return
+      }
       setGame(res.game)
       const pRes = await getProblem(res.game.problem_ids[0])
       setProblem((prev) => {
@@ -125,7 +129,7 @@ export function GamePage() {
     } finally {
       setLoading(false)
     }
-  }, [gameId, storageKey])
+  }, [gameId, storageKey, navigate])
 
   // Initial load
   useEffect(() => {
@@ -138,17 +142,6 @@ export function GamePage() {
     const timer = setInterval(fetchGame, 2000)
     return () => clearInterval(timer)
   }, [game?.status, fetchGame])
-
-  useEffect(() => {
-    if (game?.status !== 'finished') return
-    getGameSolutions(gameId).then((res) => {
-      const progress: Record<string, number> = {}
-      for (const s of res.solutions) {
-        progress[s.user_id] = (progress[s.user_id] ?? 0) + 1
-      }
-      setPlayerProgress(progress)
-    }).catch(() => {})
-  }, [game?.status, gameId])
 
   // Connect WebSocket when game is active, reconnect on unexpected close
   useEffect(() => {
@@ -439,7 +432,7 @@ export function GamePage() {
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-amber-400/90">Завершена</span>
               <Button size="sm" variant="outline" className="border-amber-400/40 text-amber-400/90 hover:bg-amber-400/10 hover:text-amber-400" onClick={() => navigate(`/games/${gameId}/results`)}>
-                Смотреть решения
+                Смотреть решения участников
               </Button>
             </div>
           )}
@@ -636,14 +629,9 @@ export function GamePage() {
                 ? 'Ты решил все задачи первым!'
                 : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id.slice(0, 8)}`}
             </p>
-            <div className="flex flex-col gap-2">
-              <Button className="w-full" onClick={() => navigate(`/games/${gameId}/results`)}>
-                Смотреть решения
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => setWinner(null)}>
-                Закрыть
-              </Button>
-            </div>
+            <Button className="w-full" onClick={() => navigate(`/games/${gameId}/results`)}>
+              Смотреть решения участников
+            </Button>
           </div>
         </div>
       )}
