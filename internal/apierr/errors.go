@@ -28,6 +28,7 @@ const (
 	ErrCodeRecentlySent     = "CODE_RECENTLY_SENT"
 	ErrExecutionRateLimited = "EXECUTION_RATE_LIMITED"
 	ErrExecutionInProgress  = "EXECUTION_IN_PROGRESS"
+	ErrExecutorOverloaded   = "EXECUTOR_OVERLOADED"
 	ErrRoundAlreadyAdvanced = "ROUND_ALREADY_ADVANCED"
 	ErrUserNotFound         = "USER_NOT_FOUND"
 
@@ -57,6 +58,8 @@ func httpStatusCode(code string) int {
 		return http.StatusNotFound
 	case ErrTooManyAttempts, ErrCodeRecentlySent, ErrExecutionRateLimited, ErrExecutionInProgress:
 		return http.StatusTooManyRequests
+	case ErrExecutorOverloaded:
+		return http.StatusServiceUnavailable
 	case ErrInvalidEmail, ErrInvalidCode:
 		return http.StatusBadRequest
 	default:

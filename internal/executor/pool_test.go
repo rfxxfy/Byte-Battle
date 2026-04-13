@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"sync/atomic"
 	"testing"
 
@@ -11,76 +10,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTakeFromPool_ReturnsLiveContainer(t *testing.T) {
-	mock := &mockDockerClient{}
-	e := newTestExecutor(mock)
-	e.pools["python"] = make(chan string, 3)
-	e.pools["python"] <- "alive"
-
-	id := e.takeFromPool(context.Background(), "python")
-	assert.Equal(t, "alive", id)
-}
-
-func TestTakeFromPool_DiscardsDeadReturnsNext(t *testing.T) {
-	calls := 0
-	mock := &mockDockerClient{
-		containerInspectFn: func(_ context.Context, id string) (container.InspectResponse, error) {
-			calls++
-			if id == "dead" {
-				return container.InspectResponse{
-					ContainerJSONBase: &container.ContainerJSONBase{
-						State: &container.State{Running: false},
-					},
-				}, nil
-			}
-			return container.InspectResponse{
-				ContainerJSONBase: &container.ContainerJSONBase{
-					State: &container.State{Running: true},
-				},
-			}, nil
-		},
-	}
-	e := newTestExecutor(mock)
-	e.pools["python"] = make(chan string, 3)
-	e.pools["python"] <- "dead"
-	e.pools["python"] <- "alive"
-
-	id := e.takeFromPool(context.Background(), "python")
-	assert.Equal(t, "alive", id)
-	assert.Equal(t, 2, calls)
-}
-
-func TestTakeFromPool_EmptyPoolReturnsEmpty(t *testing.T) {
-	e := newTestExecutor(&mockDockerClient{})
-	e.pools["python"] = make(chan string, 3)
-
-	id := e.takeFromPool(context.Background(), "python")
-	assert.Empty(t, id)
-}
-
-func TestTakeFromPool_AllDeadReturnsEmpty(t *testing.T) {
-	mock := &mockDockerClient{
-		containerInspectFn: func(_ context.Context, _ string) (container.InspectResponse, error) {
-			return container.InspectResponse{
-				ContainerJSONBase: &container.ContainerJSONBase{
-					State: &container.State{Running: false},
-				},
-			}, nil
-		},
-	}
-	e := newTestExecutor(mock)
-	e.pools["python"] = make(chan string, 3)
-	e.pools["python"] <- "dead1"
-	e.pools["python"] <- "dead2"
-
-	id := e.takeFromPool(context.Background(), "python")
-	assert.Empty(t, id)
-}
-
 func TestIsContainerRunning_InspectError(t *testing.T) {
 	mock := &mockDockerClient{
 		containerInspectFn: func(_ context.Context, _ string) (container.InspectResponse, error) {
-			return container.InspectResponse{}, errors.New("daemon gone")
+			return container.InspectResponse{}, assert.AnError
+		},
+	}
+	e := newTestExecutor(mock)
+	require.False(t, e.isContainerRunning(context.Background(), "any"))
+}
+
+func TestIsContainerRunning_NilState(t *testing.T) {
+	mock := &mockDockerClient{
+		containerInspectFn: func(_ context.Context, _ string) (container.InspectResponse, error) {
+			return container.InspectResponse{}, nil
 		},
 	}
 	e := newTestExecutor(mock)
@@ -88,62 +31,57 @@ func TestIsContainerRunning_InspectError(t *testing.T) {
 }
 
 func TestInitPools_CustomPoolSize(t *testing.T) {
+	shutdownCtx, shutdown := context.WithCancel(context.Background())
+	shutdown() // cancel immediately so spawned workers exit without creating containers
 	e := &DockerExecutor{
 		cli: &mockDockerClient{},
 		config: &Config{Languages: map[Language]LangSettings{
 			"python": {Image: "python:3.14-slim", PoolSize: 7},
 			"go":     {Image: "golang:1.26-alpine"},
 		}},
-		pools:   make(map[Language]chan string),
-		errChan: make(chan error, 16),
+		pools:       make(map[Language]*langPool),
+		errChan:     make(chan error, 16),
+		shutdownCtx: shutdownCtx,
+		shutdown:    shutdown,
 	}
-	e.initPools()
-	assert.Equal(t, 7, cap(e.pools["python"]), "custom PoolSize should set channel capacity")
-	assert.Equal(t, poolSize, cap(e.pools["go"]), "zero PoolSize should fall back to global poolSize")
-}
+	e.primedPerLang = make(map[Language]*atomic.Bool, len(e.config.Languages))
+	for lang := range e.config.Languages {
+		e.primedPerLang[lang] = new(atomic.Bool)
+	}
 
-func TestIsContainerRunning_NilState(t *testing.T) {
-	mock := &mockDockerClient{
-		containerInspectFn: func(_ context.Context, _ string) (container.InspectResponse, error) {
-			return container.InspectResponse{}, nil // ContainerJSONBase is nil
-		},
-	}
-	e := newTestExecutor(mock)
-	require.False(t, e.isContainerRunning(context.Background(), "any"))
+	e.initPools()
+
+	assert.Equal(t, 7*queueMultiplier, cap(e.pools["python"].queue), "custom PoolSize should set queue capacity")
+	assert.Equal(t, poolSize*queueMultiplier, cap(e.pools["go"].queue), "zero PoolSize should fall back to global poolSize")
 }
 
 func TestIsReady_FalseBeforePrimed(t *testing.T) {
 	e := newTestExecutor(&mockDockerClient{})
-	e.pools["python"] = make(chan string, 3)
+	e.pools["python"] = &langPool{}
 	assert.False(t, e.IsReady())
 }
 
 func TestIsReady_TrueAfterAllPoolsPrimed(t *testing.T) {
 	e := newTestExecutor(&mockDockerClient{})
-	e.pools["python"] = make(chan string, 3)
+	e.pools["python"] = &langPool{}
 	e.notifyPoolPrimed("python")
 	assert.True(t, e.IsReady())
 }
 
 func TestIsReady_FalseWithEmptyPools(t *testing.T) {
 	e := newTestExecutor(&mockDockerClient{})
-	// pools not initialized — no languages
-	e.pools = make(map[Language]chan string)
+	e.pools = make(map[Language]*langPool)
 	e.primedPerLang = make(map[Language]*atomic.Bool)
 	e.config = &Config{Languages: map[Language]LangSettings{}}
 	assert.False(t, e.IsReady())
 }
 
-func TestIsReady_NotFlapWhenPoolDrained(t *testing.T) {
+func TestIsReady_StaysReadyAfterPrimed(t *testing.T) {
 	e := newTestExecutor(&mockDockerClient{})
-	e.pools["python"] = make(chan string, 3)
+	e.pools["python"] = &langPool{}
 	e.notifyPoolPrimed("python")
 	require.True(t, e.IsReady())
-
-	// drain the pool — should stay ready
-	e.pools["python"] <- "c1"
-	<-e.pools["python"]
-	assert.True(t, e.IsReady(), "should not flap when pool is temporarily empty")
+	assert.True(t, e.IsReady())
 }
 
 func TestIsReady_MultiLang_NotReadyUntilAllPrimed(t *testing.T) {
@@ -152,8 +90,8 @@ func TestIsReady_MultiLang_NotReadyUntilAllPrimed(t *testing.T) {
 		"go":     {Image: "golang:1.26-alpine"},
 	}
 	e := newTestExecutorWithLangs(&mockDockerClient{}, langs)
-	e.pools["python"] = make(chan string, 3)
-	e.pools["go"] = make(chan string, 3)
+	e.pools["python"] = &langPool{}
+	e.pools["go"] = &langPool{}
 
 	e.notifyPoolPrimed("python")
 	assert.False(t, e.IsReady(), "should not be ready until all languages primed")
