@@ -131,7 +131,6 @@ export function GamePage() {
     }
   }, [gameId, storageKey, navigate])
 
-  // Initial load
   useEffect(() => {
     fetchGame()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -309,12 +308,10 @@ export function GamePage() {
   const totalProblems = game.problem_ids.length
   const myProgress = playerProgress[userId ?? ''] ?? 0
 
-  // Lobby (pending)
   if (game.status === 'pending') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] py-8">
         <div className="w-full max-w-md flex flex-col gap-4">
-          {/* Back link */}
           <Link
             to="/games"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors self-start"
@@ -322,7 +319,6 @@ export function GamePage() {
             ← Игры
           </Link>
 
-          {/* Problem card */}
           <div className="rounded-lg border border-border/60 bg-card/50 p-5">
             <h2 className="text-base font-semibold mb-1">{problem.title}</h2>
             <div className="flex items-center gap-2 flex-wrap">
@@ -335,7 +331,6 @@ export function GamePage() {
             </div>
           </div>
 
-          {/* Participants card */}
           <div className="rounded-lg border border-border/60 bg-card/50 p-5">
             <p className="text-xs font-medium text-muted-foreground mb-3">
               Участники · {game.participants.length}
@@ -360,7 +355,6 @@ export function GamePage() {
             <p className="text-sm text-destructive">{actionError}</p>
           )}
 
-          {/* Actions */}
           {isCreator ? (
             <div className="flex flex-col gap-2">
               <Button onClick={handleStart} disabled={!canStart} className="w-full">
@@ -397,15 +391,13 @@ export function GamePage() {
     )
   }
 
-  // Game / Finished
   const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
   const winnerParticipant = winner
     ? game.participants.find((p) => p.id === winner.winner_id)
     : null
 
   return (
-    <div className="flex flex-col gap-4" style={{ height: 'calc(100vh - 80px)' }}>
-      {/* Header */}
+    <div className="flex flex-col gap-4 flex-1 min-h-0 py-4">
       <div className="flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <Link
@@ -443,9 +435,7 @@ export function GamePage() {
         <p className="text-sm text-destructive flex-shrink-0">{actionError}</p>
       )}
 
-      {/* Main layout */}
       <div className="flex gap-4 flex-1 min-h-0">
-        {/* Left: problem + participants */}
         <div className="w-2/5 flex flex-col gap-3 overflow-y-auto">
           <div className="rounded-lg border border-border bg-card p-5 flex-shrink-0 shadow-sm">
             <h2 className="text-base font-semibold mb-3">{problem.title}</h2>
@@ -487,10 +477,8 @@ export function GamePage() {
           </div>
         </div>
 
-        {/* Right: editor + controls */}
-        <div className="flex-1 flex flex-col gap-2 min-h-0">
-          {/* Toolbar */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex-1 flex flex-col min-h-0 rounded-lg border border-border overflow-hidden shadow-sm">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60 bg-card flex-shrink-0">
             <select
               value={language}
               onChange={(e) => handleLangChange(e.target.value as LangValue)}
@@ -505,7 +493,7 @@ export function GamePage() {
             </select>
             {isFinished && (
               <span className="text-xs text-muted-foreground bg-muted/40 border border-border/40 px-2 py-1 rounded-md">
-                Завершена — только чтение
+                Только чтение
               </span>
             )}
             <div className="ml-auto flex items-center gap-2">
@@ -515,7 +503,14 @@ export function GamePage() {
                 onClick={handleRun}
                 disabled={!isActive || running}
               >
-                {running ? 'Запуск...' : 'Запустить'}
+                {running ? 'Запуск...' : (
+                  <span className="flex items-center gap-1.5">
+                    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 text-green-400">
+                      <path d="M3 2.5l10 5.5-10 5.5V2.5z" />
+                    </svg>
+                    Запустить
+                  </span>
+                )}
               </Button>
               <Button
                 size="sm"
@@ -527,78 +522,73 @@ export function GamePage() {
             </div>
           </div>
 
-          {/* Monaco editor */}
-          <div className="flex-1 rounded-lg border border-border overflow-hidden min-h-0 shadow-sm">
-            <Editor
-              height="100%"
-              language={monacoLang}
-              value={code}
-              onChange={(val) => { if (!isFinished) setCode(val ?? '') }}
-              theme="vs-dark"
-              options={{
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                readOnly: isFinished,
-                domReadOnly: isFinished,
-                mouseStyle: isFinished ? 'default' : 'text',
-                renderLineHighlight: isFinished ? 'none' : 'line',
-                padding: { top: 12 },
-              }}
-            />
+          <div className="flex-1 min-h-0 relative">
+            <div className="absolute inset-0">
+              <Editor
+                height="100%"
+                language={monacoLang}
+                value={code}
+                onChange={(val) => { if (!isFinished) setCode(val ?? '') }}
+                theme="vs-dark"
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  readOnly: isFinished,
+                  domReadOnly: isFinished,
+                  mouseStyle: isFinished ? 'default' : 'text',
+                  renderLineHighlight: isFinished ? 'none' : 'line',
+                  padding: { top: 12 },
+                }}
+              />
+            </div>
           </div>
 
-          {/* Stdin */}
-          <textarea
-            placeholder="stdin для кнопки «Запустить»"
-            value={stdin}
-            onChange={(e) => setStdin(e.target.value)}
-            disabled={!isActive}
-            rows={2}
-            className="flex-shrink-0 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 placeholder:text-muted-foreground"
-          />
-
-          {/* Run output */}
-          {runOutput && (
-            <div className="flex-shrink-0 rounded-md border border-border bg-muted/30 p-3 text-xs font-mono max-h-32 overflow-y-auto">
-              {runOutput.stdout && (
-                <pre className="whitespace-pre-wrap">{runOutput.stdout}</pre>
-              )}
-              {runOutput.stderr && (
-                <pre className="whitespace-pre-wrap text-destructive">{runOutput.stderr}</pre>
-              )}
-              {!runOutput.stdout && !runOutput.stderr && (
-                <span className="text-muted-foreground">(нет вывода)</span>
-              )}
-            </div>
-          )}
-
-          {/* Submission result */}
-          {submissionResult && (
-            <div
-              className={`flex-shrink-0 rounded-md border px-4 py-2.5 text-sm font-medium ${
-                submissionResult.accepted
-                  ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                  : 'border-red-500/30 bg-red-500/10 text-red-400'
-              }`}
-            >
-              {submissionResult.accepted ? (
-                'Принято!'
-              ) : (
+          <div className="flex-shrink-0 border-t border-border/60">
+            <textarea
+              placeholder="stdin для кнопки «Запустить»"
+              value={stdin}
+              onChange={(e) => setStdin(e.target.value)}
+              disabled={!isActive}
+              rows={2}
+              className="w-full border-b border-border/60 bg-background px-3 py-2 text-xs font-mono text-foreground resize-none focus:outline-none disabled:opacity-50 placeholder:text-muted-foreground block"
+            />
+            <div className="h-20 overflow-y-auto px-3 py-2 text-xs font-mono bg-background">
+              {submissionResult ? (
+                <div className={submissionResult.accepted ? 'text-green-400' : 'text-red-400'}>
+                  {submissionResult.accepted ? (
+                    'Принято!'
+                  ) : (
+                    <>
+                      Неверно
+                      {submissionResult.failed_test != null &&
+                        ` — тест #${submissionResult.failed_test + 1}`}
+                      {submissionResult.stderr && (
+                        <pre className="mt-1 opacity-80 whitespace-pre-wrap">
+                          {submissionResult.stderr}
+                        </pre>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : runOutput ? (
                 <>
-                  Неверно
-                  {submissionResult.failed_test != null &&
-                    ` — тест #${submissionResult.failed_test + 1}`}
-                  {submissionResult.stderr && (
-                    <pre className="mt-1 text-xs font-mono opacity-80 whitespace-pre-wrap">
-                      {submissionResult.stderr}
-                    </pre>
+                  {runOutput.stdout && (
+                    <pre className="whitespace-pre-wrap">{runOutput.stdout}</pre>
+                  )}
+                  {runOutput.stderr && (
+                    <pre className="whitespace-pre-wrap text-destructive">{runOutput.stderr}</pre>
+                  )}
+                  {!runOutput.stdout && !runOutput.stderr && (
+                    <span className="text-muted-foreground">(нет вывода)</span>
                   )}
                 </>
+              ) : (
+                <span className="text-muted-foreground/40">Вывод появится здесь</span>
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 

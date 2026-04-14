@@ -376,7 +376,7 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ws.NewClient(conn)
+	client := ws.NewClient(conn, session.UserID)
 	s.hub.Join(int32(gameID), client)
 	defer s.hub.Leave(int32(gameID), client)
 	defer client.Close() // signals WritePump to exit cleanly
@@ -447,7 +447,7 @@ func (s *HTTPServer) processSubmit(ctx context.Context, gameID int32, userID uui
 		Stderr:     result.Stderr,
 		FailedTest: result.FailedTest,
 	})
-	s.hub.Broadcast(gameID, resultMsg)
+	s.hub.SendToUser(gameID, userID, resultMsg)
 
 	if !result.Accepted {
 		return
@@ -503,5 +503,5 @@ func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) 
 		UserID:  userID,
 		Message: msg,
 	})
-	s.hub.Broadcast(gameID, errMsg)
+	s.hub.SendToUser(gameID, userID, errMsg)
 }
