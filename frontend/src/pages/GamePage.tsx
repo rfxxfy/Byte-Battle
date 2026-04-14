@@ -20,10 +20,10 @@ const LANGUAGES = [
 type LangValue = (typeof LANGUAGES)[number]['value']
 
 const DEFAULT_CODE: Record<LangValue, string> = {
-  python: '',
-  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\t\n}\n',
-  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n\t\n\treturn 0;\n}\n',
-  java: 'public class Main {\n    public static void main(String[] args) {\n        \n    }\n}\n',
+  python: 'print("Hello, ByteBattle!")\n',
+  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, ByteBattle!")\n}\n',
+  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n\tcout << "Hello, ByteBattle!" << endl;\n\treturn 0;\n}\n',
+  java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, ByteBattle!");\n    }\n}\n',
 }
 
 
