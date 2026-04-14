@@ -85,8 +85,10 @@ type ConfirmRequest struct {
 
 // CreateGameRequest defines model for CreateGameRequest.
 type CreateGameRequest struct {
-	IsPublic   *bool    `json:"is_public,omitempty"`
-	ProblemIds []string `json:"problem_ids"`
+	IsPublic         *bool    `json:"is_public,omitempty"`
+	IsSolo           *bool    `json:"is_solo,omitempty"`
+	ProblemIds       []string `json:"problem_ids"`
+	TimeLimitMinutes *int     `json:"time_limit_minutes,omitempty"`
 }
 
 // DeletedResponse defines model for DeletedResponse.
@@ -122,16 +124,19 @@ type ExecuteResponse struct {
 
 // Game defines model for Game.
 type Game struct {
-	CreatedAt    time.Time           `json:"created_at"`
-	CreatorId    openapi_types.UUID  `json:"creator_id"`
-	Id           int                 `json:"id"`
-	InviteToken  *openapi_types.UUID `json:"invite_token,omitempty"`
-	IsPublic     bool                `json:"is_public"`
-	Participants []GameParticipant   `json:"participants"`
-	ProblemIds   []string            `json:"problem_ids"`
-	Status       GameStatus          `json:"status"`
-	UpdatedAt    time.Time           `json:"updated_at"`
-	WinnerId     *openapi_types.UUID `json:"winner_id,omitempty"`
+	CreatedAt        time.Time           `json:"created_at"`
+	CreatorId        openapi_types.UUID  `json:"creator_id"`
+	Id               int                 `json:"id"`
+	InviteToken      *openapi_types.UUID `json:"invite_token,omitempty"`
+	IsPublic         bool                `json:"is_public"`
+	IsSolo           bool                `json:"is_solo"`
+	Participants     []GameParticipant   `json:"participants"`
+	ProblemIds       []string            `json:"problem_ids"`
+	StartedAt        *time.Time          `json:"started_at,omitempty"`
+	Status           GameStatus          `json:"status"`
+	TimeLimitMinutes *int                `json:"time_limit_minutes,omitempty"`
+	UpdatedAt        time.Time           `json:"updated_at"`
+	WinnerId         *openapi_types.UUID `json:"winner_id,omitempty"`
 }
 
 // GameStatus defines model for Game.Status.
@@ -307,6 +312,9 @@ type ServerInterface interface {
 	// Start a pending game
 	// (POST /games/{id}/start)
 	StartGame(w http.ResponseWriter, r *http.Request, id GameID)
+	// Finish a solo game when the timer expires
+	// (POST /games/{id}/timeout)
+	TimeoutGame(w http.ResponseWriter, r *http.Request, id GameID)
 	// List all available problems
 	// (GET /problems)
 	ListProblems(w http.ResponseWriter, r *http.Request)
@@ -424,6 +432,12 @@ func (_ Unimplemented) GetGameSolutions(w http.ResponseWriter, r *http.Request, 
 // Start a pending game
 // (POST /games/{id}/start)
 func (_ Unimplemented) StartGame(w http.ResponseWriter, r *http.Request, id GameID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Finish a solo game when the timer expires
+// (POST /games/{id}/timeout)
+func (_ Unimplemented) TimeoutGame(w http.ResponseWriter, r *http.Request, id GameID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -921,6 +935,37 @@ func (siw *ServerInterfaceWrapper) StartGame(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// TimeoutGame operation middleware
+func (siw *ServerInterfaceWrapper) TimeoutGame(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id GameID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TimeoutGame(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListProblems operation middleware
 func (siw *ServerInterfaceWrapper) ListProblems(w http.ResponseWriter, r *http.Request) {
 
@@ -1126,6 +1171,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/games/{id}/start", wrapper.StartGame)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/games/{id}/timeout", wrapper.TimeoutGame)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/problems", wrapper.ListProblems)
@@ -1840,6 +1888,59 @@ func (response StartGame404JSONResponse) VisitStartGameResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type TimeoutGameRequestObject struct {
+	Id GameID `json:"id"`
+}
+
+type TimeoutGameResponseObject interface {
+	VisitTimeoutGameResponse(w http.ResponseWriter) error
+}
+
+type TimeoutGame200JSONResponse GameResponse
+
+func (response TimeoutGame200JSONResponse) VisitTimeoutGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TimeoutGame400JSONResponse struct{ ErrorJSONResponse }
+
+func (response TimeoutGame400JSONResponse) VisitTimeoutGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TimeoutGame401JSONResponse ErrorResponse
+
+func (response TimeoutGame401JSONResponse) VisitTimeoutGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TimeoutGame403JSONResponse ErrorResponse
+
+func (response TimeoutGame403JSONResponse) VisitTimeoutGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type TimeoutGame404JSONResponse ErrorResponse
+
+func (response TimeoutGame404JSONResponse) VisitTimeoutGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListProblemsRequestObject struct {
 }
 
@@ -1938,6 +2039,9 @@ type StrictServerInterface interface {
 	// Start a pending game
 	// (POST /games/{id}/start)
 	StartGame(ctx context.Context, request StartGameRequestObject) (StartGameResponseObject, error)
+	// Finish a solo game when the timer expires
+	// (POST /games/{id}/timeout)
+	TimeoutGame(ctx context.Context, request TimeoutGameRequestObject) (TimeoutGameResponseObject, error)
 	// List all available problems
 	// (GET /problems)
 	ListProblems(ctx context.Context, request ListProblemsRequestObject) (ListProblemsResponseObject, error)
@@ -2471,6 +2575,32 @@ func (sh *strictHandler) StartGame(w http.ResponseWriter, r *http.Request, id Ga
 	}
 }
 
+// TimeoutGame operation middleware
+func (sh *strictHandler) TimeoutGame(w http.ResponseWriter, r *http.Request, id GameID) {
+	var request TimeoutGameRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TimeoutGame(ctx, request.(TimeoutGameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TimeoutGame")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TimeoutGameResponseObject); ok {
+		if err := validResponse.VisitTimeoutGameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListProblems operation middleware
 func (sh *strictHandler) ListProblems(w http.ResponseWriter, r *http.Request) {
 	var request ListProblemsRequestObject
@@ -2524,41 +2654,43 @@ func (sh *strictHandler) GetProblem(w http.ResponseWriter, r *http.Request, prob
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+Rb3W/bOBL/VwTePdwBau20xQHrt6btBT2k3WDTvZcgMGhpZLMrkSo/nDiB//cDP/RN",
-	"yVY3ysa4t8ii5us3MxwOJ48oYlnOKFAp0OIR5ZjjDCRw83SBM/j8Uf9FKFqgHMsNChHFGaAFIjEKEYcf",
-	"inCI0UJyBSES0QYyrL+Qu9ysohLWwNF+v9erRc6oAEP8E+eM6z8iRiVQqf/EeZ6SCEvC6Oy7YFT/VpH8",
-	"O4cELdDfZpXMM/tWzAy13xx9yy0GEXGSa2JoYdkFvFpRCGuE+cCyPAUJWuPf4IcCYeTJOcuBS2IlviOU",
-	"Al+SWD8kjGdYogVSyljC6SskJ3SNrLaFbW5qn96WS9nqO0QS7UP0gdGE8KyXccRiqNm04BEiyDBJPW9a",
-	"3O2y0NLxCsABH1CeiGWuVimJ9EMMCVapLFB39FaMpYCpJphztkohW5LYfAz3WNtXyzKfn72Sd+yVUBkK",
-	"0Xz+5lVCHh5W6uFBS0YkZMKraobvP9uXb+Yhygh1T2cle8w53nV0r0viU/0jaNzj0nU6isd2QU2oUs8W",
-	"q2Klj80nKoH3GncUjl7yDffv0tevl4UblWigi/dfPi2//vpt+e9ff//6sevFIcpACLxufbbGGQSUySBh",
-	"ih52/hr3iqBXi3uIlITxcUBorqT3TYrpWjkFhqV08pUfFFQHBe01+D2Ry5a4ZSoMkZAxcO4VWMiY9egi",
-	"SQZLJSBeNmKkSrFNhRylkltYk6pFzKfjhUnzHQhMpoiXWDaSYIwlvNIkfT5kvmFHJs4QkdhvNEK3RMJS",
-	"sj+A+ghRlaZ4pR20kZVqhOspzJOzMJckIjl2e2GZi4b2HW2lq+pDA1MjHf2luVBjj6WyfKnKTEIEGms6",
-	"IcKRJFuNWEIoERvQRowwjSBNG1msYqzyeDT6g7vmAcxaHm0+qZuz4VulsnWkW7CGdQdu6NMXAnVwu5vi",
-	"cR5NXSiN1rZPqP7Es3asDvlsh5v5sI/fNUuVraOOTskDifdog9TB9idLlm5HuqMSP1nCFR82hAo920Yl",
-	"1CFzin4cRbFkVCYqcdofqIoq8j4ZL4mQmpwY9rNxsvlSo2QSpw0oCJX/eldh0be3WfYFgT4drixQA2o4",
-	"KI/XxJE8aOCSsE+2L0OVQ1EKHoyNo4PoT7u8T4fCEJ56uXbs8sRsTJKERCqVu/quBFjsTHUYE7MZbjD3",
-	"b0FWj6oWbe6hnvo1Y3y3TElG5DJb+SsLCULXRcqm+Oa58avKVsADlgR6VRBhYR2vS0QXVI6P6OFDZHpE",
-	"JWqRMWubp9iG8docu7oOwHYwIo6OA7/fe3lfm+15IOdVtUoJL/vjoJe6z3wcv+la8SliDe5zwkGM2mmO",
-	"js+yoh2K3GEbWBINOcPB8P3dVD5f+s9ahfQZvr8EupYbtDib22qzfD6EDPXXFHrjhkhxInfX2p0sw3PA",
-	"HPh7pSm7ro8p0M3PlX03Uua2v0NowoxlbFSh852E4BxLmULw/uozCtEWuLBRPH999nqu9WY5UJwTtEBv",
-	"X89fvzX1odwYAWZYyc0ssr0YYxBmDaPNYnpSn2O0QFdMSC2la9q4JhgIec7i3ZP1s1otoX3TtNqR2v20",
-	"N/P5k3Fvxo2nm6YNAFRq6hBru76z3H1ESyltk86ufjdm9Ztfjl5d8y20uLkNkVBZhvkOLdB/gZNkF2R4",
-	"TaJAl20BpnGwBhkIENpPAhtFmob1BaAS+GFPML2difyg0Td6Zi9o5WuPG3zQVhRgz71jXGAAJqdsgOtI",
-	"bQkObLau0EnZ2nVKhuG5tOv+UkNdsvUa4kDLYSx19pOWaqbJm9t9w3SfaBxEinOgpU/X7GXz+Ro8proA",
-	"Y6kvMKWValWvz5Wc3HrTmtJGFyBLG+F6Fis551hGG4876Z9rVnr6WG/vyc8c7sP4WOHiGj7jEv40aFqp",
-	"SkC1cEHOWUJS2+GYge3UDmcJ186dKoU3u9rPjGq7Ve27GjNL9AbIQahUvhx4nfDVbs1BKk51Hs2VrSRn",
-	"ZSfCm9nKVobtBJaXmzfuTvOHAr6rLjXN2QnV7zHLq66zua8r4SfDkkRADx0fmdsJHaDbzPHtT0RIfca1",
-	"xnwx+BuxjEzBHZGbIMdrQnHR4fIHdHWXOVVp3rksPSqkz55MgEYH2AOmfh+4PvfLwdKaLcABhTuDaS18",
-	"Z98ZobPH+g3PfqhY0Rqe7765Q68vrluzCvWro6GphUP9sSkD9ShY7Y3ryCPUQLWtyyFznatP08FqF1hT",
-	"2aNQ8A/KAg3NP/vD7T+M0P9LOLTiEDtPHhc2ow/A818mCUmtQoAt/i3o68H5SOJ9NQnRdQE7QuEybgt9",
-	"n8zVkpmbMJoUyPaER19oFeMbk4I5Bh4reAmPtlM4mBJfpPnHprVxln/7AnAqc6gDqRk5M3ul3n8C+WDe",
-	"nzZ+1djApPXGdBhaEFwy7ELoxgMHQKwNEP45GKfoJXeHG5/5FHqcEzk5T9eJnALFnmrOLDiwEzAdp9KF",
-	"Vb9DFXXVSeaETm00JZZvT7XucpNY1lew0L/UJ8la7pIC3g4koEv9+mQd5hIS+dOl9Ok5gAFrtAc0ZoKG",
-	"6sByvujF+kJ3AmqgKVXpfcIFYo6FgLjSJUgY7ys3hMR84GLrWr8+7XrRaHi6G71BoBW/FsX6QFlvQ7qY",
-	"S0MTt307828DQVYKPtQtMotxmgZ4i4kZaml+V6o/e6yGJAc7ecUcUceT+ya8PO2kxjzmwf9IepbmUXvM",
-	"ymN4t2SSjp6zSHkgNcv5trCt4ilaoBnOCdrf7v8XAAD//2WaKAcENgAA",
+	"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",
+	"Wy0yvMAzUlC8u9n9PwAA//+DILT+WTkAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

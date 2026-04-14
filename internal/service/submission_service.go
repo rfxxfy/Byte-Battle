@@ -144,9 +144,7 @@ func (s *SubmissionService) completeAcceptedSubmission(
 ) (SubmissionResult, error) {
 	updatedGame, finished, err := s.gameSvc.HandleAcceptedSubmission(ctx, gameID, userID)
 	if err != nil {
-		var appErr *apierr.AppError
-		if errors.As(err, &appErr) && (appErr.ErrorCode == apierr.ErrGameNotInProgress || appErr.ErrorCode == apierr.ErrRoundAlreadyAdvanced) {
-			// Another player already won — suppress broadcast.
+		if errors.Is(err, errGameAlreadyFinished) {
 			return SubmissionResult{Accepted: true, AlreadyAdvanced: true}, nil
 		}
 		return SubmissionResult{}, fmt.Errorf("complete game: %w", err)

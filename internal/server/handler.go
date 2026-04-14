@@ -115,7 +115,16 @@ func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestOb
 	userID, _ := userIDFromContext(ctx)
 
 	isPublic := req.Body.IsPublic == nil || *req.Body.IsPublic
-	game, err := s.gameService.CreateGame(ctx, userID, req.Body.ProblemIds, isPublic)
+	isSolo := req.Body.IsSolo != nil && *req.Body.IsSolo
+	if isSolo {
+		isPublic = false
+	}
+	var timeLimitMinutes *int16
+	if req.Body.TimeLimitMinutes != nil {
+		v := int16(*req.Body.TimeLimitMinutes)
+		timeLimitMinutes = &v
+	}
+	game, err := s.gameService.CreateGame(ctx, userID, req.Body.ProblemIds, isPublic, isSolo, timeLimitMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -366,12 +375,17 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 	result := api.Game{
 		Id:           int(g.ID),
 		IsPublic:     g.IsPublic,
+		IsSolo:       g.IsSolo,
 		ProblemIds:   problemIDs,
 		CreatorId:    g.CreatorID,
 		Status:       api.GameStatus(g.Status),
 		Participants: apiParticipants,
 		CreatedAt:    g.CreatedAt.Time,
 		UpdatedAt:    g.UpdatedAt.Time,
+	}
+	if g.StartedAt.Valid {
+		t := g.StartedAt.Time
+		result.StartedAt = &t
 	}
 	if g.WinnerID.Valid {
 		id := g.WinnerID.UUID
@@ -380,7 +394,28 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 	if showToken {
 		result.InviteToken = &g.InviteToken
 	}
+	if g.TimeLimitMinutes.Valid {
+		v := int(g.TimeLimitMinutes.Int16)
+		result.TimeLimitMinutes = &v
+	}
 	return result
+}
+
+func (s *HTTPServer) TimeoutGame(ctx context.Context, req api.TimeoutGameRequestObject) (api.TimeoutGameResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	game, err := s.gameService.TimeoutGame(ctx, req.Id, userID)
+	if err != nil {
+		return nil, err
+	}
+	participantIDs, err := s.gameService.GetParticipants(ctx, int(game.ID))
+	if err != nil {
+		return nil, err
+	}
+	gameProblemIDs, err := s.gameService.GetGameProblemIDs(ctx, game.ID)
+	if err != nil {
+		return nil, err
+	}
+	return api.TimeoutGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, false)}, nil
 }
 
 func isParticipantOf(userID uuid.UUID, participants []service.Participant) bool {
