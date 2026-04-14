@@ -25,7 +25,6 @@ export function GameResultsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Selected problem + user for code viewer
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null)
   const [manualUserId, setManualUserId] = useState<string | null>(null)
 
@@ -74,7 +73,6 @@ export function GameResultsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto w-full">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <Link to="/games" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Игры
@@ -84,7 +82,6 @@ export function GameResultsPage() {
       </div>
 
       <div className="flex gap-6 min-h-0">
-        {/* Left: problem list */}
         <div className="w-56 flex-shrink-0 flex flex-col gap-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Задачи</p>
           {game.problem_ids.map((pid, idx) => {
@@ -111,11 +108,9 @@ export function GameResultsPage() {
           })}
         </div>
 
-        {/* Right: solutions */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {selectedProblemId && (
             <>
-              {/* Participant tabs */}
               {(() => {
                 const solvers = problemSolvers(selectedProblemId)
                 if (solvers.length === 0) {
@@ -132,14 +127,14 @@ export function GameResultsPage() {
                         <button
                           key={s.user_id}
                           onClick={() => setManualUserId(s.user_id)}
-                          className={`shrink-0 px-3 py-1.5 rounded-md text-sm transition-colors border ${
+                          className={`shrink-0 flex items-center gap-2 max-w-[11rem] px-3 py-1.5 rounded-md text-sm transition-colors border ${
                             s.user_id === effectiveUserId
                               ? 'bg-primary text-primary-foreground border-primary'
                               : 'border-border/60 hover:bg-muted/50 text-muted-foreground hover:text-foreground'
                           }`}
                         >
-                          {participantLabel(s)}
-                          <span className="ml-2 text-xs opacity-60">{s.language}</span>
+                          <span className="truncate">{participantLabel(s)}</span>
+                          <span className="text-xs opacity-60 shrink-0">{s.language}</span>
                         </button>
                       ))}
                     </div>

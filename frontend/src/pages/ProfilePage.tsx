@@ -32,7 +32,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex flex-col gap-6 max-w-2xl py-8">
       <h1 className="text-2xl font-semibold">Профиль</h1>
 
       <div className="rounded-lg border border-border/60 bg-card/50 p-6 flex flex-col gap-4">

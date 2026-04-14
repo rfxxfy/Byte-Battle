@@ -42,13 +42,13 @@ func TestGameWS_InvalidParams(t *testing.T) {
 }
 
 func TestGameWS_PendingGame(t *testing.T) {
-	g := createGame(t) // pending, not started
+	g := createGame(t)
 	_, resp := wsDial(t, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
 	require.NotNil(t, resp)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
+func TestGameWS_SubmitResultOnlyToSubmitter(t *testing.T) {
 	srv := newGameServer(t, correctExecutor{})
 	g := createActiveGameOnServer(t, srv)
 	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
@@ -68,15 +68,13 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 		Language: "python",
 	}))
 
+	// Submitter receives the result privately.
 	r1 := wsReadUntilType(t, conn1, ws.TypeSubmissionResult)
-	assert.Equal(t, ws.TypeSubmissionResult, r1.Type)
 	assert.Equal(t, user1ID, r1.UserID)
 	assert.True(t, r1.Accepted)
 
-	r2 := wsReadUntilType(t, conn2, ws.TypeSubmissionResult)
-	assert.Equal(t, ws.TypeSubmissionResult, r2.Type)
-	assert.Equal(t, user1ID, r2.UserID)
-	assert.True(t, r2.Accepted)
+	// Other player receives game_finished (broadcast), not submission_result.
+	wsReadUntilTypeNotSeen(t, conn2, ws.TypeGameFinished, ws.TypeSubmissionResult)
 }
 
 func TestGameWS_PlayerJoinedBroadcast(t *testing.T) {
@@ -123,8 +121,8 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	var g gameResp
 	decodeJSON(t, r, &g)
 
-	// user2 joins
-	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
+	require.NotNil(t, g.Game.InviteToken)
+	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token2)
 	require.Equal(t, http.StatusOK, joinResp.StatusCode)
 	joinResp.Body.Close()
 
@@ -184,7 +182,8 @@ func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 	var g gameResp
 	decodeJSON(t, r, &g)
 
-	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
+	require.NotNil(t, g.Game.InviteToken)
+	joinResp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token2)
 	require.Equal(t, http.StatusOK, joinResp.StatusCode)
 	joinResp.Body.Close()
 
@@ -244,7 +243,8 @@ func TestGameWS_AcceptedSubmitAdvancesRound(t *testing.T) {
 	var g gameResp
 	decodeJSON(t, resp, &g)
 
-	joinResp := doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/%d/join", g.Game.ID), nil, token2)
+	require.NotNil(t, g.Game.InviteToken)
+	joinResp := doOnServer(t, srv, http.MethodPost, fmt.Sprintf("/api/games/join/%s", *g.Game.InviteToken), nil, token2)
 	require.Equal(t, http.StatusOK, joinResp.StatusCode)
 	joinResp.Body.Close()
 
@@ -290,13 +290,13 @@ func TestGameWS_ConcurrentSlotRejected(t *testing.T) {
 	conn := wsConnectOnServer(t, srv, fmt.Sprintf("/api/games/%d/ws", g.Game.ID), token1)
 	wsReadUntilType(t, conn, ws.TypePlayerJoined)
 
-	// first submit — will block inside the executor, holding the slot
+	// first submit: blocks inside the executor, holding the slot
 	require.NoError(t, conn.WriteJSON(ws.ClientMessage{Type: ws.TypeSubmit, Code: "x", Language: "go"}))
 
 	// wait until the executor has actually started (slot is held)
 	<-exec.started
 
-	// second submit while slot is held — should get an error broadcast
+	// second submit while slot is held: should get an error broadcast
 	require.NoError(t, conn.WriteJSON(ws.ClientMessage{Type: ws.TypeSubmit, Code: "x", Language: "go"}))
 	errMsg := wsReadUntilType(t, conn, ws.TypeError)
 	assert.Contains(t, errMsg.Message, "in progress")
@@ -333,6 +333,20 @@ func TestGameWS_TwoPlayersRace_OnlyOneWins(t *testing.T) {
 
 	assert.Equal(t, finished1.WinnerID, finished2.WinnerID, "both connections must see the same winner")
 	assert.True(t, finished1.WinnerID == user1ID || finished1.WinnerID == user2ID, "winner must be one of the players")
+}
+
+func wsReadUntilTypeNotSeen(t *testing.T, conn wsJSONReader, wantType, forbidType string) ws.ServerMessage {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		require.NoError(t, conn.SetReadDeadline(deadline))
+		var msg ws.ServerMessage
+		require.NoError(t, conn.ReadJSON(&msg))
+		assert.NotEqual(t, forbidType, msg.Type, "unexpected message type %q received before %q", forbidType, wantType)
+		if msg.Type == wantType {
+			return msg
+		}
+	}
 }
 
 func wsReadUntilType(t *testing.T, conn wsJSONReader, wantType string) ws.ServerMessage {

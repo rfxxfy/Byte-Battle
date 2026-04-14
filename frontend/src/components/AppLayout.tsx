@@ -81,7 +81,7 @@ export function AppLayout() {
           </div>
         </div>
       </header>
-      <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-6 flex flex-col overflow-hidden">
         <Outlet />
       </main>
       <footer className="border-t border-border/40 py-3">

@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -14,6 +15,7 @@ const (
 )
 
 type Client struct {
+	UserID uuid.UUID
 	send   chan []byte
 	conn   *websocket.Conn
 	mu     sync.Mutex
@@ -21,10 +23,11 @@ type Client struct {
 	once   sync.Once
 }
 
-func NewClient(conn *websocket.Conn) *Client {
+func NewClient(conn *websocket.Conn, userID uuid.UUID) *Client {
 	return &Client{
-		conn: conn,
-		send: make(chan []byte, 64),
+		UserID: userID,
+		conn:   conn,
+		send:   make(chan []byte, 64),
 	}
 }
 
