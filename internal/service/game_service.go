@@ -239,7 +239,7 @@ func (s *GameService) GetGameByToken(ctx context.Context, token uuid.UUID) (sqlc
 	return game, err
 }
 
-func (s *GameService) JoinGameByToken(ctx context.Context, token uuid.UUID, userID uuid.UUID) (sqlcdb.Game, error) {
+func (s *GameService) JoinGameByToken(ctx context.Context, token, userID uuid.UUID) (sqlcdb.Game, error) {
 	game, err := s.GetGameByToken(ctx, token)
 	if err != nil {
 		return sqlcdb.Game{}, err
