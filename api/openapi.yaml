@@ -213,6 +213,8 @@ paths:
                 $ref: "#/components/schemas/GameResponse"
         "401":
           $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
 
@@ -302,6 +304,55 @@ paths:
                 $ref: "#/components/schemas/GameResponse"
         "400":
           $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /games/join/{invite_token}:
+    get:
+      operationId: GetGameByToken
+      summary: Get game info by invite token (no join)
+      security: []
+      parameters:
+        - name: invite_token
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Game found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: JoinGameByToken
+      summary: Join a game by invite token
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: invite_token
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Joined game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameResponse"
         "401":
           $ref: "#/components/responses/Error"
         "404":
@@ -593,12 +644,19 @@ components:
         - problem_ids
         - creator_id
         - status
+        - is_public
         - participants
         - created_at
         - updated_at
       properties:
         id:
           type: integer
+        is_public:
+          type: boolean
+        invite_token:
+          type: string
+          format: uuid
+          nullable: true
         problem_ids:
           type: array
           minItems: 1
@@ -661,6 +719,9 @@ components:
           items:
             type: string
           example: ["001-two-sum", "002-fizzbuzz"]
+        is_public:
+          type: boolean
+          default: true
 
     CompleteGameRequest:
       type: object

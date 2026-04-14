@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { enter, confirm, updateMe } from '../api/auth'
 import { ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -12,6 +12,8 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const nextPath = searchParams.get('next') || '/games'
   const { login } = useAuth()
 
   const [email, setEmail] = useState('')
@@ -97,7 +99,7 @@ export function LoginPage() {
         setStep('name')
       } else {
         login(res.token, res.user_id, res.name, res.email ?? null)
-        navigate('/games', { replace: true })
+        navigate(nextPath, { replace: true })
       }
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
@@ -113,7 +115,7 @@ export function LoginPage() {
     try {
       await updateMe(name, pendingConfirm!.token)
       login(pendingConfirm!.token, pendingConfirm!.userId, name, pendingConfirm!.email)
-      navigate('/games', { replace: true })
+      navigate(nextPath, { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     } finally {
