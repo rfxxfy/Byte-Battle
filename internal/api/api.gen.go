@@ -85,6 +85,7 @@ type ConfirmRequest struct {
 
 // CreateGameRequest defines model for CreateGameRequest.
 type CreateGameRequest struct {
+	IsPublic   *bool    `json:"is_public,omitempty"`
 	ProblemIds []string `json:"problem_ids"`
 }
 
@@ -124,6 +125,8 @@ type Game struct {
 	CreatedAt    time.Time           `json:"created_at"`
 	CreatorId    openapi_types.UUID  `json:"creator_id"`
 	Id           int                 `json:"id"`
+	InviteToken  *openapi_types.UUID `json:"invite_token,omitempty"`
+	IsPublic     bool                `json:"is_public"`
 	Participants []GameParticipant   `json:"participants"`
 	ProblemIds   []string            `json:"problem_ids"`
 	Status       GameStatus          `json:"status"`
@@ -274,6 +277,12 @@ type ServerInterface interface {
 	// Create a new game
 	// (POST /games)
 	CreateGame(w http.ResponseWriter, r *http.Request)
+	// Get game info by invite token (no join)
+	// (GET /games/join/{invite_token})
+	GetGameByToken(w http.ResponseWriter, r *http.Request, inviteToken openapi_types.UUID)
+	// Join a game by invite token
+	// (POST /games/join/{invite_token})
+	JoinGameByToken(w http.ResponseWriter, r *http.Request, inviteToken openapi_types.UUID)
 	// Delete game by ID
 	// (DELETE /games/{id})
 	DeleteGame(w http.ResponseWriter, r *http.Request, id GameID)
@@ -355,6 +364,18 @@ func (_ Unimplemented) ListGames(w http.ResponseWriter, r *http.Request, params 
 // Create a new game
 // (POST /games)
 func (_ Unimplemented) CreateGame(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get game info by invite token (no join)
+// (GET /games/join/{invite_token})
+func (_ Unimplemented) GetGameByToken(w http.ResponseWriter, r *http.Request, inviteToken openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Join a game by invite token
+// (POST /games/join/{invite_token})
+func (_ Unimplemented) JoinGameByToken(w http.ResponseWriter, r *http.Request, inviteToken openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -587,6 +608,62 @@ func (siw *ServerInterfaceWrapper) CreateGame(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateGame(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetGameByToken operation middleware
+func (siw *ServerInterfaceWrapper) GetGameByToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "invite_token" -------------
+	var inviteToken openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "invite_token", chi.URLParam(r, "invite_token"), &inviteToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "invite_token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGameByToken(w, r, inviteToken)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// JoinGameByToken operation middleware
+func (siw *ServerInterfaceWrapper) JoinGameByToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "invite_token" -------------
+	var inviteToken openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "invite_token", chi.URLParam(r, "invite_token"), &inviteToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "invite_token", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.JoinGameByToken(w, r, inviteToken)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1021,6 +1098,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/games", wrapper.CreateGame)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/games/join/{invite_token}", wrapper.GetGameByToken)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/games/join/{invite_token}", wrapper.JoinGameByToken)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/games/{id}", wrapper.DeleteGame)
 	})
 	r.Group(func(r chi.Router) {
@@ -1316,6 +1399,76 @@ func (response CreateGame401JSONResponse) VisitCreateGameResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetGameByTokenRequestObject struct {
+	InviteToken openapi_types.UUID `json:"invite_token"`
+}
+
+type GetGameByTokenResponseObject interface {
+	VisitGetGameByTokenResponse(w http.ResponseWriter) error
+}
+
+type GetGameByToken200JSONResponse GameResponse
+
+func (response GetGameByToken200JSONResponse) VisitGetGameByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGameByToken404JSONResponse struct{ ErrorJSONResponse }
+
+func (response GetGameByToken404JSONResponse) VisitGetGameByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type JoinGameByTokenRequestObject struct {
+	InviteToken openapi_types.UUID `json:"invite_token"`
+}
+
+type JoinGameByTokenResponseObject interface {
+	VisitJoinGameByTokenResponse(w http.ResponseWriter) error
+}
+
+type JoinGameByToken200JSONResponse GameResponse
+
+func (response JoinGameByToken200JSONResponse) VisitJoinGameByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type JoinGameByToken401JSONResponse struct{ ErrorJSONResponse }
+
+func (response JoinGameByToken401JSONResponse) VisitJoinGameByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type JoinGameByToken404JSONResponse ErrorResponse
+
+func (response JoinGameByToken404JSONResponse) VisitJoinGameByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type JoinGameByToken409JSONResponse ErrorResponse
+
+func (response JoinGameByToken409JSONResponse) VisitJoinGameByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type DeleteGameRequestObject struct {
 	Id GameID `json:"id"`
 }
@@ -1373,6 +1526,15 @@ type GetGame401JSONResponse struct{ ErrorJSONResponse }
 func (response GetGame401JSONResponse) VisitGetGameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGame403JSONResponse ErrorResponse
+
+func (response GetGame403JSONResponse) VisitGetGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1506,6 +1668,15 @@ type JoinGame401JSONResponse ErrorResponse
 func (response JoinGame401JSONResponse) VisitJoinGameResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type JoinGame403JSONResponse ErrorResponse
+
+func (response JoinGame403JSONResponse) VisitJoinGameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1737,6 +1908,12 @@ type StrictServerInterface interface {
 	// Create a new game
 	// (POST /games)
 	CreateGame(ctx context.Context, request CreateGameRequestObject) (CreateGameResponseObject, error)
+	// Get game info by invite token (no join)
+	// (GET /games/join/{invite_token})
+	GetGameByToken(ctx context.Context, request GetGameByTokenRequestObject) (GetGameByTokenResponseObject, error)
+	// Join a game by invite token
+	// (POST /games/join/{invite_token})
+	JoinGameByToken(ctx context.Context, request JoinGameByTokenRequestObject) (JoinGameByTokenResponseObject, error)
 	// Delete game by ID
 	// (DELETE /games/{id})
 	DeleteGame(ctx context.Context, request DeleteGameRequestObject) (DeleteGameResponseObject, error)
@@ -2027,6 +2204,58 @@ func (sh *strictHandler) CreateGame(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetGameByToken operation middleware
+func (sh *strictHandler) GetGameByToken(w http.ResponseWriter, r *http.Request, inviteToken openapi_types.UUID) {
+	var request GetGameByTokenRequestObject
+
+	request.InviteToken = inviteToken
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGameByToken(ctx, request.(GetGameByTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGameByToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetGameByTokenResponseObject); ok {
+		if err := validResponse.VisitGetGameByTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// JoinGameByToken operation middleware
+func (sh *strictHandler) JoinGameByToken(w http.ResponseWriter, r *http.Request, inviteToken openapi_types.UUID) {
+	var request JoinGameByTokenRequestObject
+
+	request.InviteToken = inviteToken
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.JoinGameByToken(ctx, request.(JoinGameByTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "JoinGameByToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(JoinGameByTokenResponseObject); ok {
+		if err := validResponse.VisitJoinGameByTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteGame operation middleware
 func (sh *strictHandler) DeleteGame(w http.ResponseWriter, r *http.Request, id GameID) {
 	var request DeleteGameRequestObject
@@ -2295,39 +2524,41 @@ func (sh *strictHandler) GetProblem(w http.ResponseWriter, r *http.Request, prob
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"H4sIAAAAAAAC/+Rb3W/bOBL/VwTePdwBau20xQHrt6btBT2k3WDTvZcgMGhpZLMrkSo/nDiB//cDP/RN",
+	"yVY3ysa4t8ii5us3MxwOJ48oYlnOKFAp0OIR5ZjjDCRw83SBM/j8Uf9FKFqgHMsNChHFGaAFIjEKEYcf",
+	"inCI0UJyBSES0QYyrL+Qu9ysohLWwNF+v9erRc6oAEP8E+eM6z8iRiVQqf/EeZ6SCEvC6Oy7YFT/VpH8",
+	"O4cELdDfZpXMM/tWzAy13xx9yy0GEXGSa2JoYdkFvFpRCGuE+cCyPAUJWuPf4IcCYeTJOcuBS2IlviOU",
+	"Al+SWD8kjGdYogVSyljC6SskJ3SNrLaFbW5qn96WS9nqO0QS7UP0gdGE8KyXccRiqNm04BEiyDBJPW9a",
+	"3O2y0NLxCsABH1CeiGWuVimJ9EMMCVapLFB39FaMpYCpJphztkohW5LYfAz3WNtXyzKfn72Sd+yVUBkK",
+	"0Xz+5lVCHh5W6uFBS0YkZMKraobvP9uXb+Yhygh1T2cle8w53nV0r0viU/0jaNzj0nU6isd2QU2oUs8W",
+	"q2Klj80nKoH3GncUjl7yDffv0tevl4UblWigi/dfPi2//vpt+e9ff//6sevFIcpACLxufbbGGQSUySBh",
+	"ih52/hr3iqBXi3uIlITxcUBorqT3TYrpWjkFhqV08pUfFFQHBe01+D2Ry5a4ZSoMkZAxcO4VWMiY9egi",
+	"SQZLJSBeNmKkSrFNhRylkltYk6pFzKfjhUnzHQhMpoiXWDaSYIwlvNIkfT5kvmFHJs4QkdhvNEK3RMJS",
+	"sj+A+ghRlaZ4pR20kZVqhOspzJOzMJckIjl2e2GZi4b2HW2lq+pDA1MjHf2luVBjj6WyfKnKTEIEGms6",
+	"IcKRJFuNWEIoERvQRowwjSBNG1msYqzyeDT6g7vmAcxaHm0+qZuz4VulsnWkW7CGdQdu6NMXAnVwu5vi",
+	"cR5NXSiN1rZPqP7Es3asDvlsh5v5sI/fNUuVraOOTskDifdog9TB9idLlm5HuqMSP1nCFR82hAo920Yl",
+	"1CFzin4cRbFkVCYqcdofqIoq8j4ZL4mQmpwY9rNxsvlSo2QSpw0oCJX/eldh0be3WfYFgT4drixQA2o4",
+	"KI/XxJE8aOCSsE+2L0OVQ1EKHoyNo4PoT7u8T4fCEJ56uXbs8sRsTJKERCqVu/quBFjsTHUYE7MZbjD3",
+	"b0FWj6oWbe6hnvo1Y3y3TElG5DJb+SsLCULXRcqm+Oa58avKVsADlgR6VRBhYR2vS0QXVI6P6OFDZHpE",
+	"JWqRMWubp9iG8docu7oOwHYwIo6OA7/fe3lfm+15IOdVtUoJL/vjoJe6z3wcv+la8SliDe5zwkGM2mmO",
+	"js+yoh2K3GEbWBINOcPB8P3dVD5f+s9ahfQZvr8EupYbtDib22qzfD6EDPXXFHrjhkhxInfX2p0sw3PA",
+	"HPh7pSm7ro8p0M3PlX03Uua2v0NowoxlbFSh852E4BxLmULw/uozCtEWuLBRPH999nqu9WY5UJwTtEBv",
+	"X89fvzX1odwYAWZYyc0ssr0YYxBmDaPNYnpSn2O0QFdMSC2la9q4JhgIec7i3ZP1s1otoX3TtNqR2v20",
+	"N/P5k3Fvxo2nm6YNAFRq6hBru76z3H1ESyltk86ufjdm9Ztfjl5d8y20uLkNkVBZhvkOLdB/gZNkF2R4",
+	"TaJAl20BpnGwBhkIENpPAhtFmob1BaAS+GFPML2difyg0Td6Zi9o5WuPG3zQVhRgz71jXGAAJqdsgOtI",
+	"bQkObLau0EnZ2nVKhuG5tOv+UkNdsvUa4kDLYSx19pOWaqbJm9t9w3SfaBxEinOgpU/X7GXz+Ro8proA",
+	"Y6kvMKWValWvz5Wc3HrTmtJGFyBLG+F6Fis551hGG4876Z9rVnr6WG/vyc8c7sP4WOHiGj7jEv40aFqp",
+	"SkC1cEHOWUJS2+GYge3UDmcJ186dKoU3u9rPjGq7Ve27GjNL9AbIQahUvhx4nfDVbs1BKk51Hs2VrSRn",
+	"ZSfCm9nKVobtBJaXmzfuTvOHAr6rLjXN2QnV7zHLq66zua8r4SfDkkRADx0fmdsJHaDbzPHtT0RIfca1",
+	"xnwx+BuxjEzBHZGbIMdrQnHR4fIHdHWXOVVp3rksPSqkz55MgEYH2AOmfh+4PvfLwdKaLcABhTuDaS18",
+	"Z98ZobPH+g3PfqhY0Rqe7765Q68vrluzCvWro6GphUP9sSkD9ShY7Y3ryCPUQLWtyyFznatP08FqF1hT",
+	"2aNQ8A/KAg3NP/vD7T+M0P9LOLTiEDtPHhc2ow/A818mCUmtQoAt/i3o68H5SOJ9NQnRdQE7QuEybgt9",
+	"n8zVkpmbMJoUyPaER19oFeMbk4I5Bh4reAmPtlM4mBJfpPnHprVxln/7AnAqc6gDqRk5M3ul3n8C+WDe",
+	"nzZ+1djApPXGdBhaEFwy7ELoxgMHQKwNEP45GKfoJXeHG5/5FHqcEzk5T9eJnALFnmrOLDiwEzAdp9KF",
+	"Vb9DFXXVSeaETm00JZZvT7XucpNY1lew0L/UJ8la7pIC3g4koEv9+mQd5hIS+dOl9Ok5gAFrtAc0ZoKG",
+	"6sByvujF+kJ3AmqgKVXpfcIFYo6FgLjSJUgY7ys3hMR84GLrWr8+7XrRaHi6G71BoBW/FsX6QFlvQ7qY",
+	"S0MTt307828DQVYKPtQtMotxmgZ4i4kZaml+V6o/e6yGJAc7ecUcUceT+ya8PO2kxjzmwf9IepbmUXvM",
+	"ymN4t2SSjp6zSHkgNcv5trCt4ilaoBnOCdrf7v8XAAD//2WaKAcENgAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

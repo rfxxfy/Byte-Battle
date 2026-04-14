@@ -17,6 +17,7 @@ const (
 	ErrGameAlreadyCancelled     = "GAME_ALREADY_CANCELLED"
 	ErrNotParticipant           = "NOT_PARTICIPANT"
 	ErrCreatorCannotLeave       = "CREATOR_CANNOT_LEAVE"
+	ErrPrivateGame              = "PRIVATE_GAME"
 
 	ErrSessionNotFound = "SESSION_NOT_FOUND"
 	ErrSessionExpired  = "SESSION_EXPIRED"
@@ -48,7 +49,7 @@ func httpStatusCode(code string) int {
 	switch code {
 	case ErrValidation, ErrNotEnoughPlayers, ErrInvalidWinner:
 		return http.StatusBadRequest
-	case ErrNotGameCreator, ErrCreatorCannotLeave, ErrNotParticipant:
+	case ErrNotGameCreator, ErrCreatorCannotLeave, ErrNotParticipant, ErrPrivateGame:
 		return http.StatusForbidden
 	case ErrAlreadyParticipant, ErrGameAlreadyStarted, ErrGameNotInProgress,
 		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled, ErrRoundAlreadyAdvanced:
