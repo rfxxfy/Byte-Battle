@@ -48,7 +48,7 @@ func TestGameWS_PendingGame(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
+func TestGameWS_SubmitResultOnlyToSubmitter(t *testing.T) {
 	srv := newGameServer(t, correctExecutor{})
 	g := createActiveGameOnServer(t, srv)
 	wsPath := fmt.Sprintf("/api/games/%d/ws", g.Game.ID)
@@ -68,15 +68,13 @@ func TestGameWS_SubmitBroadcastsToAllClients(t *testing.T) {
 		Language: "python",
 	}))
 
+	// Submitter receives the result privately.
 	r1 := wsReadUntilType(t, conn1, ws.TypeSubmissionResult)
-	assert.Equal(t, ws.TypeSubmissionResult, r1.Type)
 	assert.Equal(t, user1ID, r1.UserID)
 	assert.True(t, r1.Accepted)
 
-	r2 := wsReadUntilType(t, conn2, ws.TypeSubmissionResult)
-	assert.Equal(t, ws.TypeSubmissionResult, r2.Type)
-	assert.Equal(t, user1ID, r2.UserID)
-	assert.True(t, r2.Accepted)
+	// Other player receives game_finished (broadcast), not submission_result.
+	wsReadUntilTypeNotSeen(t, conn2, ws.TypeGameFinished, ws.TypeSubmissionResult)
 }
 
 func TestGameWS_PlayerJoinedBroadcast(t *testing.T) {
@@ -333,6 +331,20 @@ func TestGameWS_TwoPlayersRace_OnlyOneWins(t *testing.T) {
 
 	assert.Equal(t, finished1.WinnerID, finished2.WinnerID, "both connections must see the same winner")
 	assert.True(t, finished1.WinnerID == user1ID || finished1.WinnerID == user2ID, "winner must be one of the players")
+}
+
+func wsReadUntilTypeNotSeen(t *testing.T, conn wsJSONReader, wantType, forbidType string) ws.ServerMessage {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		require.NoError(t, conn.SetReadDeadline(deadline))
+		var msg ws.ServerMessage
+		require.NoError(t, conn.ReadJSON(&msg))
+		assert.NotEqual(t, forbidType, msg.Type, "unexpected message type %q received before %q", forbidType, wantType)
+		if msg.Type == wantType {
+			return msg
+		}
+	}
 }
 
 func wsReadUntilType(t *testing.T, conn wsJSONReader, wantType string) ws.ServerMessage {

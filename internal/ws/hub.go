@@ -1,6 +1,10 @@
 package ws
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/google/uuid"
+)
 
 // Hub manages WebSocket rooms, one room per game.
 type Hub struct {
@@ -62,5 +66,23 @@ func (h *Hub) Broadcast(gameID int32, msg []byte) {
 	defer r.mu.Unlock()
 	for c := range r.clients {
 		c.Send(msg)
+	}
+}
+
+func (h *Hub) SendToUser(gameID int32, userID uuid.UUID, msg []byte) {
+	h.mu.RLock()
+	r, ok := h.rooms[gameID]
+	h.mu.RUnlock()
+	if !ok {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for c := range r.clients {
+		if c.UserID == userID {
+			c.Send(msg)
+			return
+		}
 	}
 }
