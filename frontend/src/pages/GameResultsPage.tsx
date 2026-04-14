@@ -13,7 +13,7 @@ const MONACO_LANG: Record<string, string> = {
 }
 
 function participantLabel(solution: GameSolution): string {
-  return solution.name ?? solution.username
+  return solution.name ?? solution.user_id.slice(0, 8)
 }
 
 export function GameResultsPage() {
@@ -76,11 +76,11 @@ export function GameResultsPage() {
     <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto w-full">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link to={`/games/${gameId}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          ← Игра #{gameId}
+        <Link to="/games" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          ← Игры
         </Link>
         <span className="text-muted-foreground/40">/</span>
-        <span className="text-sm font-medium">Решения</span>
+        <span className="text-sm font-medium">Игра #{gameId} — Решения</span>
       </div>
 
       <div className="flex gap-6 min-h-0">

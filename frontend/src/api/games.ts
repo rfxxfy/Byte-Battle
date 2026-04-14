@@ -46,7 +46,6 @@ export const cancelGame = (id: number) =>
 
 export interface GameSolution {
   user_id: string
-  username: string
   name?: string | null
   problem_id: string
   code: string

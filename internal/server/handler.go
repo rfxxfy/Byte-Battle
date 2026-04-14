@@ -291,7 +291,6 @@ func (s *HTTPServer) GetGameSolutions(ctx context.Context, req api.GetGameSoluti
 		}
 		solutions[i] = api.GameSolution{
 			UserId:    r.UserID,
-			Username:  r.Username,
 			Name:      name,
 			ProblemId: r.ProblemID,
 			Code:      r.Code,
