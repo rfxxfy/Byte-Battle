@@ -470,12 +470,18 @@ components:
       required:
         - token
         - expires_at
+        - user_id
       properties:
         token:
           type: string
         expires_at:
           type: string
           format: date-time
+        user_id:
+          type: string
+        email:
+          type: string
+          nullable: true
         name:
           type: string
           nullable: true
@@ -700,7 +706,6 @@ components:
       type: object
       required:
         - user_id
-        - username
         - problem_id
         - code
         - language
@@ -709,8 +714,6 @@ components:
         user_id:
           type: string
           format: uuid
-        username:
-          type: string
         name:
           type: string
           nullable: true

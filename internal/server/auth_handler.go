@@ -24,10 +24,14 @@ func (s *HTTPServer) PostAuthConfirm(ctx context.Context, req api.PostAuthConfir
 	resp := api.PostAuthConfirm200JSONResponse{
 		Token:     session.Token,
 		ExpiresAt: session.ExpiresAt.Time,
+		UserId:    session.UserID.String(),
 	}
 	user, err := s.users.GetByID(ctx, session.UserID)
-	if err == nil && user.Name.Valid {
-		resp.Name = &user.Name.String
+	if err == nil {
+		resp.Email = &user.Email
+		if user.Name.Valid {
+			resp.Name = &user.Name.String
+		}
 	}
 	return resp, nil
 }
