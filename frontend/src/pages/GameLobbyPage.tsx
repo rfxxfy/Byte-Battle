@@ -30,6 +30,8 @@ export function GameLobbyPage() {
 
       if (g.status === 'active') {
         if (prevStatusRef.current === 'pending') {
+          prevStatusRef.current = g.status
+          setGame(g)
           setCountdown(3)
           setTimeout(() => setCountdown(2), 1000)
           setTimeout(() => setCountdown(1), 2000)
@@ -60,7 +62,7 @@ export function GameLobbyPage() {
 
   useEffect(() => {
     if (game?.status !== 'pending') return
-    const timer = setInterval(fetchGame, 3000)
+    const timer = setInterval(fetchGame, 1000)
     return () => clearInterval(timer)
   }, [game?.status, fetchGame])
 
@@ -80,8 +82,8 @@ export function GameLobbyPage() {
     if (!game) return
     setActionError('')
     try {
-      const res = await startGame(game.id)
-      setGame(res.game)
+      await startGame(game.id)
+      await fetchGame()
     } catch (err) {
       setActionError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     }
