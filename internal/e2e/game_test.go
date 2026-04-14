@@ -365,7 +365,7 @@ func TestGame_Leave(t *testing.T) {
 		g := createGame(t)
 		token3 := authToken(t, "outsider-leave@test.com")
 		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/%d/leave", g.Game.ID), nil, token3)
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 		assert.Equal(t, "NOT_PARTICIPANT", errCode(t, resp))
 	})
 
