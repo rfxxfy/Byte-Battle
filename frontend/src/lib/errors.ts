@@ -19,6 +19,7 @@ const messages: Record<string, string> = {
   NOT_GAME_CREATOR: 'Только создатель может начать игру',
   CANNOT_CANCEL_FINISHED_GAME: 'Нельзя отменить завершённую игру',
   GAME_ALREADY_CANCELLED: 'Игра уже отменена',
+  GAME_NOT_FINISHED: 'Решения доступны только после завершения игры',
 
   // Problems
   PROBLEM_NOT_FOUND: 'Задача не найдена',

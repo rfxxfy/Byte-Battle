@@ -17,6 +17,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
+  const [pendingConfirm, setPendingConfirm] = useState<{ token: string; userId: string; email: string | null } | null>(null)
   const [step, setStep] = useState<'email' | 'code' | 'name'>('email')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -91,10 +92,11 @@ export function LoginPage() {
     try {
       const res = await confirm(email, code)
       sessionStorage.removeItem('login_code_step')
-      login(res.token, res.expires_at)
       if (!res.name) {
+        setPendingConfirm({ token: res.token, userId: res.user_id, email: res.email ?? null })
         setStep('name')
       } else {
+        login(res.token, res.user_id, res.name, res.email ?? null)
         navigate('/games', { replace: true })
       }
     } catch (err) {
@@ -109,7 +111,8 @@ export function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await updateMe(name)
+      await updateMe(name, pendingConfirm!.token)
+      login(pendingConfirm!.token, pendingConfirm!.userId, name, pendingConfirm!.email)
       navigate('/games', { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
