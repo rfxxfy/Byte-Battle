@@ -4,6 +4,7 @@ import Editor from '@monaco-editor/react'
 import { getGame, getGameSolutions, type Game, type GameSolution } from '@/api/games'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
+import { pluralize } from '@/lib/utils'
 
 const MONACO_LANG: Record<string, string> = {
   python: 'python',
@@ -139,7 +140,7 @@ export function GameResultsPage() {
                     ? 'Не решена'
                     : isSolo
                       ? 'Решена'
-                      : `${solvers.length} ${solvers.length === 1 ? 'решение' : solvers.length < 5 ? 'решения' : 'решений'}`}
+                      : `${solvers.length} ${pluralize(solvers.length, 'решение', 'решения', 'решений')}`}
                 </div>
               </button>
             )

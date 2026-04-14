@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getGameByToken, joinGameByToken, startGame, cancelGame, leaveGame, type Game, type GameParticipant } from '@/api/games'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
+import { pluralize } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 
@@ -148,9 +149,7 @@ export function GameLobbyPage() {
             Игра #{game.id} · {game.is_public ? 'Публичная' : 'Приватная'}
           </p>
           <p className="text-sm font-medium">
-            {game.problem_ids.length === 1
-              ? '1 задача'
-              : `${game.problem_ids.length} задачи`}
+            {game.problem_ids.length} {pluralize(game.problem_ids.length, 'задача', 'задачи', 'задач')}
           </p>
         </div>
 
