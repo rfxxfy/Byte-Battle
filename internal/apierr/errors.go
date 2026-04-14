@@ -48,7 +48,7 @@ func httpStatusCode(code string) int {
 	switch code {
 	case ErrValidation, ErrNotEnoughPlayers, ErrInvalidWinner:
 		return http.StatusBadRequest
-	case ErrNotGameCreator, ErrCreatorCannotLeave:
+	case ErrNotGameCreator, ErrCreatorCannotLeave, ErrNotParticipant:
 		return http.StatusForbidden
 	case ErrAlreadyParticipant, ErrGameAlreadyStarted, ErrGameNotInProgress,
 		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled, ErrRoundAlreadyAdvanced:
@@ -57,7 +57,7 @@ func httpStatusCode(code string) int {
 		return http.StatusForbidden
 	case ErrInvalidToken, ErrSessionExpired:
 		return http.StatusUnauthorized
-	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound, ErrUserNotFound, ErrNotParticipant:
+	case ErrGameNotFound, ErrSessionNotFound, ErrProblemNotFound, ErrUserNotFound:
 		return http.StatusNotFound
 	case ErrTooManyAttempts, ErrCodeRecentlySent, ErrExecutionRateLimited, ErrExecutionInProgress:
 		return http.StatusTooManyRequests
