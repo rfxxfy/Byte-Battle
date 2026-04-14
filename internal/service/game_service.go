@@ -153,6 +153,13 @@ func (s *GameService) GetParticipants(ctx context.Context, gameID int) ([]Partic
 	return result, nil
 }
 
+func (s *GameService) IsParticipant(ctx context.Context, gameID int, userID uuid.UUID) (bool, error) {
+	return s.q.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
+		GameID: int32(gameID),
+		UserID: userID,
+	})
+}
+
 func (s *GameService) GetParticipantsByGameIDs(ctx context.Context, gameIDs []int32) (map[int32][]Participant, error) {
 	rows, err := s.q.GetParticipantsByGameIDs(ctx, gameIDs)
 	if err != nil {
