@@ -91,7 +91,6 @@ func (s *SubmissionService) getCurrentProblemForSubmission(ctx context.Context, 
 		return nil, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
 	}
 
-	// Each player has their own current problem index.
 	playerIdx, err := s.gameSvc.GetParticipantProblemIndex(ctx, gameID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get participant problem index: %w", err)
@@ -144,9 +143,7 @@ func (s *SubmissionService) completeAcceptedSubmission(
 ) (SubmissionResult, error) {
 	updatedGame, finished, err := s.gameSvc.HandleAcceptedSubmission(ctx, gameID, userID)
 	if err != nil {
-		var appErr *apierr.AppError
-		if errors.As(err, &appErr) && (appErr.ErrorCode == apierr.ErrGameNotInProgress || appErr.ErrorCode == apierr.ErrRoundAlreadyAdvanced) {
-			// Another player already won — suppress broadcast.
+		if errors.Is(err, errGameAlreadyFinished) {
 			return SubmissionResult{Accepted: true, AlreadyAdvanced: true}, nil
 		}
 		return SubmissionResult{}, fmt.Errorf("complete game: %w", err)
@@ -156,7 +153,6 @@ func (s *SubmissionService) completeAcceptedSubmission(
 		return SubmissionResult{Accepted: true, WinnerID: updatedGame.WinnerID.UUID}, nil
 	}
 
-	// Player advanced to their next problem.
 	playerIdx, err := s.gameSvc.GetParticipantProblemIndex(ctx, gameID, userID)
 	if err != nil {
 		return SubmissionResult{}, fmt.Errorf("get participant problem index: %w", err)
