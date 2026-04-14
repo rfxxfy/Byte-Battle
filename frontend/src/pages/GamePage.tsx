@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { getGame, timeoutGame, type Game, type GameParticipant } from '@/api/games'
+import { getGame, timeoutGame, type Game } from '@/api/games'
 import { getProblem, type Problem } from '@/api/problems'
 import { runCode } from '@/api/execute'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
+import { pluralize, displayName } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { ProblemDescription } from '@/components/ProblemDescription'
@@ -51,7 +52,6 @@ interface PlayerState {
   progress: Record<string, number>
 }
 
-const participantLabel = (p: GameParticipant) => p.name ?? p.id.slice(0, 8)
 
 function formatSeconds(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60)
@@ -150,7 +150,6 @@ export function GamePage() {
     fetchGame()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Solo timer (countdown or stopwatch)
   useEffect(() => {
     if (!game?.is_solo || game.status !== 'active') return
 
@@ -287,12 +286,19 @@ export function GamePage() {
     ws.send(JSON.stringify({ type: 'submit', code, language }))
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (loading) return (
+    <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">Загрузка...</div>
+  )
+  if (error) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <p className="text-sm text-destructive">{error}</p>
+    </div>
+  )
   if (!game || !problem) return null
 
   const isActive = game.status === 'active'
-  const isFinished = game.status === 'finished' || game.status === 'cancelled'
+  const isCancelled = game.status === 'cancelled'
+  const isFinished = game.status === 'finished' || isCancelled
   const blocked = isFinished || timedOut
   const totalProblems = game.problem_ids.length
   const myProgress = playerProgress[userId ?? ''] ?? 0
@@ -312,10 +318,8 @@ export function GamePage() {
             ← Игры
           </Link>
           <span className="text-muted-foreground/40">|</span>
-          <span className="text-sm font-medium">{problem.title}</span>
-          <span className="text-muted-foreground/40">|</span>
           <span className="text-xs text-muted-foreground">
-            {myProgress + 1}/{totalProblems}
+            Задача {myProgress + 1}/{totalProblems}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -325,7 +329,7 @@ export function GamePage() {
                 ? soloRemainingSeconds !== null && soloRemainingSeconds < 300 ? 'text-red-400' : 'text-muted-foreground'
                 : 'text-muted-foreground'
             }`}>
-              {game.time_limit_minutes != null ? '⏱' : '⏱'} {soloTimeDisplay}
+              ⏱ {soloTimeDisplay}
             </div>
           )}
           {isActive && !soloTimeDisplay && (
@@ -336,7 +340,7 @@ export function GamePage() {
           )}
           {isFinished && (
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-amber-400/90">Завершена</span>
+              <span className="text-sm font-medium text-amber-400/90">{isCancelled ? 'Отменена' : 'Завершена'}</span>
               <Button
                 size="sm"
                 variant="outline"
@@ -380,7 +384,7 @@ export function GamePage() {
                   >
                     <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
                     <span className={p.id === userId ? 'text-primary font-medium' : ''}>
-                      {participantLabel(p)}
+                      {displayName(p.name, p.id)}
                       {p.id === userId && ' (ты)'}
                     </span>
                     <div className="ml-auto flex items-center gap-2">
@@ -468,14 +472,14 @@ export function GamePage() {
 
           <div className="flex-shrink-0 border-t border-border/60">
             <textarea
-              placeholder="stdin для кнопки «Запустить»"
+              placeholder="stdin"
               value={stdin}
               onChange={(e) => setStdin(e.target.value)}
               disabled={!isActive || timedOut}
               rows={2}
               className="w-full border-b border-border/60 bg-background px-3 py-2 text-xs font-mono text-foreground resize-none focus:outline-none disabled:opacity-50 placeholder:text-muted-foreground block"
             />
-            <div className="h-20 overflow-y-auto px-3 py-2 text-xs font-mono bg-background">
+            <div className="min-h-[80px] max-h-40 overflow-y-auto px-3 py-2 text-xs font-mono bg-background">
               {submissionResult ? (
                 <div className={submissionResult.accepted ? 'text-green-400' : 'text-red-400'}>
                   {submissionResult.accepted ? (
@@ -535,9 +539,12 @@ export function GamePage() {
 
       {timedOut && !winner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="text-center">
-            <p className="text-4xl font-bold text-red-400">Время вышло</p>
-            <p className="text-sm text-muted-foreground mt-3">Переходим к результатам...</p>
+          <div className="bg-card border border-border/60 rounded-xl p-8 w-full max-w-sm shadow-2xl shadow-black/40 mx-4 text-center">
+            <h2 className="text-xl font-semibold mb-1 text-red-400">Время вышло</h2>
+            <p className="text-sm text-muted-foreground mb-5">
+              Решено {myProgress}/{totalProblems} {pluralize(myProgress, 'задача', 'задачи', 'задач')}
+            </p>
+            <p className="text-xs text-muted-foreground">Переходим к результатам...</p>
           </div>
         </div>
       )}
@@ -547,13 +554,9 @@ export function GamePage() {
           <div className="bg-card border border-border/60 rounded-xl p-8 w-full max-w-sm shadow-2xl shadow-black/40 mx-4 text-center">
             {game.is_solo ? (
               <>
-                <h2 className="text-xl font-semibold mb-1">
-                  {winner.winner_id ? 'Готово!' : 'Время вышло'}
-                </h2>
+                <h2 className="text-xl font-semibold mb-1">Готово!</h2>
                 <p className="text-sm text-muted-foreground mb-5">
-                  {winner.winner_id
-                    ? 'Все задачи решены!'
-                    : `Решено ${myProgress}/${totalProblems} задач`}
+                  Решено {totalProblems}/{totalProblems} {pluralize(totalProblems, 'задача', 'задачи', 'задач')}
                 </p>
               </>
             ) : (
@@ -564,7 +567,7 @@ export function GamePage() {
                 <p className="text-sm text-muted-foreground mb-5">
                   {winner.winner_id === userId
                     ? 'Ты решил все задачи первым!'
-                    : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id?.slice(0, 8)}`}
+                    : `Победил ${winnerParticipant ? displayName(winnerParticipant.name, winnerParticipant.id) : winner.winner_id?.slice(0, 8)}`}
                 </p>
               </>
             )}
