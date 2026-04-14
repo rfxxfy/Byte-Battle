@@ -383,6 +383,10 @@ func toAPIGame(g sqlcdb.Game, participants []service.Participant, problemIDs []s
 		CreatedAt:    g.CreatedAt.Time,
 		UpdatedAt:    g.UpdatedAt.Time,
 	}
+	if g.StartedAt.Valid {
+		t := g.StartedAt.Time
+		result.StartedAt = &t
+	}
 	if g.WinnerID.Valid {
 		id := g.WinnerID.UUID
 		result.WinnerId = &id

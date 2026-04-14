@@ -16,6 +16,7 @@ export interface Game {
   time_limit_minutes?: number | null
   participants: GameParticipant[]
   winner_id?: string | null
+  started_at?: string | null
   created_at: string
   updated_at: string
 }

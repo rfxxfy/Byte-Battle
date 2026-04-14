@@ -710,6 +710,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/GameParticipant"
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
         created_at:
           type: string
           format: date-time

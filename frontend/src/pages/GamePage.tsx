@@ -101,6 +101,7 @@ export function GamePage() {
   const [notification, setNotification] = useState<string | null>(null)
 
   const [soloTimeDisplay, setSoloTimeDisplay] = useState<string | null>(null)
+  const [soloRemainingSeconds, setSoloRemainingSeconds] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -153,15 +154,15 @@ export function GamePage() {
   useEffect(() => {
     if (!game?.is_solo || game.status !== 'active') return
 
-    const startedAt = new Date(game.updated_at).getTime()
-    const timeLimitSeconds = game.time_limit_minutes != null ? game.time_limit_minutes * 60 : null
-
-    if (timeLimitSeconds === null) return
+    if (!game.started_at || game.time_limit_minutes == null) return
+    const startedAt = new Date(game.started_at).getTime()
+    const timeLimitSeconds = game.time_limit_minutes * 60
 
     const tick = () => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000)
       const remaining = Math.max(0, timeLimitSeconds - elapsed)
       setSoloTimeDisplay(formatSeconds(remaining))
+      setSoloRemainingSeconds(remaining)
       if (remaining === 0 && !timeoutCalledRef.current) {
         timeoutCalledRef.current = true
         setTimedOut(true)
@@ -173,7 +174,7 @@ export function GamePage() {
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [game?.is_solo, game?.status, game?.updated_at, game?.time_limit_minutes, gameId, navigate])
+  }, [game?.is_solo, game?.status, game?.started_at, game?.time_limit_minutes, gameId, navigate])
 
   useEffect(() => {
     if (game?.status !== 'active' || !token) return
@@ -321,7 +322,7 @@ export function GamePage() {
           {soloTimeDisplay && isActive && (
             <div className={`flex items-center gap-1.5 text-sm font-mono tabular-nums ${
               game.time_limit_minutes != null && !timedOut
-                ? parseInt(soloTimeDisplay) < 5 ? 'text-red-400' : 'text-muted-foreground'
+                ? soloRemainingSeconds !== null && soloRemainingSeconds < 300 ? 'text-red-400' : 'text-muted-foreground'
                 : 'text-muted-foreground'
             }`}>
               {game.time_limit_minutes != null ? '⏱' : '⏱'} {soloTimeDisplay}
