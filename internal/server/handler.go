@@ -367,6 +367,16 @@ func (s *HTTPServer) handleGameWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ok, err := s.gameService.IsParticipant(r.Context(), gameID, session.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		writeHTTPError(w, apierr.New(apierr.ErrNotParticipant, "not a participant"))
+		return
+	}
+
 	// Echo the subprotocol back — required by browser WS spec
 	conn, err := upgrader.Upgrade(w, r, http.Header{
 		"Sec-WebSocket-Protocol": {token},
