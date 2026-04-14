@@ -11,7 +11,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (token: string, expiresAt: string) => void
+  login: (token: string, userId: string, name: string | null, email: string | null) => void
   logout: () => Promise<void>
   setName: (name: string) => void
 }
@@ -19,20 +19,14 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    token: localStorage.getItem('token'),
-    userId: null,
-    email: null,
-    name: null,
-    loading: true,
+  const [state, setState] = useState<AuthState>(() => {
+    const token = localStorage.getItem('token')
+    return { token, userId: null, email: null, name: null, loading: !!token }
   })
 
   useEffect(() => {
     const token = localStorage.getItem('token')
-    if (!token) {
-      setState({ token: null, userId: null, email: null, name: null, loading: false })
-      return
-    }
+    if (!token) return
     me()
       .then((res) => {
         setState((prev) => ({ ...prev, token, userId: res.user_id, email: res.email ?? null, name: res.name ?? null, loading: false }))
@@ -56,16 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('unauthorized', handler)
   }, [])
 
-  const login = (token: string, _expiresAt: string) => {
+  const login = (token: string, userId: string, name: string | null, email: string | null) => {
     localStorage.setItem('token', token)
-    setState((prev) => ({ ...prev, token, loading: true }))
-    me()
-      .then((res) => {
-        setState((prev) => ({ ...prev, token, userId: res.user_id, email: res.email ?? null, name: res.name ?? null, loading: false }))
-      })
-      .catch(() => {
-        setState((prev) => ({ ...prev, loading: false }))
-      })
+    setState({ token, userId, name, email, loading: false })
   }
 
   const logout = async () => {
@@ -85,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider')

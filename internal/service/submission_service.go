@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"bytebattle/internal/apierr"
+	sqlcdb "bytebattle/internal/db/sqlc"
 	"bytebattle/internal/executor"
 	"bytebattle/internal/problems"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type SubmissionResult struct {
@@ -27,6 +30,7 @@ type SubmissionService struct {
 	execSvc  *ExecutionService
 	gameSvc  *GameService
 	problems *problems.Loader
+	q        sqlcdb.Querier
 }
 
 type executionOutcome struct {
@@ -36,8 +40,8 @@ type executionOutcome struct {
 	stderr     string
 }
 
-func NewSubmissionService(execSvc *ExecutionService, gameSvc *GameService, loader *problems.Loader) *SubmissionService {
-	return &SubmissionService{execSvc: execSvc, gameSvc: gameSvc, problems: loader}
+func NewSubmissionService(execSvc *ExecutionService, gameSvc *GameService, loader *problems.Loader, q sqlcdb.Querier) *SubmissionService {
+	return &SubmissionService{execSvc: execSvc, gameSvc: gameSvc, problems: loader, q: q}
 }
 
 func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.UUID, code string, language executor.Language) (SubmissionResult, error) {
@@ -63,6 +67,16 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 			Stdout:     outcome.stdout,
 			Stderr:     outcome.stderr,
 		}, nil
+	}
+
+	if err := s.q.InsertSolution(ctx, sqlcdb.InsertSolutionParams{
+		UserID:    userID,
+		ProblemID: problem.ID,
+		GameID:    pgtype.Int4{Int32: int32(gameID), Valid: true},
+		Code:      code,
+		Language:  string(language),
+	}); err != nil {
+		log.Printf("warn: failed to save solution user=%s problem=%s game=%d: %v", userID, problem.ID, gameID, err)
 	}
 
 	return s.completeAcceptedSubmission(ctx, gameID, userID)

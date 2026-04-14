@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -515,6 +516,20 @@ func (s *GameService) SetWinner(ctx context.Context, gameID int, winnerID uuid.U
 		ID:       int32(gameID),
 		WinnerID: uuid.NullUUID{UUID: winnerID, Valid: true},
 	})
+}
+
+func (s *GameService) GetGameSolutions(ctx context.Context, gameID int) ([]sqlcdb.GetGameSolutionsRow, error) {
+	game, err := s.q.GetGameByID(ctx, int32(gameID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if game.Status != gameStatusFinished {
+		return nil, apierr.New(apierr.ErrGameNotFinished, "solutions are only available after the game is finished")
+	}
+	return s.q.GetGameSolutions(ctx, pgtype.Int4{Int32: int32(gameID), Valid: true})
 }
 
 func (s *GameService) DeleteGame(ctx context.Context, id int, userID uuid.UUID) error {
