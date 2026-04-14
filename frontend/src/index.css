@@ -107,6 +107,17 @@
     --sidebar-ring: oklch(0.627 0.194 149.214);
 }
 
+@keyframes count-tick {
+  0%   { transform: translateY(-64px); opacity: 0; }
+  18%  { transform: translateY(0);     opacity: 1; }
+  72%  { transform: translateY(0);     opacity: 1; }
+  100% { transform: translateY(64px);  opacity: 0; }
+}
+
+.animate-count-tick {
+  animation: count-tick 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

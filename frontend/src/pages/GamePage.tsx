@@ -95,9 +95,15 @@ export function GamePage() {
   const [winner, setWinner] = useState<GameFinished | null>(null)
   const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({})
   const [solvedTransition, setSolvedTransition] = useState(false)
+  const [notification, setNotification] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [countdown, setCountdown] = useState<3 | 2 | 1 | 0 | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
   const userIdRef = useRef<string | null>(userId)
+  const gameRef = useRef<Game | null>(null)
+  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevStatusRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     languageRef.current = language
@@ -106,6 +112,21 @@ export function GamePage() {
   useEffect(() => {
     userIdRef.current = userId
   }, [userId])
+
+  useEffect(() => {
+    gameRef.current = game
+  }, [game])
+
+  useEffect(() => {
+    if (prevStatusRef.current === 'pending' && game?.status === 'active') {
+      setCountdown(3)
+      setTimeout(() => setCountdown(2), 1000)
+      setTimeout(() => setCountdown(1), 2000)
+      setTimeout(() => setCountdown(0), 3000)
+      setTimeout(() => setCountdown(null), 4000)
+    }
+    prevStatusRef.current = game?.status
+  }, [game?.status])
 
   const fetchGame = useCallback(async () => {
     try {
@@ -169,6 +190,14 @@ export function GamePage() {
             }).catch(() => {})
           } else if (msg.type === 'player_advanced') {
             setPlayerProgress(msg.progress ?? {})
+            if (msg.user_id !== userIdRef.current) {
+              const p = gameRef.current?.participants.find((p) => p.id === msg.user_id)
+              const label = p ? (p.name ?? p.id.slice(0, 8)) : msg.user_id.slice(0, 8)
+              const text = `${label} решил задачу ${msg.problem_index}`
+              if (notifTimerRef.current) clearTimeout(notifTimerRef.current)
+              setNotification(text)
+              notifTimerRef.current = setTimeout(() => setNotification(null), 3500)
+            }
             if (msg.user_id === userIdRef.current) {
               setSolvedTransition(true)
               ;(async () => {
@@ -263,7 +292,10 @@ export function GamePage() {
   }
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href)
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
   }
 
   const handleRun = async () => {
@@ -365,8 +397,12 @@ export function GamePage() {
                   Нужен хотя бы 1 соперник
                 </p>
               )}
-              <Button variant="outline" onClick={handleCopyLink} className="w-full">
-                Скопировать ссылку
+              <Button
+                variant="outline"
+                onClick={handleCopyLink}
+                className={`w-full transition-colors ${linkCopied ? 'border-green-500/60 text-green-400 hover:text-green-400' : ''}`}
+              >
+                {linkCopied ? '✓ Скопировано' : 'Скопировать ссылку'}
               </Button>
               <Button variant="outline" onClick={handleCancel} className="w-full">
                 Отменить игру
@@ -591,6 +627,23 @@ export function GamePage() {
           </div>
         </div>
       </div>
+
+      {notification && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg border border-border bg-card shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <span className="text-muted-foreground">{notification}</span>
+        </div>
+      )}
+
+      {countdown !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-hidden">
+          <span
+            key={countdown}
+            className={`animate-count-tick font-bold tracking-tight select-none ${countdown === 0 ? 'text-4xl text-primary' : 'text-8xl'}`}
+          >
+            {countdown === 0 ? 'Начали!' : countdown}
+          </span>
+        </div>
+      )}
 
       {/* Solved transition overlay */}
       {solvedTransition && (
