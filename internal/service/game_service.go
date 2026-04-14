@@ -28,6 +28,8 @@ const (
 	maxGameProblems     = 20 // sync with CHECK (problem_index < 20) in migration 000009
 )
 
+var errGameAlreadyFinished = errors.New("game already finished")
+
 type GameService struct {
 	q        *sqlcdb.Queries
 	pool     *pgxpool.Pool
@@ -38,7 +40,7 @@ func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Load
 	return &GameService{q: q, pool: pool, problems: loader}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemIDs []string, isPublic bool) (sqlcdb.Game, error) {
+func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemIDs []string, isPublic, isSolo bool, timeLimitMinutes *int16) (sqlcdb.Game, error) {
 	if len(problemIDs) == 0 {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "at least one problem is required")
 	}
@@ -62,9 +64,15 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 
 	qtx := s.q.WithTx(tx)
 
+	var timeLimitPgx pgtype.Int2
+	if timeLimitMinutes != nil {
+		timeLimitPgx = pgtype.Int2{Int16: *timeLimitMinutes, Valid: true}
+	}
 	game, err := qtx.CreateGame(ctx, sqlcdb.CreateGameParams{
-		CreatorID: creatorID,
-		IsPublic:  isPublic,
+		CreatorID:        creatorID,
+		IsPublic:         isPublic,
+		IsSolo:           isSolo,
+		TimeLimitMinutes: timeLimitPgx,
 	})
 	if err != nil {
 		return sqlcdb.Game{}, err
@@ -304,7 +312,11 @@ func (s *GameService) StartGame(ctx context.Context, id int, userID uuid.UUID) (
 	if err != nil {
 		return sqlcdb.Game{}, err
 	}
-	if count < 2 {
+	minPlayers := int64(2)
+	if game.IsSolo {
+		minPlayers = 1
+	}
+	if count < minPlayers {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrNotEnoughPlayers, "at least two players must join before starting")
 	}
 
@@ -328,7 +340,6 @@ func (s *GameService) CompleteGameAsWinner(ctx context.Context, id int, winnerID
 // If the player has now solved all problems they win the game.
 // Returns (game, finished, error). finished=true means this player won.
 func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, bool, error) {
-	// 1. Advance this player's problem index atomically.
 	newIdx, err := s.q.AdvanceParticipantProblem(ctx, sqlcdb.AdvanceParticipantProblemParams{
 		GameID: int32(id),
 		UserID: userID,
@@ -337,19 +348,16 @@ func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, user
 		return sqlcdb.Game{}, false, fmt.Errorf("advance participant problem: %w", err)
 	}
 
-	// 2. Check total problems.
 	totalProblems, err := s.q.CountGameProblems(ctx, int32(id))
 	if err != nil {
 		return sqlcdb.Game{}, false, err
 	}
 
-	// 3. Not finished yet — return early.
 	if totalProblems == 0 || int64(newIdx) < totalProblems {
 		game, err := s.q.GetGameByID(ctx, int32(id))
 		return game, false, err
 	}
 
-	// 4. Player solved all problems — try to claim the win inside a transaction.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlcdb.Game{}, false, err
@@ -367,12 +375,18 @@ func (s *GameService) HandleAcceptedSubmission(ctx context.Context, id int, user
 
 	// Another player may have already finished.
 	if game.Status != gameStatusActive {
-		return game, false, apierr.New(apierr.ErrRoundAlreadyAdvanced, "game already finished")
+		return game, false, errGameAlreadyFinished
+	}
+
+	// For solo games, the creator is always the winner when all problems are solved.
+	winnerID := userID
+	if game.IsSolo {
+		winnerID = game.CreatorID
 	}
 
 	updated, err := qtx.CompleteGame(ctx, sqlcdb.CompleteGameParams{
 		ID:       game.ID,
-		WinnerID: uuid.NullUUID{UUID: userID, Valid: true},
+		WinnerID: uuid.NullUUID{UUID: winnerID, Valid: true},
 	})
 	if err != nil {
 		return sqlcdb.Game{}, false, err
@@ -467,6 +481,26 @@ func (s *GameService) completeGame(ctx context.Context, id int, winnerID uuid.UU
 	}
 
 	return game, nil
+}
+
+func (s *GameService) TimeoutGame(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, error) {
+	game, err := s.q.GetGameByID(ctx, int32(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "game not found")
+	}
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	if !game.IsSolo {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "timeout is only allowed for solo games")
+	}
+	if game.CreatorID != userID {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrNotGameCreator, "only the game creator can timeout the game")
+	}
+	if game.Status != gameStatusActive {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotInProgress, "game is not in progress")
+	}
+	return s.q.TimeoutGame(ctx, game.ID)
 }
 
 func (s *GameService) CancelGame(ctx context.Context, id int, userID uuid.UUID) (sqlcdb.Game, error) {

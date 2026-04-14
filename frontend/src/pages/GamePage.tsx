@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { getGame, type Game, type GameParticipant } from '@/api/games'
+import { getGame, timeoutGame, type Game, type GameParticipant } from '@/api/games'
 import { getProblem, type Problem } from '@/api/problems'
 import { runCode } from '@/api/execute'
 import { ApiError } from '@/api/client'
@@ -35,7 +35,7 @@ interface SubmissionResult {
 }
 
 interface GameFinished {
-  winner_id: string
+  winner_id: string | null
 }
 
 interface PlayerAdvanced {
@@ -52,6 +52,12 @@ interface PlayerState {
 }
 
 const participantLabel = (p: GameParticipant) => p.name ?? p.id.slice(0, 8)
+
+function formatSeconds(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
 
 export function GamePage() {
   const { id } = useParams<{ id: string }>()
@@ -94,10 +100,14 @@ export function GamePage() {
   const [solvedTransition, setSolvedTransition] = useState(false)
   const [notification, setNotification] = useState<string | null>(null)
 
+  const [soloTimeDisplay, setSoloTimeDisplay] = useState<string | null>(null)
+  const [timedOut, setTimedOut] = useState(false)
+
   const wsRef = useRef<WebSocket | null>(null)
   const userIdRef = useRef<string | null>(userId)
   const gameRef = useRef<Game | null>(null)
   const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timeoutCalledRef = useRef(false)
 
   useEffect(() => { languageRef.current = language }, [language])
   useEffect(() => { userIdRef.current = userId }, [userId])
@@ -108,7 +118,11 @@ export function GamePage() {
       const res = await getGame(gameId)
       const g = res.game
       if (g.status === 'pending') {
-        navigate(`/games/join/${g.invite_token}`, { replace: true })
+        if (g.is_solo) {
+          navigate(`/games/${gameId}/lobby`, { replace: true })
+        } else {
+          navigate(`/games/join/${g.invite_token}`, { replace: true })
+        }
         return
       }
       if (g.status === 'finished') {
@@ -134,6 +148,32 @@ export function GamePage() {
   useEffect(() => {
     fetchGame()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Solo timer (countdown or stopwatch)
+  useEffect(() => {
+    if (!game?.is_solo || game.status !== 'active') return
+
+    const startedAt = new Date(game.updated_at).getTime()
+    const timeLimitSeconds = game.time_limit_minutes != null ? game.time_limit_minutes * 60 : null
+
+    if (timeLimitSeconds === null) return
+
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000)
+      const remaining = Math.max(0, timeLimitSeconds - elapsed)
+      setSoloTimeDisplay(formatSeconds(remaining))
+      if (remaining === 0 && !timeoutCalledRef.current) {
+        timeoutCalledRef.current = true
+        setTimedOut(true)
+        timeoutGame(gameId).catch(() => {})
+        setTimeout(() => navigate(`/games/${gameId}/results`, { replace: true }), 2000)
+      }
+    }
+
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [game?.is_solo, game?.status, game?.updated_at, game?.time_limit_minutes, gameId, navigate])
 
   useEffect(() => {
     if (game?.status !== 'active' || !token) return
@@ -187,7 +227,10 @@ export function GamePage() {
               })()
             }
           } else if (msg.type === 'game_finished') {
-            setWinner({ winner_id: msg.winner_id })
+            // For timeout, we already handle navigation via the timer effect
+            if (!timeoutCalledRef.current) {
+              setWinner({ winner_id: msg.winner_id })
+            }
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
             setSubmitting(false)
           }
@@ -249,10 +292,11 @@ export function GamePage() {
 
   const isActive = game.status === 'active'
   const isFinished = game.status === 'finished' || game.status === 'cancelled'
+  const blocked = isFinished || timedOut
   const totalProblems = game.problem_ids.length
   const myProgress = playerProgress[userId ?? ''] ?? 0
   const monacoLang = LANGUAGES.find((l) => l.value === language)?.monaco ?? 'python'
-  const winnerParticipant = winner
+  const winnerParticipant = winner?.winner_id
     ? game.participants.find((p) => p.id === winner.winner_id)
     : null
 
@@ -274,7 +318,16 @@ export function GamePage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          {isActive && (
+          {soloTimeDisplay && isActive && (
+            <div className={`flex items-center gap-1.5 text-sm font-mono tabular-nums ${
+              game.time_limit_minutes != null && !timedOut
+                ? parseInt(soloTimeDisplay) < 5 ? 'text-red-400' : 'text-muted-foreground'
+                : 'text-muted-foreground'
+            }`}>
+              {game.time_limit_minutes != null ? '⏱' : '⏱'} {soloTimeDisplay}
+            </div>
+          )}
+          {isActive && !soloTimeDisplay && (
             <div className="flex items-center gap-1.5 text-sm text-green-400">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               Идёт
@@ -289,7 +342,7 @@ export function GamePage() {
                 className="border-amber-400/40 text-amber-400/90 hover:bg-amber-400/10 hover:text-amber-400"
                 onClick={() => navigate(`/games/${gameId}/results`)}
               >
-                Смотреть решения участников
+                {game.is_solo ? 'Смотреть результаты' : 'Смотреть решения участников'}
               </Button>
             </div>
           )}
@@ -315,31 +368,33 @@ export function GamePage() {
             <ProblemDescription content={problem.description} />
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-4 flex-shrink-0 shadow-sm">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Участники</p>
-            <div className="flex flex-col divide-y divide-border">
-              {game.participants.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0 rounded-md px-1 -mx-1"
-                >
-                  <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
-                  <span className={p.id === userId ? 'text-primary font-medium' : ''}>
-                    {participantLabel(p)}
-                    {p.id === userId && ' (ты)'}
-                  </span>
-                  <div className="ml-auto flex items-center gap-2">
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {playerProgress[p.id] ?? 0}/{totalProblems}
+          {!game.is_solo && (
+            <div className="rounded-lg border border-border bg-card p-4 flex-shrink-0 shadow-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Участники</p>
+              <div className="flex flex-col divide-y divide-border">
+                {game.participants.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 text-sm py-2 first:pt-0 last:pb-0 rounded-md px-1 -mx-1"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
+                    <span className={p.id === userId ? 'text-primary font-medium' : ''}>
+                      {participantLabel(p)}
+                      {p.id === userId && ' (ты)'}
                     </span>
-                    {game.winner_id === p.id && (
-                      <span className="text-xs text-yellow-400 font-medium">Победитель</span>
-                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {playerProgress[p.id] ?? 0}/{totalProblems}
+                      </span>
+                      {game.winner_id === p.id && (
+                        <span className="text-xs text-yellow-400 font-medium">Победитель</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="flex-1 flex flex-col min-h-0 rounded-lg border border-border overflow-hidden shadow-sm">
@@ -347,7 +402,7 @@ export function GamePage() {
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value as LangValue)}
-              disabled={isFinished}
+              disabled={blocked}
               className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
             >
               {LANGUAGES.map((l) => (
@@ -356,7 +411,7 @@ export function GamePage() {
                 </option>
               ))}
             </select>
-            {isFinished && (
+            {blocked && (
               <span className="text-xs text-muted-foreground bg-muted/40 border border-border/40 px-2 py-1 rounded-md">
                 Только чтение
               </span>
@@ -366,7 +421,7 @@ export function GamePage() {
                 size="sm"
                 variant="outline"
                 onClick={handleRun}
-                disabled={!isActive || running}
+                disabled={!isActive || running || timedOut}
               >
                 {running ? 'Запуск...' : (
                   <span className="flex items-center gap-1.5">
@@ -380,7 +435,7 @@ export function GamePage() {
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={!isActive || submitting}
+                disabled={!isActive || submitting || timedOut}
               >
                 {submitting ? 'Проверяем...' : 'Отправить решение'}
               </Button>
@@ -393,17 +448,17 @@ export function GamePage() {
                 height="100%"
                 language={monacoLang}
                 value={code}
-                onChange={(val) => { if (!isFinished) setCode(val ?? '') }}
+                onChange={(val) => { if (!blocked) setCode(val ?? '') }}
                 theme="vs-dark"
                 options={{
                   minimap: { enabled: false },
                   fontSize: 14,
                   lineNumbers: 'on',
                   scrollBeyondLastLine: false,
-                  readOnly: isFinished,
-                  domReadOnly: isFinished,
-                  mouseStyle: isFinished ? 'default' : 'text',
-                  renderLineHighlight: isFinished ? 'none' : 'line',
+                  readOnly: blocked,
+                  domReadOnly: blocked,
+                  mouseStyle: blocked ? 'default' : 'text',
+                  renderLineHighlight: blocked ? 'none' : 'line',
                   padding: { top: 12 },
                 }}
               />
@@ -415,7 +470,7 @@ export function GamePage() {
               placeholder="stdin для кнопки «Запустить»"
               value={stdin}
               onChange={(e) => setStdin(e.target.value)}
-              disabled={!isActive}
+              disabled={!isActive || timedOut}
               rows={2}
               className="w-full border-b border-border/60 bg-background px-3 py-2 text-xs font-mono text-foreground resize-none focus:outline-none disabled:opacity-50 placeholder:text-muted-foreground block"
             />
@@ -477,19 +532,43 @@ export function GamePage() {
         </div>
       )}
 
+      {timedOut && !winner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="text-center">
+            <p className="text-4xl font-bold text-red-400">Время вышло</p>
+            <p className="text-sm text-muted-foreground mt-3">Переходим к результатам...</p>
+          </div>
+        </div>
+      )}
+
       {winner && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-card border border-border/60 rounded-xl p-8 w-full max-w-sm shadow-2xl shadow-black/40 mx-4 text-center">
-            <h2 className="text-xl font-semibold mb-1">
-              {winner.winner_id === userId ? 'Победа!' : 'Игра завершена'}
-            </h2>
-            <p className="text-sm text-muted-foreground mb-5">
-              {winner.winner_id === userId
-                ? 'Ты решил все задачи первым!'
-                : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id.slice(0, 8)}`}
-            </p>
+            {game.is_solo ? (
+              <>
+                <h2 className="text-xl font-semibold mb-1">
+                  {winner.winner_id ? 'Готово!' : 'Время вышло'}
+                </h2>
+                <p className="text-sm text-muted-foreground mb-5">
+                  {winner.winner_id
+                    ? 'Все задачи решены!'
+                    : `Решено ${myProgress}/${totalProblems} задач`}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-semibold mb-1">
+                  {winner.winner_id === userId ? 'Победа!' : 'Игра завершена'}
+                </h2>
+                <p className="text-sm text-muted-foreground mb-5">
+                  {winner.winner_id === userId
+                    ? 'Ты решил все задачи первым!'
+                    : `Победил ${winnerParticipant ? participantLabel(winnerParticipant) : winner.winner_id?.slice(0, 8)}`}
+                </p>
+              </>
+            )}
             <Button className="w-full" onClick={() => navigate(`/games/${gameId}/results`)}>
-              Смотреть решения участников
+              {game.is_solo ? 'Смотреть результаты' : 'Смотреть решения участников'}
             </Button>
           </div>
         </div>

@@ -9,6 +9,7 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const cancelGame = `-- name: CancelGame :one
@@ -16,7 +17,7 @@ UPDATE games
 SET status = 'cancelled',
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes
 `
 
 func (q *Queries) CancelGame(ctx context.Context, id int32) (Game, error) {
@@ -33,6 +34,8 @@ func (q *Queries) CancelGame(ctx context.Context, id int32) (Game, error) {
 		&i.UpdatedAt,
 		&i.IsPublic,
 		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
 	)
 	return i, err
 }
@@ -44,7 +47,7 @@ SET status = 'finished',
     completed_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes
 `
 
 type CompleteGameParams struct {
@@ -66,6 +69,8 @@ func (q *Queries) CompleteGame(ctx context.Context, arg CompleteGameParams) (Gam
 		&i.UpdatedAt,
 		&i.IsPublic,
 		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
 	)
 	return i, err
 }
@@ -88,18 +93,25 @@ func (q *Queries) CountGamesForUser(ctx context.Context, userID uuid.UUID) (int6
 }
 
 const createGame = `-- name: CreateGame :one
-INSERT INTO games (creator_id, status, is_public)
-VALUES ($1, 'pending', $2)
-RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token
+INSERT INTO games (creator_id, status, is_public, is_solo, time_limit_minutes)
+VALUES ($1, 'pending', $2, $3, $4)
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes
 `
 
 type CreateGameParams struct {
-	CreatorID uuid.UUID `json:"creator_id"`
-	IsPublic  bool      `json:"is_public"`
+	CreatorID        uuid.UUID   `json:"creator_id"`
+	IsPublic         bool        `json:"is_public"`
+	IsSolo           bool        `json:"is_solo"`
+	TimeLimitMinutes pgtype.Int2 `json:"time_limit_minutes"`
 }
 
 func (q *Queries) CreateGame(ctx context.Context, arg CreateGameParams) (Game, error) {
-	row := q.db.QueryRow(ctx, createGame, arg.CreatorID, arg.IsPublic)
+	row := q.db.QueryRow(ctx, createGame,
+		arg.CreatorID,
+		arg.IsPublic,
+		arg.IsSolo,
+		arg.TimeLimitMinutes,
+	)
 	var i Game
 	err := row.Scan(
 		&i.ID,
@@ -112,6 +124,8 @@ func (q *Queries) CreateGame(ctx context.Context, arg CreateGameParams) (Game, e
 		&i.UpdatedAt,
 		&i.IsPublic,
 		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
 	)
 	return i, err
 }
@@ -129,7 +143,7 @@ func (q *Queries) DeleteGame(ctx context.Context, id int32) (int64, error) {
 }
 
 const getGameByID = `-- name: GetGameByID :one
-SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token FROM games WHERE id = $1 LIMIT 1
+SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes FROM games WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetGameByID(ctx context.Context, id int32) (Game, error) {
@@ -146,12 +160,14 @@ func (q *Queries) GetGameByID(ctx context.Context, id int32) (Game, error) {
 		&i.UpdatedAt,
 		&i.IsPublic,
 		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
 	)
 	return i, err
 }
 
 const getGameByInviteToken = `-- name: GetGameByInviteToken :one
-SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token FROM games WHERE invite_token = $1 LIMIT 1
+SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes FROM games WHERE invite_token = $1 LIMIT 1
 `
 
 func (q *Queries) GetGameByInviteToken(ctx context.Context, inviteToken uuid.UUID) (Game, error) {
@@ -168,12 +184,14 @@ func (q *Queries) GetGameByInviteToken(ctx context.Context, inviteToken uuid.UUI
 		&i.UpdatedAt,
 		&i.IsPublic,
 		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
 	)
 	return i, err
 }
 
 const getGameForUpdate = `-- name: GetGameForUpdate :one
-SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token FROM games WHERE id = $1 LIMIT 1 FOR UPDATE
+SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes FROM games WHERE id = $1 LIMIT 1 FOR UPDATE
 `
 
 func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) {
@@ -190,12 +208,14 @@ func (q *Queries) GetGameForUpdate(ctx context.Context, id int32) (Game, error) 
 		&i.UpdatedAt,
 		&i.IsPublic,
 		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
 	)
 	return i, err
 }
 
 const listGamesForUser = `-- name: ListGamesForUser :many
-SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token FROM games
+SELECT id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes FROM games
 WHERE is_public = true
    OR creator_id = $3::uuid
    OR EXISTS (
@@ -231,6 +251,8 @@ func (q *Queries) ListGamesForUser(ctx context.Context, arg ListGamesForUserPara
 			&i.UpdatedAt,
 			&i.IsPublic,
 			&i.InviteToken,
+			&i.IsSolo,
+			&i.TimeLimitMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -248,7 +270,7 @@ SET status = 'active',
     started_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes
 `
 
 func (q *Queries) StartGame(ctx context.Context, id int32) (Game, error) {
@@ -265,6 +287,37 @@ func (q *Queries) StartGame(ctx context.Context, id int32) (Game, error) {
 		&i.UpdatedAt,
 		&i.IsPublic,
 		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
+	)
+	return i, err
+}
+
+const timeoutGame = `-- name: TimeoutGame :one
+UPDATE games
+SET status = 'finished',
+    completed_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+RETURNING id, creator_id, winner_id, status, started_at, completed_at, created_at, updated_at, is_public, invite_token, is_solo, time_limit_minutes
+`
+
+func (q *Queries) TimeoutGame(ctx context.Context, id int32) (Game, error) {
+	row := q.db.QueryRow(ctx, timeoutGame, id)
+	var i Game
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorID,
+		&i.WinnerID,
+		&i.Status,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsPublic,
+		&i.InviteToken,
+		&i.IsSolo,
+		&i.TimeLimitMinutes,
 	)
 	return i, err
 }

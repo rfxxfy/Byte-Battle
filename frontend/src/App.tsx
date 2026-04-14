@@ -10,6 +10,7 @@ import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { GameResultsPage } from './pages/GameResultsPage'
 import { GameLobbyPage } from './pages/GameLobbyPage'
+import { SoloLobbyPage } from './pages/SoloLobbyPage'
 
 function RootRedirect() {
   const { token, loading } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/games" element={<GamesPage />} />
             <Route path="/games/:id" element={<GamePage />} />
             <Route path="/games/:id/results" element={<GameResultsPage />} />
+            <Route path="/games/:id/lobby" element={<SoloLobbyPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
           <Route element={<AppLayout />}>

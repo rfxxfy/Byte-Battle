@@ -11,7 +11,9 @@ export interface Game {
   creator_id: string
   status: 'pending' | 'active' | 'finished' | 'cancelled'
   is_public: boolean
+  is_solo: boolean
   invite_token?: string | null
+  time_limit_minutes?: number | null
   participants: GameParticipant[]
   winner_id?: string | null
   created_at: string
@@ -26,14 +28,24 @@ export const listGames = (limit = 10, offset = 0) =>
 export const getGame = (id: number) =>
   apiFetch<{ game: Game }>(`/games/${id}`)
 
-export const createGame = (problemIds: string[], isPublic = true) =>
+export const createGame = (
+  problemIds: string[],
+  isPublic = true,
+  isSolo = false,
+  timeLimitMinutes?: number | null,
+) =>
   apiFetch<{ game: Game }>('/games', {
     method: 'POST',
     body: JSON.stringify({
       problem_ids: problemIds.slice(0, 20),
       is_public: isPublic,
+      is_solo: isSolo,
+      time_limit_minutes: timeLimitMinutes ?? undefined,
     }),
   })
+
+export const timeoutGame = (id: number) =>
+  apiFetch<{ game: Game }>(`/games/${id}/timeout`, { method: 'POST' })
 
 export const getGameByToken = (token: string) =>
   apiFetch<{ game: Game }>(`/games/join/${token}`)

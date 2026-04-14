@@ -36,6 +36,11 @@ function formatDate(iso: string) {
   })
 }
 
+function formatTimer(minutes: number | null | undefined): string {
+  if (!minutes) return 'Без таймера'
+  if (minutes < 60) return `${minutes} мин`
+  return `${minutes / 60} ч`
+}
 
 const MAX_DOTS = 6
 
@@ -65,6 +70,10 @@ function ProblemDots({ game }: { game: Game }) {
   )
 }
 
+type TabId = 'multiplayer' | 'solo'
+
+type TimerOption = 15 | 30 | 60 | 90 | 120 | 'custom' | null
+
 export function GamesPage() {
   const navigate = useNavigate()
   useAuth()
@@ -73,11 +82,15 @@ export function GamesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
+  const [activeTab, setActiveTab] = useState<TabId>('multiplayer')
 
   const [modalOpen, setModalOpen] = useState(false)
   const [problems, setProblems] = useState<Problem[]>([])
   const [selectedProblemIds, setSelectedProblemIds] = useState<string[]>([])
   const [isPublic, setIsPublic] = useState(true)
+  const [isSolo, setIsSolo] = useState(false)
+  const [timerOption, setTimerOption] = useState<TimerOption>(null)
+  const [customMinutes, setCustomMinutes] = useState('')
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -88,6 +101,15 @@ export function GamesPage() {
       )
       .finally(() => setLoading(false))
   }, [])
+
+  const closeModal = () => {
+    setModalOpen(false)
+    setActionError('')
+    setIsPublic(true)
+    setIsSolo(false)
+    setTimerOption(null)
+    setCustomMinutes('')
+  }
 
   const openModal = async () => {
     setModalOpen(true)
@@ -105,18 +127,40 @@ export function GamesPage() {
     }
   }
 
+  const resolvedTimeLimitMinutes = (): number | null => {
+    if (!isSolo || timerOption === null) return null
+    if (timerOption === 'custom') {
+      const n = parseInt(customMinutes, 10)
+      return isNaN(n) ? null : n
+    }
+    return timerOption
+  }
+
+  const customMinutesValid =
+    timerOption !== 'custom' ||
+    (() => {
+      const n = parseInt(customMinutes, 10)
+      return !isNaN(n) && n >= 1 && n <= 300
+    })()
+
   const handleCreateGame = async () => {
     if (selectedProblemIds.length === 0) return
     if (selectedProblemIds.length > 20) {
       setActionError('Можно выбрать не более 20 задач')
       return
     }
+    if (!customMinutesValid) return
     setCreating(true)
     setActionError('')
     try {
-      const res = await createGame(selectedProblemIds, isPublic)
-      setModalOpen(false)
-      navigate(`/games/join/${res.game.invite_token}`)
+      const timeLimitMinutes = resolvedTimeLimitMinutes()
+      const res = await createGame(selectedProblemIds, isSolo ? false : isPublic, isSolo, timeLimitMinutes)
+      closeModal()
+      if (isSolo) {
+        navigate(`/games/${res.game.id}/lobby`)
+      } else {
+        navigate(`/games/join/${res.game.invite_token}`)
+      }
     } catch (err) {
       setActionError(
         err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err),
@@ -135,6 +179,10 @@ export function GamesPage() {
     })
   }
 
+  const multiplayerGames = games.filter((g) => !g.is_solo)
+  const soloGames = games.filter((g) => g.is_solo)
+  const visibleGames = activeTab === 'multiplayer' ? multiplayerGames : soloGames
+
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
   if (error) return <p className="text-sm text-destructive">{error}</p>
 
@@ -143,6 +191,23 @@ export function GamesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Игры</h1>
         <Button onClick={openModal}>Создать игру</Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-border/60">
+        {(['multiplayer', 'solo'] as TabId[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab === 'multiplayer' ? 'Мультиплеер' : 'Соло'}
+          </button>
+        ))}
       </div>
 
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
@@ -154,35 +219,41 @@ export function GamesPage() {
               <th className="px-4 py-3 text-left w-12">#</th>
               <th className="pl-3 pr-4 py-3 text-left w-24">Задачи</th>
               <th className="pl-[26px] pr-4 py-3 text-left w-36">Статус</th>
-              <th className="px-4 py-3 text-left">Участники</th>
+              {activeTab === 'multiplayer' ? (
+                <th className="px-4 py-3 text-left">Участники</th>
+              ) : (
+                <th className="px-4 py-3 text-left">Таймер</th>
+              )}
               <th className="pl-[34px] pr-4 py-3 text-left w-40">Дата</th>
             </tr>
           </thead>
           <tbody>
-            {games.length === 0 ? (
+            {visibleGames.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                  Игр пока нет — создай первую
+                  {activeTab === 'multiplayer' ? 'Пока нет игр' : 'Пока нет соло-практик'}
                 </td>
               </tr>
             ) : (
-              games.map((g) => (
-                  <tr
-                    key={g.id}
-                    onClick={() => {
-                      if (g.status === 'finished') navigate(`/games/${g.id}/results`)
-                      else if (g.status === 'pending' && g.invite_token) navigate(`/games/join/${g.invite_token}`)
-                      else navigate(`/games/${g.id}`)
-                    }}
-                    className="border-b border-border/40 last:border-0 hover:bg-muted/10 cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40">{g.id}</td>
-                    <td className="px-4 py-4"><ProblemDots game={g} /></td>
-                    <td className="px-4 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass[g.status]}`}>
-                        {statusLabel[g.status]}
-                      </span>
-                    </td>
+              visibleGames.map((g) => (
+                <tr
+                  key={g.id}
+                  onClick={() => {
+                    if (g.status === 'finished') navigate(`/games/${g.id}/results`)
+                    else if (g.status === 'pending' && g.is_solo) navigate(`/games/${g.id}/lobby`)
+                    else if (g.status === 'pending' && g.invite_token) navigate(`/games/join/${g.invite_token}`)
+                    else navigate(`/games/${g.id}`)
+                  }}
+                  className="border-b border-border/40 last:border-0 hover:bg-muted/10 cursor-pointer transition-colors"
+                >
+                  <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40">{g.id}</td>
+                  <td className="px-4 py-4"><ProblemDots game={g} /></td>
+                  <td className="px-4 py-4">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass[g.status]}`}>
+                      {statusLabel[g.status]}
+                    </span>
+                  </td>
+                  {activeTab === 'multiplayer' ? (
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-1">
                         {g.participants.slice(0, 4).map((p, idx) => (
@@ -205,10 +276,15 @@ export function GamesPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-left text-xs text-muted-foreground/60">
-                      {formatDate(g.created_at)}
+                  ) : (
+                    <td className="px-4 py-4 text-xs text-muted-foreground">
+                      {formatTimer(g.time_limit_minutes)}
                     </td>
-                  </tr>
+                  )}
+                  <td className="px-4 py-4 text-left text-xs text-muted-foreground/60">
+                    {formatDate(g.created_at)}
+                  </td>
+                </tr>
               ))
             )}
           </tbody>
@@ -219,7 +295,7 @@ export function GamesPage() {
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setModalOpen(false)}
+          onClick={closeModal}
         >
           <div
             className="bg-card border border-border/60 rounded-xl p-6 w-full max-w-sm shadow-2xl shadow-black/40 mx-4"
@@ -260,33 +336,104 @@ export function GamesPage() {
             <label className="flex items-center gap-2 text-sm mt-4 cursor-pointer select-none">
               <input
                 type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
+                checked={isSolo}
+                onChange={(e) => {
+                  setIsSolo(e.target.checked)
+                  setTimerOption(null)
+                  setCustomMinutes('')
+                }}
               />
-              <span>Публичная игра</span>
-              {!isPublic && (
-                <span className="text-xs text-muted-foreground">(только по ссылке)</span>
-              )}
+              <span>Одиночная игра</span>
             </label>
+
+            {isSolo ? (
+              <div className="flex flex-col gap-2 mt-4">
+                <label className="text-sm text-muted-foreground">Таймер</label>
+                <div className="flex flex-wrap gap-2">
+                  {([15, 30, 60, 90, 120] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setTimerOption(m)}
+                      className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
+                        timerOption === m
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'border-border text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {m} мин
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setTimerOption('custom')}
+                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
+                      timerOption === 'custom'
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Своё
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimerOption(null)}
+                    className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
+                      timerOption === null
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Без таймера
+                  </button>
+                </div>
+                {timerOption === 'custom' && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={300}
+                      value={customMinutes}
+                      onChange={(e) => setCustomMinutes(e.target.value)}
+                      placeholder="1–300"
+                      className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <span className="text-xs text-muted-foreground">минут (1–300)</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <label className="flex items-center gap-2 text-sm mt-4 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                />
+                <span>Публичная игра</span>
+                {!isPublic && (
+                  <span className="text-xs text-muted-foreground">(только по ссылке)</span>
+                )}
+              </label>
+            )}
+
+            <p className="text-xs text-muted-foreground/60 mt-4">
+              После создания вы попадёте в лобби
+            </p>
 
             {actionError && <p className="text-sm text-destructive mt-3">{actionError}</p>}
 
-            <div className="flex gap-2 mt-6">
+            <div className="flex gap-2 mt-4">
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => {
-                  setModalOpen(false)
-                  setActionError('')
-                  setIsPublic(true)
-                }}
+                onClick={closeModal}
               >
                 Отмена
               </Button>
               <Button
                 className="flex-1"
                 onClick={handleCreateGame}
-                disabled={creating || selectedProblemIds.length === 0}
+                disabled={creating || selectedProblemIds.length === 0 || !customMinutesValid}
               >
                 {creating ? 'Создаём...' : 'Создать →'}
               </Button>

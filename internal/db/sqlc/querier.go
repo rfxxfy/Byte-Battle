@@ -54,6 +54,7 @@ type Querier interface {
 	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	StartGame(ctx context.Context, id int32) (Game, error)
+	TimeoutGame(ctx context.Context, id int32) (Game, error)
 	UpdateGameWinner(ctx context.Context, arg UpdateGameWinnerParams) error
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
 	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (User, error)

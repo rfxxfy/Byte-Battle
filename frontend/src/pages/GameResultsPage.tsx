@@ -64,6 +64,10 @@ export function GameResultsPage() {
     )
   }
 
+  const isSolo = game.is_solo
+  const solvedCount = new Set(solutions.map((s) => s.problem_id)).size
+  const totalCount = game.problem_ids.length
+
   const problemSolvers = (problemId: string) =>
     solutions.filter((s) => s.problem_id === problemId)
 
@@ -78,8 +82,40 @@ export function GameResultsPage() {
           ← Игры
         </Link>
         <span className="text-muted-foreground/40">/</span>
-        <span className="text-sm font-medium">Игра #{gameId} — Решения</span>
+        <span className="text-sm font-medium">
+          {isSolo ? `Соло #${gameId}` : `Игра #${gameId}`} — {isSolo ? 'Результаты' : 'Решения'}
+        </span>
       </div>
+
+      {isSolo && (
+        <div className={`rounded-lg border px-5 py-4 flex items-center gap-4 ${
+          game.winner_id
+            ? 'border-green-500/30 bg-green-500/5'
+            : 'border-orange-500/30 bg-orange-500/5'
+        }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+            game.winner_id ? 'bg-green-500/20' : 'bg-orange-500/20'
+          }`}>
+            {game.winner_id ? (
+              <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div>
+            <p className={`text-sm font-medium ${game.winner_id ? 'text-green-400' : 'text-orange-400'}`}>
+              {game.winner_id ? 'Завершено' : 'Время вышло'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Решено задач: {solvedCount} / {totalCount}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-6 min-h-0">
         <div className="w-56 flex-shrink-0 flex flex-col gap-2">
@@ -100,8 +136,10 @@ export function GameResultsPage() {
                 <div className="font-medium">Задача {idx + 1}</div>
                 <div className="text-xs mt-0.5 opacity-70">
                   {solvers.length === 0
-                    ? 'Никто не решил'
-                    : `${solvers.length} ${solvers.length === 1 ? 'решение' : solvers.length < 5 ? 'решения' : 'решений'}`}
+                    ? 'Не решена'
+                    : isSolo
+                      ? 'Решена'
+                      : `${solvers.length} ${solvers.length === 1 ? 'решение' : solvers.length < 5 ? 'решения' : 'решений'}`}
                 </div>
               </button>
             )
@@ -116,28 +154,30 @@ export function GameResultsPage() {
                 if (solvers.length === 0) {
                   return (
                     <div className="flex items-center justify-center h-32 rounded-lg border border-border/50 text-sm text-muted-foreground">
-                      Никто не решил эту задачу
+                      Задача не решена
                     </div>
                   )
                 }
                 return (
                   <>
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                      {solvers.map((s) => (
-                        <button
-                          key={s.user_id}
-                          onClick={() => setManualUserId(s.user_id)}
-                          className={`shrink-0 flex items-center gap-2 max-w-[11rem] px-3 py-1.5 rounded-md text-sm transition-colors border ${
-                            s.user_id === effectiveUserId
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'border-border/60 hover:bg-muted/50 text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          <span className="truncate">{participantLabel(s)}</span>
-                          <span className="text-xs opacity-60 shrink-0">{s.language}</span>
-                        </button>
-                      ))}
-                    </div>
+                    {!isSolo && (
+                      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                        {solvers.map((s) => (
+                          <button
+                            key={s.user_id}
+                            onClick={() => setManualUserId(s.user_id)}
+                            className={`shrink-0 flex items-center gap-2 max-w-[11rem] px-3 py-1.5 rounded-md text-sm transition-colors border ${
+                              s.user_id === effectiveUserId
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'border-border/60 hover:bg-muted/50 text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <span className="truncate">{participantLabel(s)}</span>
+                            <span className="text-xs opacity-60 shrink-0">{s.language}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     {activeSolution && (
                       <div className="flex-1 rounded-lg border border-border overflow-hidden min-h-[480px]">
