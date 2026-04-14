@@ -19,8 +19,8 @@ type Querier interface {
 	CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error)
 	CountGameParticipants(ctx context.Context, gameID int32) (int64, error)
 	CountGameProblems(ctx context.Context, gameID int32) (int64, error)
-	CountGames(ctx context.Context) (int64, error)
-	CreateGame(ctx context.Context, creatorID uuid.UUID) (Game, error)
+	CountGamesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
+	CreateGame(ctx context.Context, arg CreateGameParams) (Game, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (User, error)
@@ -31,6 +31,7 @@ type Querier interface {
 	DeleteVerificationCode(ctx context.Context, email string) error
 	GetAllParticipantsProblemIndices(ctx context.Context, gameID int32) ([]GetAllParticipantsProblemIndicesRow, error)
 	GetGameByID(ctx context.Context, id int32) (Game, error)
+	GetGameByInviteToken(ctx context.Context, inviteToken uuid.UUID) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
 	GetGameProblemIDByIndex(ctx context.Context, arg GetGameProblemIDByIndexParams) (string, error)
 	GetGameProblemIDs(ctx context.Context, gameID int32) ([]string, error)
@@ -49,7 +50,7 @@ type Querier interface {
 	IncrementAttemptsIfBelowLimit(ctx context.Context, arg IncrementAttemptsIfBelowLimitParams) (VerificationCode, error)
 	InsertSolution(ctx context.Context, arg InsertSolutionParams) error
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
-	ListGames(ctx context.Context, arg ListGamesParams) ([]Game, error)
+	ListGamesForUser(ctx context.Context, arg ListGamesForUserParams) ([]Game, error)
 	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	StartGame(ctx context.Context, id int32) (Game, error)

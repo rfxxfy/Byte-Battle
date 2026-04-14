@@ -38,7 +38,7 @@ func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Load
 	return &GameService{q: q, pool: pool, problems: loader}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemIDs []string) (sqlcdb.Game, error) {
+func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemIDs []string, isPublic bool) (sqlcdb.Game, error) {
 	if len(problemIDs) == 0 {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "at least one problem is required")
 	}
@@ -62,7 +62,10 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 
 	qtx := s.q.WithTx(tx)
 
-	game, err := qtx.CreateGame(ctx, creatorID)
+	game, err := qtx.CreateGame(ctx, sqlcdb.CreateGameParams{
+		CreatorID: creatorID,
+		IsPublic:  isPublic,
+	})
 	if err != nil {
 		return sqlcdb.Game{}, err
 	}
@@ -211,7 +214,40 @@ func (s *GameService) GetGame(ctx context.Context, id int) (sqlcdb.Game, error) 
 	return game, err
 }
 
-func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcdb.Game, int64, error) {
+func (s *GameService) CanAccessGame(ctx context.Context, game sqlcdb.Game, userID uuid.UUID) error {
+	if game.IsPublic {
+		return nil
+	}
+	ok, err := s.q.IsGameParticipant(ctx, sqlcdb.IsGameParticipantParams{
+		GameID: game.ID,
+		UserID: userID,
+	})
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apierr.New(apierr.ErrNotParticipant, "not a participant")
+	}
+	return nil
+}
+
+func (s *GameService) GetGameByToken(ctx context.Context, token uuid.UUID) (sqlcdb.Game, error) {
+	game, err := s.q.GetGameByInviteToken(ctx, token)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlcdb.Game{}, apierr.New(apierr.ErrGameNotFound, "invalid invite token")
+	}
+	return game, err
+}
+
+func (s *GameService) JoinGameByToken(ctx context.Context, token, userID uuid.UUID) (sqlcdb.Game, error) {
+	game, err := s.GetGameByToken(ctx, token)
+	if err != nil {
+		return sqlcdb.Game{}, err
+	}
+	return s.JoinGame(ctx, int(game.ID), userID)
+}
+
+func (s *GameService) ListGames(ctx context.Context, limit, offset int, userID uuid.UUID) ([]sqlcdb.Game, int64, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -222,14 +258,15 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int) ([]sqlcd
 		offset = 0
 	}
 
-	total, err := s.q.CountGames(ctx)
+	total, err := s.q.CountGamesForUser(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	games, err := s.q.ListGames(ctx, sqlcdb.ListGamesParams{
+	games, err := s.q.ListGamesForUser(ctx, sqlcdb.ListGamesForUserParams{
 		Limit:  int32(limit),
 		Offset: int32(offset),
+		UserID: userID,
 	})
 	if err != nil {
 		return nil, 0, err

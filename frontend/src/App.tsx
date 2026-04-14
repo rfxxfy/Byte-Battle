@@ -9,6 +9,7 @@ import { GamesPage } from './pages/GamesPage'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { GameResultsPage } from './pages/GameResultsPage'
+import { GameLobbyPage } from './pages/GameLobbyPage'
 
 function RootRedirect() {
   const { token, loading } = useAuth()
@@ -43,6 +44,9 @@ export default function App() {
             <Route path="/games/:id" element={<GamePage />} />
             <Route path="/games/:id/results" element={<GameResultsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+          </Route>
+          <Route element={<AppLayout />}>
+            <Route path="/games/join/:token" element={<GameLobbyPage />} />
           </Route>
         </Routes>
       </AuthProvider>
