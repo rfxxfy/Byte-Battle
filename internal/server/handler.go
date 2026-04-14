@@ -243,7 +243,7 @@ func (s *HTTPServer) LeaveGame(ctx context.Context, req api.LeaveGameRequestObje
 		return nil, err
 	}
 
-	return api.LeaveGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, false)}, nil
+	return api.LeaveGame200JSONResponse{Game: toAPIGame(game, participantIDs, gameProblemIDs, game.IsPublic)}, nil
 }
 
 func (s *HTTPServer) CancelGame(ctx context.Context, req api.CancelGameRequestObject) (api.CancelGameResponseObject, error) {
@@ -338,7 +338,7 @@ func (s *HTTPServer) GetGameByToken(ctx context.Context, req api.GetGameByTokenR
 	if err != nil {
 		return nil, err
 	}
-	return api.GetGameByToken200JSONResponse{Game: toAPIGame(game, participants, problemIDs, false)}, nil
+	return api.GetGameByToken200JSONResponse{Game: toAPIGame(game, participants, problemIDs, game.IsPublic)}, nil
 }
 
 func (s *HTTPServer) JoinGameByToken(ctx context.Context, req api.JoinGameByTokenRequestObject) (api.JoinGameByTokenResponseObject, error) {

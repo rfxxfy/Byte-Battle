@@ -80,8 +80,8 @@ WHERE is_public = true
    )
 `
 
-func (q *Queries) CountGamesForUser(ctx context.Context, dollar_1 uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countGamesForUser, dollar_1)
+func (q *Queries) CountGamesForUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countGamesForUser, userID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -206,13 +206,13 @@ ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
 type ListGamesForUserParams struct {
-	Limit   int32     `json:"limit"`
-	Offset  int32     `json:"offset"`
-	Column3 uuid.UUID `json:"column_3"`
+	Limit  int32     `json:"limit"`
+	Offset int32     `json:"offset"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) ListGamesForUser(ctx context.Context, arg ListGamesForUserParams) ([]Game, error) {
-	rows, err := q.db.Query(ctx, listGamesForUser, arg.Limit, arg.Offset, arg.Column3)
+	rows, err := q.db.Query(ctx, listGamesForUser, arg.Limit, arg.Offset, arg.UserID)
 	if err != nil {
 		return nil, err
 	}

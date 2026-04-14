@@ -393,6 +393,12 @@ func TestGame_PrivateGame(t *testing.T) {
 		resp.Body.Close()
 	})
 
+	t.Run("POST /games/join/{token} → 409 if already participant", func(t *testing.T) {
+		resp := doAuth(t, http.MethodPost, fmt.Sprintf("/api/games/join/%s", inviteToken), nil, token3)
+		assert.Equal(t, http.StatusConflict, resp.StatusCode)
+		assert.Equal(t, "ALREADY_PARTICIPANT", errCode(t, resp))
+	})
+
 	t.Run("GET /games/{id}/solutions → 403 for outsider on private game", func(t *testing.T) {
 		token4 := authToken(t, "private-test-outsider2@test.com")
 		resp := doAuth(t, http.MethodGet, fmt.Sprintf("/api/games/%d/solutions", g.Game.ID), nil, token4)

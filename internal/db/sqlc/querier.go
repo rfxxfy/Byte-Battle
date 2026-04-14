@@ -19,7 +19,7 @@ type Querier interface {
 	CompleteGame(ctx context.Context, arg CompleteGameParams) (Game, error)
 	CountGameParticipants(ctx context.Context, gameID int32) (int64, error)
 	CountGameProblems(ctx context.Context, gameID int32) (int64, error)
-	CountGamesForUser(ctx context.Context, dollar_1 uuid.UUID) (int64, error)
+	CountGamesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CreateGame(ctx context.Context, arg CreateGameParams) (Game, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)

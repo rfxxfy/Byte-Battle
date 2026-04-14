@@ -264,9 +264,9 @@ func (s *GameService) ListGames(ctx context.Context, limit, offset int, userID u
 	}
 
 	games, err := s.q.ListGamesForUser(ctx, sqlcdb.ListGamesForUserParams{
-		Limit:   int32(limit),
-		Offset:  int32(offset),
-		Column3: userID,
+		Limit:  int32(limit),
+		Offset: int32(offset),
+		UserID: userID,
 	})
 	if err != nil {
 		return nil, 0, err

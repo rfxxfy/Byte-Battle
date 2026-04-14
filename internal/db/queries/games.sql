@@ -15,20 +15,20 @@ SELECT * FROM games WHERE invite_token = $1 LIMIT 1;
 -- name: ListGamesForUser :many
 SELECT * FROM games
 WHERE is_public = true
-   OR creator_id = $3::uuid
+   OR creator_id = sqlc.arg(user_id)::uuid
    OR EXISTS (
        SELECT 1 FROM game_participants
-       WHERE game_id = games.id AND user_id = $3::uuid
+       WHERE game_id = games.id AND user_id = sqlc.arg(user_id)::uuid
    )
 ORDER BY created_at DESC LIMIT $1 OFFSET $2;
 
 -- name: CountGamesForUser :one
 SELECT count(*) FROM games
 WHERE is_public = true
-   OR creator_id = $1::uuid
+   OR creator_id = sqlc.arg(user_id)::uuid
    OR EXISTS (
        SELECT 1 FROM game_participants
-       WHERE game_id = games.id AND user_id = $1::uuid
+       WHERE game_id = games.id AND user_id = sqlc.arg(user_id)::uuid
    );
 
 -- name: StartGame :one
