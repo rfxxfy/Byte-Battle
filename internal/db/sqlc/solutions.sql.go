@@ -66,23 +66,25 @@ func (q *Queries) GetGameSolutions(ctx context.Context, gameID pgtype.Int4) ([]G
 }
 
 const insertSolution = `-- name: InsertSolution :exec
-INSERT INTO solutions (user_id, problem_id, game_id, code, language, status)
-VALUES ($1, $2, $3, $4, $5, 'passed')
+INSERT INTO solutions (user_id, problem_id, problem_version_id, game_id, code, language, status)
+VALUES ($1, $2, $3, $4, $5, $6, 'passed')
 ON CONFLICT (user_id, game_id, problem_id) DO NOTHING
 `
 
 type InsertSolutionParams struct {
-	UserID    uuid.UUID   `json:"user_id"`
-	ProblemID string      `json:"problem_id"`
-	GameID    pgtype.Int4 `json:"game_id"`
-	Code      string      `json:"code"`
-	Language  string      `json:"language"`
+	UserID           uuid.UUID   `json:"user_id"`
+	ProblemID        string      `json:"problem_id"`
+	ProblemVersionID pgtype.Int8 `json:"problem_version_id"`
+	GameID           pgtype.Int4 `json:"game_id"`
+	Code             string      `json:"code"`
+	Language         string      `json:"language"`
 }
 
 func (q *Queries) InsertSolution(ctx context.Context, arg InsertSolutionParams) error {
 	_, err := q.db.Exec(ctx, insertSolution,
 		arg.UserID,
 		arg.ProblemID,
+		arg.ProblemVersionID,
 		arg.GameID,
 		arg.Code,
 		arg.Language,

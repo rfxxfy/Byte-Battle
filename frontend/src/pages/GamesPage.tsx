@@ -80,6 +80,7 @@ export function GamesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [problems, setProblems] = useState<Problem[]>([])
   const [selectedProblemIds, setSelectedProblemIds] = useState<string[]>([])
+  const [problemQuery, setProblemQuery] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const [isSolo, setIsSolo] = useState(false)
   const [timerOption, setTimerOption] = useState<TimerOption>(null)
@@ -102,6 +103,7 @@ export function GamesPage() {
     setIsSolo(false)
     setTimerOption(null)
     setCustomMinutes('')
+    setProblemQuery('')
   }
 
   const openModal = async () => {
@@ -171,6 +173,16 @@ export function GamesPage() {
       return prev.filter((id) => id !== problemId)
     })
   }
+
+  const normalizedProblemQuery = problemQuery.trim().toLowerCase()
+  const visibleProblems =
+    normalizedProblemQuery === ''
+      ? problems
+      : problems.filter((p) => {
+          const id = p.id.toLowerCase()
+          const title = p.title.toLowerCase()
+          return id.includes(normalizedProblemQuery) || title.includes(normalizedProblemQuery)
+        })
 
   const multiplayerGames = games.filter((g) => !g.is_solo)
   const soloGames = games.filter((g) => g.is_solo)
@@ -299,9 +311,17 @@ export function GamesPage() {
               {problems.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Загрузка задач...</p>
               ) : (
-                <div className="max-h-52 overflow-y-auto rounded-md border border-input px-3 py-2">
+                <div className="rounded-md border border-input px-3 py-2">
+                  <input
+                    type="text"
+                    value={problemQuery}
+                    onChange={(e) => setProblemQuery(e.target.value)}
+                    placeholder="Поиск по названию или ID"
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring mb-3"
+                  />
+                  <div className="max-h-40 overflow-y-auto">
                   <div className="flex flex-col gap-2">
-                    {problems.map((p) => {
+                    {visibleProblems.map((p) => {
                       const checked = selectedProblemIds.includes(p.id)
                       const disabled = !checked && selectedProblemIds.length >= 20
                       return (
@@ -316,6 +336,10 @@ export function GamesPage() {
                         </label>
                       )
                     })}
+                    {visibleProblems.length === 0 && (
+                      <p className="text-xs text-muted-foreground">Ничего не найдено</p>
+                    )}
+                  </div>
                   </div>
                 </div>
               )}
