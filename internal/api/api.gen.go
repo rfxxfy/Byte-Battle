@@ -51,6 +51,87 @@ func (e GameStatus) Valid() bool {
 	}
 }
 
+// Defines values for MyProblemStatus.
+const (
+	Archived  MyProblemStatus = "archived"
+	Published MyProblemStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the MyProblemStatus enum.
+func (e MyProblemStatus) Valid() bool {
+	switch e {
+	case Archived:
+		return true
+	case Published:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MyProblemVisibility.
+const (
+	MyProblemVisibilityPrivate  MyProblemVisibility = "private"
+	MyProblemVisibilityPublic   MyProblemVisibility = "public"
+	MyProblemVisibilityUnlisted MyProblemVisibility = "unlisted"
+)
+
+// Valid indicates whether the value is a known member of the MyProblemVisibility enum.
+func (e MyProblemVisibility) Valid() bool {
+	switch e {
+	case MyProblemVisibilityPrivate:
+		return true
+	case MyProblemVisibilityPublic:
+		return true
+	case MyProblemVisibilityUnlisted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchProblemRequestVisibility.
+const (
+	PatchProblemRequestVisibilityPrivate  PatchProblemRequestVisibility = "private"
+	PatchProblemRequestVisibilityPublic   PatchProblemRequestVisibility = "public"
+	PatchProblemRequestVisibilityUnlisted PatchProblemRequestVisibility = "unlisted"
+)
+
+// Valid indicates whether the value is a known member of the PatchProblemRequestVisibility enum.
+func (e PatchProblemRequestVisibility) Valid() bool {
+	switch e {
+	case PatchProblemRequestVisibilityPrivate:
+		return true
+	case PatchProblemRequestVisibilityPublic:
+		return true
+	case PatchProblemRequestVisibilityUnlisted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchProblemResponseVisibility.
+const (
+	Private  PatchProblemResponseVisibility = "private"
+	Public   PatchProblemResponseVisibility = "public"
+	Unlisted PatchProblemResponseVisibility = "unlisted"
+)
+
+// Valid indicates whether the value is a known member of the PatchProblemResponseVisibility enum.
+func (e PatchProblemResponseVisibility) Valid() bool {
+	switch e {
+	case Private:
+		return true
+	case Public:
+		return true
+	case Unlisted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProblemDifficulty.
 const (
 	Easy   ProblemDifficulty = "easy"
@@ -174,9 +255,15 @@ type ListGamesResponse struct {
 	Total int64  `json:"total"`
 }
 
+// ListMyProblemsResponse defines model for ListMyProblemsResponse.
+type ListMyProblemsResponse struct {
+	Problems []MyProblem `json:"problems"`
+}
+
 // ListProblemsResponse defines model for ListProblemsResponse.
 type ListProblemsResponse struct {
 	Problems []Problem `json:"problems"`
+	Total    int64     `json:"total"`
 }
 
 // MeResponse defines model for MeResponse.
@@ -185,6 +272,38 @@ type MeResponse struct {
 	Name   *string            `json:"name,omitempty"`
 	UserId openapi_types.UUID `json:"user_id"`
 }
+
+// MyProblem defines model for MyProblem.
+type MyProblem struct {
+	Id         string              `json:"id"`
+	Status     MyProblemStatus     `json:"status"`
+	Title      string              `json:"title"`
+	Version    *int                `json:"version,omitempty"`
+	Visibility MyProblemVisibility `json:"visibility"`
+}
+
+// MyProblemStatus defines model for MyProblem.Status.
+type MyProblemStatus string
+
+// MyProblemVisibility defines model for MyProblem.Visibility.
+type MyProblemVisibility string
+
+// PatchProblemRequest defines model for PatchProblemRequest.
+type PatchProblemRequest struct {
+	Visibility PatchProblemRequestVisibility `json:"visibility"`
+}
+
+// PatchProblemRequestVisibility defines model for PatchProblemRequest.Visibility.
+type PatchProblemRequestVisibility string
+
+// PatchProblemResponse defines model for PatchProblemResponse.
+type PatchProblemResponse struct {
+	Slug       string                         `json:"slug"`
+	Visibility PatchProblemResponseVisibility `json:"visibility"`
+}
+
+// PatchProblemResponseVisibility defines model for PatchProblemResponse.Visibility.
+type PatchProblemResponseVisibility string
 
 // Problem defines model for Problem.
 type Problem struct {
@@ -238,6 +357,18 @@ type ListGamesParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// ListProblemsParams defines parameters for ListProblems.
+type ListProblemsParams struct {
+	Q      *string `form:"q,omitempty" json:"q,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int    `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListMyProblemsParams defines parameters for ListMyProblems.
+type ListMyProblemsParams struct {
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
 // PostAuthConfirmJSONRequestBody defines body for PostAuthConfirm for application/json ContentType.
 type PostAuthConfirmJSONRequestBody = ConfirmRequest
 
@@ -255,6 +386,9 @@ type CreateGameJSONRequestBody = CreateGameRequest
 
 // CompleteGameJSONRequestBody defines body for CompleteGame for application/json ContentType.
 type CompleteGameJSONRequestBody = CompleteGameRequest
+
+// PatchProblemJSONRequestBody defines body for PatchProblem for application/json ContentType.
+type PatchProblemJSONRequestBody = PatchProblemRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -312,12 +446,18 @@ type ServerInterface interface {
 	// Finish a solo game when the timer expires
 	// (POST /games/{id}/timeout)
 	TimeoutGame(w http.ResponseWriter, r *http.Request, id GameID)
-	// List all available problems
+	// List published public problems with optional search
 	// (GET /problems)
-	ListProblems(w http.ResponseWriter, r *http.Request)
-	// Get problem by ID
+	ListProblems(w http.ResponseWriter, r *http.Request, params ListProblemsParams)
+	// List problems owned by the current user (all visibility)
+	// (GET /problems/mine)
+	ListMyProblems(w http.ResponseWriter, r *http.Request, params ListMyProblemsParams)
+	// Get problem by slug (visibility check applied)
 	// (GET /problems/{problem_id})
 	GetProblem(w http.ResponseWriter, r *http.Request, problemId string)
+	// Update problem visibility (owner only)
+	// (PATCH /problems/{problem_id})
+	PatchProblem(w http.ResponseWriter, r *http.Request, problemId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -432,15 +572,27 @@ func (_ Unimplemented) TimeoutGame(w http.ResponseWriter, r *http.Request, id Ga
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// List all available problems
+// List published public problems with optional search
 // (GET /problems)
-func (_ Unimplemented) ListProblems(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) ListProblems(w http.ResponseWriter, r *http.Request, params ListProblemsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Get problem by ID
+// List problems owned by the current user (all visibility)
+// (GET /problems/mine)
+func (_ Unimplemented) ListMyProblems(w http.ResponseWriter, r *http.Request, params ListMyProblemsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get problem by slug (visibility check applied)
 // (GET /problems/{problem_id})
 func (_ Unimplemented) GetProblem(w http.ResponseWriter, r *http.Request, problemId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update problem visibility (owner only)
+// (PATCH /problems/{problem_id})
+func (_ Unimplemented) PatchProblem(w http.ResponseWriter, r *http.Request, problemId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -929,8 +1081,70 @@ func (siw *ServerInterfaceWrapper) TimeoutGame(w http.ResponseWriter, r *http.Re
 // ListProblems operation middleware
 func (siw *ServerInterfaceWrapper) ListProblems(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListProblemsParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListProblems(w, r)
+		siw.Handler.ListProblems(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMyProblems operation middleware
+func (siw *ServerInterfaceWrapper) ListMyProblems(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMyProblemsParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyProblems(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -956,6 +1170,37 @@ func (siw *ServerInterfaceWrapper) GetProblem(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetProblem(w, r, problemId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PatchProblem operation middleware
+func (siw *ServerInterfaceWrapper) PatchProblem(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "problem_id" -------------
+	var problemId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "problem_id", chi.URLParam(r, "problem_id"), &problemId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "problem_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PatchProblem(w, r, problemId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1136,7 +1381,13 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/problems", wrapper.ListProblems)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/problems/mine", wrapper.ListMyProblems)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/problems/{problem_id}", wrapper.GetProblem)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/problems/{problem_id}", wrapper.PatchProblem)
 	})
 
 	return r
@@ -1837,6 +2088,7 @@ func (response TimeoutGame404JSONResponse) VisitTimeoutGameResponse(w http.Respo
 }
 
 type ListProblemsRequestObject struct {
+	Params ListProblemsParams
 }
 
 type ListProblemsResponseObject interface {
@@ -1848,6 +2100,32 @@ type ListProblems200JSONResponse ListProblemsResponse
 func (response ListProblems200JSONResponse) VisitListProblemsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListMyProblemsRequestObject struct {
+	Params ListMyProblemsParams
+}
+
+type ListMyProblemsResponseObject interface {
+	VisitListMyProblemsResponse(w http.ResponseWriter) error
+}
+
+type ListMyProblems200JSONResponse ListMyProblemsResponse
+
+func (response ListMyProblems200JSONResponse) VisitListMyProblemsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListMyProblems401JSONResponse struct{ ErrorJSONResponse }
+
+func (response ListMyProblems401JSONResponse) VisitListMyProblemsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1872,6 +2150,60 @@ func (response GetProblem200JSONResponse) VisitGetProblemResponse(w http.Respons
 type GetProblem404JSONResponse struct{ ErrorJSONResponse }
 
 func (response GetProblem404JSONResponse) VisitGetProblemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchProblemRequestObject struct {
+	ProblemId string `json:"problem_id"`
+	Body      *PatchProblemJSONRequestBody
+}
+
+type PatchProblemResponseObject interface {
+	VisitPatchProblemResponse(w http.ResponseWriter) error
+}
+
+type PatchProblem200JSONResponse PatchProblemResponse
+
+func (response PatchProblem200JSONResponse) VisitPatchProblemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchProblem400JSONResponse struct{ ErrorJSONResponse }
+
+func (response PatchProblem400JSONResponse) VisitPatchProblemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchProblem401JSONResponse ErrorResponse
+
+func (response PatchProblem401JSONResponse) VisitPatchProblemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchProblem403JSONResponse ErrorResponse
+
+func (response PatchProblem403JSONResponse) VisitPatchProblemResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchProblem404JSONResponse ErrorResponse
+
+func (response PatchProblem404JSONResponse) VisitPatchProblemResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
@@ -1934,12 +2266,18 @@ type StrictServerInterface interface {
 	// Finish a solo game when the timer expires
 	// (POST /games/{id}/timeout)
 	TimeoutGame(ctx context.Context, request TimeoutGameRequestObject) (TimeoutGameResponseObject, error)
-	// List all available problems
+	// List published public problems with optional search
 	// (GET /problems)
 	ListProblems(ctx context.Context, request ListProblemsRequestObject) (ListProblemsResponseObject, error)
-	// Get problem by ID
+	// List problems owned by the current user (all visibility)
+	// (GET /problems/mine)
+	ListMyProblems(ctx context.Context, request ListMyProblemsRequestObject) (ListMyProblemsResponseObject, error)
+	// Get problem by slug (visibility check applied)
 	// (GET /problems/{problem_id})
 	GetProblem(ctx context.Context, request GetProblemRequestObject) (GetProblemResponseObject, error)
+	// Update problem visibility (owner only)
+	// (PATCH /problems/{problem_id})
+	PatchProblem(ctx context.Context, request PatchProblemRequestObject) (PatchProblemResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -2468,8 +2806,10 @@ func (sh *strictHandler) TimeoutGame(w http.ResponseWriter, r *http.Request, id 
 }
 
 // ListProblems operation middleware
-func (sh *strictHandler) ListProblems(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListProblems(w http.ResponseWriter, r *http.Request, params ListProblemsParams) {
 	var request ListProblemsRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListProblems(ctx, request.(ListProblemsRequestObject))
@@ -2484,6 +2824,32 @@ func (sh *strictHandler) ListProblems(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListProblemsResponseObject); ok {
 		if err := validResponse.VisitListProblemsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMyProblems operation middleware
+func (sh *strictHandler) ListMyProblems(w http.ResponseWriter, r *http.Request, params ListMyProblemsParams) {
+	var request ListMyProblemsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyProblems(ctx, request.(ListMyProblemsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyProblems")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyProblemsResponseObject); ok {
+		if err := validResponse.VisitListMyProblemsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2517,46 +2883,82 @@ func (sh *strictHandler) GetProblem(w http.ResponseWriter, r *http.Request, prob
 	}
 }
 
+// PatchProblem operation middleware
+func (sh *strictHandler) PatchProblem(w http.ResponseWriter, r *http.Request, problemId string) {
+	var request PatchProblemRequestObject
+
+	request.ProblemId = problemId
+
+	var body PatchProblemJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchProblem(ctx, request.(PatchProblemRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchProblem")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PatchProblemResponseObject); ok {
+		if err := validResponse.VisitPatchProblemResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"PSo3AAA=",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

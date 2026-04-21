@@ -13,6 +13,7 @@ import (
 )
 
 type Manifest struct {
+	Slug          string `json:"slug,omitempty"`
 	Title         string `json:"title"`
 	Difficulty    string `json:"difficulty"`
 	TimeLimitMs   int    `json:"time_limit_ms"`
@@ -149,4 +150,13 @@ func NormalizeOutput(s string) string {
 
 func Match(actual, expected string) bool {
 	return NormalizeOutput(actual) == NormalizeOutput(expected)
+}
+
+type ProblemMeta struct {
+	Slug          string
+	Title         string
+	Difficulty    string
+	TimeLimitMs   int
+	MemoryLimitMb int
+	TestCaseCount int
 }
