@@ -46,9 +46,9 @@ func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, store *pr
 
 	userService := service.NewUserService(q)
 	gameService := service.NewGameService(q, pool)
-	problemService := service.NewProblemService(store, q)
-	sessionService := service.NewSessionService(q, service.WithSessionDuration(cfg.Entrance.SessionTTL))
 	executionService := service.NewExecutionService(exec, rlCfg...)
+	problemService := service.NewProblemService(store, q, pool, executionService.Executor())
+	sessionService := service.NewSessionService(q, service.WithSessionDuration(cfg.Entrance.SessionTTL))
 	submissionService := service.NewSubmissionService(executionService, gameService, store, q)
 
 	mailer := service.NewMailer(cfg.Entrance.ResendAPIKey, cfg.Entrance.FromEmail)

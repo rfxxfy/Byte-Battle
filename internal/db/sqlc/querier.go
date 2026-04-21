@@ -20,6 +20,9 @@ type Querier interface {
 	CountGameParticipants(ctx context.Context, gameID int32) (int64, error)
 	CountGameProblems(ctx context.Context, gameID int32) (int64, error)
 	CountGamesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
+	CountProblemVersions(ctx context.Context, problemID int64) (int64, error)
+	CountPublicProblems(ctx context.Context, dollar_1 string) (int64, error)
+	CountUserProblems(ctx context.Context, ownerUserID uuid.NullUUID) (int64, error)
 	CreateGame(ctx context.Context, arg CreateGameParams) (Game, error)
 	CreateProblemCatalog(ctx context.Context, arg CreateProblemCatalogParams) (Problem, error)
 	CreateProblemVersion(ctx context.Context, arg CreateProblemVersionParams) (ProblemVersion, error)
@@ -40,6 +43,7 @@ type Querier interface {
 	GetGameProblemIDs(ctx context.Context, gameID int32) ([]string, error)
 	GetGameProblemIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetGameProblemIDsByGameIDsRow, error)
 	GetGameSolutions(ctx context.Context, gameID pgtype.Int4) ([]GetGameSolutionsRow, error)
+	GetMaxProblemVersion(ctx context.Context, problemID int64) (int32, error)
 	GetParticipantProblemIndex(ctx context.Context, arg GetParticipantProblemIndexParams) (int32, error)
 	GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error)
 	GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error)
@@ -56,14 +60,18 @@ type Querier interface {
 	InsertSolution(ctx context.Context, arg InsertSolutionParams) error
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGamesForUser(ctx context.Context, arg ListGamesForUserParams) ([]Game, error)
+	ListMyProblems(ctx context.Context, arg ListMyProblemsParams) ([]ListMyProblemsRow, error)
+	ListPublicProblemsSearch(ctx context.Context, arg ListPublicProblemsSearchParams) ([]ListPublicProblemsSearchRow, error)
 	ListPublishedPublicProblems(ctx context.Context) ([]Problem, error)
 	ListPublishedPublicProblemsWithArtifact(ctx context.Context) ([]ListPublishedPublicProblemsWithArtifactRow, error)
+	LockProblemForUpdate(ctx context.Context, id int64) (int64, error)
 	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	SetProblemCurrentVersion(ctx context.Context, arg SetProblemCurrentVersionParams) error
 	StartGame(ctx context.Context, id int32) (Game, error)
 	TimeoutGame(ctx context.Context, id int32) (Game, error)
 	UpdateGameWinner(ctx context.Context, arg UpdateGameWinnerParams) error
+	UpdateProblemVisibility(ctx context.Context, arg UpdateProblemVisibilityParams) error
 	UpdateSessionExpiry(ctx context.Context, arg UpdateSessionExpiryParams) (Session, error)
 	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) (User, error)
 	UpsertVerificationCode(ctx context.Context, arg UpsertVerificationCodeParams) (VerificationCode, error)

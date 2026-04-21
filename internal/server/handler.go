@@ -6,7 +6,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"bytebattle/internal/api"
@@ -77,8 +80,21 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
 }
 
-func (s *HTTPServer) ListProblems(ctx context.Context, _ api.ListProblemsRequestObject) (api.ListProblemsResponseObject, error) {
-	problemsList, err := s.problemService.ListProblems(ctx)
+func (s *HTTPServer) ListProblems(ctx context.Context, req api.ListProblemsRequestObject) (api.ListProblemsResponseObject, error) {
+	q := ""
+	if req.Params.Q != nil {
+		q = *req.Params.Q
+	}
+	limit := 50
+	if req.Params.Limit != nil && *req.Params.Limit > 0 {
+		limit = *req.Params.Limit
+	}
+	offset := 0
+	if req.Params.Offset != nil && *req.Params.Offset >= 0 {
+		offset = *req.Params.Offset
+	}
+
+	problemsList, total, err := s.problemService.ListProblems(ctx, q, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -88,16 +104,60 @@ func (s *HTTPServer) ListProblems(ctx context.Context, _ api.ListProblemsRequest
 		apiProblems[i] = toAPIProblem(problemsList[i])
 	}
 
-	return api.ListProblems200JSONResponse{Problems: apiProblems}, nil
+	return api.ListProblems200JSONResponse{Problems: apiProblems, Total: total}, nil
+}
+
+func (s *HTTPServer) ListMyProblems(ctx context.Context, req api.ListMyProblemsRequestObject) (api.ListMyProblemsResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	q := ""
+	if req.Params.Q != nil {
+		q = *req.Params.Q
+	}
+
+	rows, err := s.problemService.ListMyProblems(ctx, userID, q)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]api.MyProblem, len(rows))
+	for i, r := range rows {
+		items[i] = api.MyProblem{
+			Id:         r.Slug,
+			Title:      r.Title,
+			Visibility: api.MyProblemVisibility(r.Visibility),
+			Status:     api.MyProblemStatus(r.Status),
+		}
+		if r.Version != nil {
+			v := int(*r.Version)
+			items[i].Version = &v
+		}
+	}
+
+	return api.ListMyProblems200JSONResponse{Problems: items}, nil
 }
 
 func (s *HTTPServer) GetProblem(ctx context.Context, req api.GetProblemRequestObject) (api.GetProblemResponseObject, error) {
-	p, err := s.problemService.GetProblem(ctx, req.ProblemId)
+	userID, _ := userIDFromContext(ctx)
+	p, err := s.problemService.GetProblem(ctx, req.ProblemId, userID)
 	if err != nil {
-		return nil, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+		return nil, err
 	}
 
 	return api.GetProblem200JSONResponse{Problem: toAPIProblem(p)}, nil
+}
+
+func (s *HTTPServer) PatchProblem(ctx context.Context, req api.PatchProblemRequestObject) (api.PatchProblemResponseObject, error) {
+	userID, _ := userIDFromContext(ctx)
+	visibility := string(req.Body.Visibility)
+
+	if err := s.problemService.UpdateVisibility(ctx, req.ProblemId, userID, visibility); err != nil {
+		return nil, err
+	}
+
+	return api.PatchProblem200JSONResponse{
+		Slug:       req.ProblemId,
+		Visibility: api.PatchProblemResponseVisibility(visibility),
+	}, nil
 }
 
 func (s *HTTPServer) CreateGame(ctx context.Context, req api.CreateGameRequestObject) (api.CreateGameResponseObject, error) {
@@ -542,6 +602,151 @@ func (s *HTTPServer) sendPlayerState(ctx context.Context, gameID int, userID uui
 		Progress:   progress,
 	})
 	client.Send(stateMsg)
+}
+
+func (s *HTTPServer) handleUploadProblem(w http.ResponseWriter, r *http.Request) {
+	userID, _ := userIDFromContext(r.Context())
+
+	r.Body = http.MaxBytesReader(w, r.Body, problems.MaxArchiveBytes+1*1024*1024)
+	if err := r.ParseMultipartForm(problems.MaxArchiveBytes); err != nil {
+		writeHTTPError(w, apierr.New(apierr.ErrArchiveInvalid, "failed to parse multipart form"))
+		return
+	}
+
+	visibility := r.FormValue("visibility")
+	switch visibility {
+	case "public", "unlisted", "private":
+	default:
+		writeHTTPError(w, apierr.New(apierr.ErrValidation, "visibility must be public, unlisted, or private"))
+		return
+	}
+
+	f, fh, err := r.FormFile("file")
+	if err != nil {
+		writeHTTPError(w, apierr.New(apierr.ErrArchiveInvalid, "file field is required"))
+		return
+	}
+	defer f.Close()
+
+	validated, uploadErr := problems.ValidateArchive(r.Context(), f, fh.Size, s.executionService.Executor())
+	if uploadErr != nil {
+		if uploadErr.Error() == "executor not ready" {
+			writeHTTPError(w, apierr.New(apierr.ErrExecutorNotReady, "executor not ready"))
+			return
+		}
+		writeHTTPError(w, apierr.New(apierr.ErrArchiveInvalid, uploadErr.Error()))
+		return
+	}
+
+	cleanupValidated := func() {
+		if len(validated) == 1 {
+			os.RemoveAll(validated[0].Dir)
+		} else {
+			os.RemoveAll(filepath.Dir(validated[0].Dir))
+		}
+	}
+
+	if err := s.problemService.ValidateUploadBatch(r.Context(), validated, userID); err != nil {
+		cleanupValidated()
+		writeHTTPError(w, err)
+		return
+	}
+
+	var results []map[string]any
+	for _, vp := range validated {
+		res, err := s.problemService.UploadProblem(r.Context(), vp, userID, visibility)
+		if err != nil {
+			cleanupValidated()
+			writeHTTPError(w, mapUploadError(err))
+			return
+		}
+		results = append(results, map[string]any{
+			"slug":    res.Slug,
+			"title":   res.Title,
+			"version": res.Version,
+		})
+	}
+
+	if len(validated) > 1 {
+		_ = os.Remove(filepath.Dir(validated[0].Dir))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if len(results) == 1 {
+		_ = json.NewEncoder(w).Encode(results[0])
+	} else {
+		_ = json.NewEncoder(w).Encode(map[string]any{"problems": results})
+	}
+}
+
+func (s *HTTPServer) handleUploadProblemVersion(w http.ResponseWriter, r *http.Request) {
+	userID, _ := userIDFromContext(r.Context())
+	slug := chi.URLParam(r, "slug")
+
+	r.Body = http.MaxBytesReader(w, r.Body, problems.MaxArchiveBytes+1*1024*1024)
+	if err := r.ParseMultipartForm(problems.MaxArchiveBytes); err != nil {
+		writeHTTPError(w, apierr.New(apierr.ErrArchiveInvalid, "failed to parse multipart form"))
+		return
+	}
+
+	f, fh, err := r.FormFile("file")
+	if err != nil {
+		writeHTTPError(w, apierr.New(apierr.ErrArchiveInvalid, "file field is required"))
+		return
+	}
+	defer f.Close()
+
+	validated, uploadErr := problems.ValidateArchive(r.Context(), f, fh.Size, s.executionService.Executor())
+	if uploadErr != nil {
+		if uploadErr.Error() == "executor not ready" {
+			writeHTTPError(w, apierr.New(apierr.ErrExecutorNotReady, "executor not ready"))
+			return
+		}
+		writeHTTPError(w, apierr.New(apierr.ErrArchiveInvalid, uploadErr.Error()))
+		return
+	}
+	if len(validated) != 1 {
+		if len(validated) > 1 {
+			os.RemoveAll(filepath.Dir(validated[0].Dir))
+		}
+		writeHTTPError(w, apierr.New(apierr.ErrArchiveInvalid, "versioning endpoint requires a single-problem archive"))
+		return
+	}
+
+	res, err := s.problemService.UploadNewVersion(r.Context(), validated[0], slug, userID)
+	if err != nil {
+		os.RemoveAll(validated[0].Dir)
+		writeHTTPError(w, mapUploadError(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"slug":    res.Slug,
+		"version": res.Version,
+	})
+}
+
+func mapUploadError(err error) error {
+	var ae *apierr.AppError
+	if errors.As(err, &ae) {
+		return ae
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "problem limit reached"):
+		return apierr.New(apierr.ErrProblemLimitReached, msg)
+	case strings.Contains(msg, "version limit reached"):
+		return apierr.New(apierr.ErrVersionLimitReached, msg)
+	case strings.Contains(msg, "not the owner"):
+		return apierr.New(apierr.ErrNotProblemOwner, msg)
+	case strings.Contains(msg, "not found"):
+		return apierr.New(apierr.ErrProblemNotFound, msg)
+	default:
+		return apierr.New(apierr.ErrInternal, "upload failed")
+	}
 }
 
 func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {

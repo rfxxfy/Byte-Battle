@@ -33,7 +33,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// correctExecutor returns the expected output for the test problem (01.out = "3").
 type correctExecutor struct{}
 
 func (correctExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
@@ -42,7 +41,6 @@ func (correctExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (exec
 
 func (correctExecutor) IsReady() bool { return true }
 
-// failingExecutor returns output that does not match any test case expected output.
 type failingExecutor struct{}
 
 func (failingExecutor) Run(_ context.Context, _ executor.ExecutionRequest) (executor.ExecutionResult, error) {
@@ -186,14 +184,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// makeAuthToken bypasses the email mailer by inserting a known verification code
-// directly into the DB, then calls /auth/confirm to get a session token.
 func makeAuthToken(email string) (string, error) {
 	ctx := context.Background()
 	q := sqlcdb.New(testPool)
 
 	const code = "000001"
-	hash, err := bcrypt.GenerateFromPassword([]byte(code), 4) // low cost for tests
+	hash, err := bcrypt.GenerateFromPassword([]byte(code), 4)
 	if err != nil {
 		return "", fmt.Errorf("hash code: %w", err)
 	}
@@ -334,9 +330,14 @@ func (e *blockingExecutor) Run(ctx context.Context, _ executor.ExecutionRequest)
 	}
 }
 
-// newGameServer creates a test HTTP server. Rate limiting is disabled by default
-// (rate.Inf) so tests don't need to worry about burst exhaustion; pass an explicit
-// RateLimitConfig to test rate-limiting behaviour.
+func newUploadServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	store := problems.NewStore(t.TempDir())
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, correctExecutor{}, store, config.Load()))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
 func newGameServer(t *testing.T, exec executor.Executor, rlCfg ...service.RateLimitConfig) *httptest.Server {
 	t.Helper()
 	cfg := service.RateLimitConfig{Rate: rate.Inf, Burst: 1}
@@ -348,7 +349,6 @@ func newGameServer(t *testing.T, exec executor.Executor, rlCfg ...service.RateLi
 	return srv
 }
 
-// doOnServer performs an authenticated HTTP request against a custom test server.
 func doOnServer(t *testing.T, srv *httptest.Server, method, path string, body any, token string) *http.Response {
 	t.Helper()
 	var buf bytes.Buffer
@@ -368,7 +368,6 @@ func doOnServer(t *testing.T, srv *httptest.Server, method, path string, body an
 	return resp
 }
 
-// createActiveGameOnServer creates a pending game as user1, has user2 join, then starts it.
 func createActiveGameOnServer(t *testing.T, srv *httptest.Server) gameResp {
 	t.Helper()
 	r := doOnServer(t, srv, http.MethodPost, "/api/games", map[string]any{"problem_ids": []string{"test-problem"}}, token1)
@@ -388,7 +387,6 @@ func createActiveGameOnServer(t *testing.T, srv *httptest.Server) gameResp {
 	return started
 }
 
-// wsConnectOnServer dials a WebSocket on a custom test server.
 func wsConnectOnServer(t *testing.T, srv *httptest.Server, path, token string) *websocket.Conn {
 	t.Helper()
 	u := "ws" + srv.URL[len("http"):] + path

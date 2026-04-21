@@ -11,6 +11,17 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+const countProblemVersions = `-- name: CountProblemVersions :one
+SELECT COUNT(*) FROM problem_versions WHERE problem_id = $1
+`
+
+func (q *Queries) CountProblemVersions(ctx context.Context, problemID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countProblemVersions, problemID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createProblemVersion = `-- name: CreateProblemVersion :one
 INSERT INTO problem_versions (
     problem_id,
@@ -66,4 +77,15 @@ func (q *Queries) CreateProblemVersion(ctx context.Context, arg CreateProblemVer
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getMaxProblemVersion = `-- name: GetMaxProblemVersion :one
+SELECT COALESCE(MAX(version), 0)::int FROM problem_versions WHERE problem_id = $1
+`
+
+func (q *Queries) GetMaxProblemVersion(ctx context.Context, problemID int64) (int32, error) {
+	row := q.db.QueryRow(ctx, getMaxProblemVersion, problemID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }

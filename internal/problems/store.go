@@ -13,6 +13,7 @@ import (
 )
 
 type Manifest struct {
+	Slug          string `json:"slug,omitempty"`
 	Title         string `json:"title"`
 	Difficulty    string `json:"difficulty"`
 	TimeLimitMs   int    `json:"time_limit_ms"`

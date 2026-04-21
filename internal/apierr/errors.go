@@ -34,6 +34,12 @@ const (
 	ErrUserNotFound         = "USER_NOT_FOUND"
 
 	ErrValidation = "VALIDATION_ERROR"
+
+	ErrProblemLimitReached = "PROBLEM_LIMIT_REACHED"
+	ErrVersionLimitReached = "VERSION_LIMIT_REACHED"
+	ErrNotProblemOwner     = "NOT_PROBLEM_OWNER"
+	ErrExecutorNotReady    = "EXECUTOR_NOT_READY"
+	ErrArchiveInvalid      = "ARCHIVE_INVALID"
 )
 
 type AppError struct {
@@ -46,10 +52,12 @@ func (e *AppError) Error() string { return e.Message }
 
 func httpStatusCode(code string) int {
 	switch code {
-	case ErrValidation, ErrNotEnoughPlayers, ErrInvalidWinner:
+	case ErrValidation, ErrNotEnoughPlayers, ErrInvalidWinner, ErrArchiveInvalid:
 		return http.StatusBadRequest
-	case ErrNotGameCreator, ErrCreatorCannotLeave, ErrNotParticipant, ErrPrivateGame:
+	case ErrNotGameCreator, ErrCreatorCannotLeave, ErrNotParticipant, ErrPrivateGame, ErrNotProblemOwner:
 		return http.StatusForbidden
+	case ErrProblemLimitReached, ErrVersionLimitReached:
+		return http.StatusUnprocessableEntity
 	case ErrAlreadyParticipant, ErrGameAlreadyStarted, ErrGameNotInProgress,
 		ErrCannotCancelFinishedGame, ErrGameAlreadyCancelled:
 		return http.StatusConflict
@@ -61,7 +69,7 @@ func httpStatusCode(code string) int {
 		return http.StatusNotFound
 	case ErrTooManyAttempts, ErrCodeRecentlySent, ErrExecutionRateLimited, ErrExecutionInProgress:
 		return http.StatusTooManyRequests
-	case ErrExecutorOverloaded:
+	case ErrExecutorOverloaded, ErrExecutorNotReady:
 		return http.StatusServiceUnavailable
 	case ErrInvalidEmail, ErrInvalidCode:
 		return http.StatusBadRequest

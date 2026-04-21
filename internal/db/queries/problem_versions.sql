@@ -1,3 +1,9 @@
+-- name: CountProblemVersions :one
+SELECT COUNT(*) FROM problem_versions WHERE problem_id = $1;
+
+-- name: GetMaxProblemVersion :one
+SELECT COALESCE(MAX(version), 0)::int FROM problem_versions WHERE problem_id = $1;
+
 -- name: CreateProblemVersion :one
 INSERT INTO problem_versions (
     problem_id,

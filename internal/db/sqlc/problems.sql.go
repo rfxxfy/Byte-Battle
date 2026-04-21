@@ -12,6 +12,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPublicProblems = `-- name: CountPublicProblems :one
+SELECT COUNT(*)
+FROM problems
+WHERE status = 'published' AND visibility = 'public'
+  AND ($1::text = '' OR title ILIKE '%' || $1::text || '%' OR slug ILIKE '%' || $1::text || '%')
+`
+
+func (q *Queries) CountPublicProblems(ctx context.Context, dollar_1 string) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicProblems, dollar_1)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countUserProblems = `-- name: CountUserProblems :one
+SELECT COUNT(*) FROM problems WHERE owner_user_id = $1
+`
+
+func (q *Queries) CountUserProblems(ctx context.Context, ownerUserID uuid.NullUUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countUserProblems, ownerUserID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createProblemCatalog = `-- name: CreateProblemCatalog :one
 INSERT INTO problems (slug, owner_user_id, visibility, status, title)
 VALUES ($1, $2, $3, $4, $5)
@@ -112,6 +137,121 @@ func (q *Queries) GetProblemWithArtifactBySlug(ctx context.Context, slug string)
 	return i, err
 }
 
+const listMyProblems = `-- name: ListMyProblems :many
+SELECT p.id, p.slug, p.title, p.visibility, p.status, p.current_version_id, p.owner_user_id,
+       p.created_at, p.updated_at, pv.artifact_path, pv.version
+FROM problems p
+LEFT JOIN problem_versions pv ON pv.id = p.current_version_id
+WHERE p.owner_user_id = $1
+  AND ($2::text = '' OR p.title ILIKE '%' || $2::text || '%' OR p.slug ILIKE '%' || $2::text || '%')
+ORDER BY p.created_at DESC
+`
+
+type ListMyProblemsParams struct {
+	OwnerUserID uuid.NullUUID `json:"owner_user_id"`
+	Column2     string        `json:"column_2"`
+}
+
+type ListMyProblemsRow struct {
+	ID               int64              `json:"id"`
+	Slug             string             `json:"slug"`
+	Title            string             `json:"title"`
+	Visibility       string             `json:"visibility"`
+	Status           string             `json:"status"`
+	CurrentVersionID pgtype.Int8        `json:"current_version_id"`
+	OwnerUserID      uuid.NullUUID      `json:"owner_user_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ArtifactPath     pgtype.Text        `json:"artifact_path"`
+	Version          pgtype.Int4        `json:"version"`
+}
+
+func (q *Queries) ListMyProblems(ctx context.Context, arg ListMyProblemsParams) ([]ListMyProblemsRow, error) {
+	rows, err := q.db.Query(ctx, listMyProblems, arg.OwnerUserID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMyProblemsRow{}
+	for rows.Next() {
+		var i ListMyProblemsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Title,
+			&i.Visibility,
+			&i.Status,
+			&i.CurrentVersionID,
+			&i.OwnerUserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArtifactPath,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicProblemsSearch = `-- name: ListPublicProblemsSearch :many
+SELECT p.id, p.slug, p.title, p.visibility, p.current_version_id, p.owner_user_id, pv.artifact_path
+FROM problems p
+JOIN problem_versions pv ON pv.id = p.current_version_id
+WHERE p.status = 'published' AND p.visibility = 'public'
+  AND ($3::text = '' OR p.title ILIKE '%' || $3::text || '%' OR p.slug ILIKE '%' || $3::text || '%')
+ORDER BY p.created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListPublicProblemsSearchParams struct {
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+	Column3 string `json:"column_3"`
+}
+
+type ListPublicProblemsSearchRow struct {
+	ID               int64         `json:"id"`
+	Slug             string        `json:"slug"`
+	Title            string        `json:"title"`
+	Visibility       string        `json:"visibility"`
+	CurrentVersionID pgtype.Int8   `json:"current_version_id"`
+	OwnerUserID      uuid.NullUUID `json:"owner_user_id"`
+	ArtifactPath     string        `json:"artifact_path"`
+}
+
+func (q *Queries) ListPublicProblemsSearch(ctx context.Context, arg ListPublicProblemsSearchParams) ([]ListPublicProblemsSearchRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProblemsSearch, arg.Limit, arg.Offset, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicProblemsSearchRow{}
+	for rows.Next() {
+		var i ListPublicProblemsSearchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Title,
+			&i.Visibility,
+			&i.CurrentVersionID,
+			&i.OwnerUserID,
+			&i.ArtifactPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPublishedPublicProblems = `-- name: ListPublishedPublicProblems :many
 SELECT id, slug, owner_user_id, visibility, status, title, current_version_id, created_at, updated_at
 FROM problems
@@ -201,6 +341,16 @@ func (q *Queries) ListPublishedPublicProblemsWithArtifact(ctx context.Context) (
 	return items, nil
 }
 
+const lockProblemForUpdate = `-- name: LockProblemForUpdate :one
+SELECT id FROM problems WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockProblemForUpdate(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRow(ctx, lockProblemForUpdate, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
 const setProblemCurrentVersion = `-- name: SetProblemCurrentVersion :exec
 UPDATE problems
 SET current_version_id = $2,
@@ -215,5 +365,19 @@ type SetProblemCurrentVersionParams struct {
 
 func (q *Queries) SetProblemCurrentVersion(ctx context.Context, arg SetProblemCurrentVersionParams) error {
 	_, err := q.db.Exec(ctx, setProblemCurrentVersion, arg.ID, arg.CurrentVersionID)
+	return err
+}
+
+const updateProblemVisibility = `-- name: UpdateProblemVisibility :exec
+UPDATE problems SET visibility = $2, updated_at = NOW() WHERE id = $1
+`
+
+type UpdateProblemVisibilityParams struct {
+	ID         int64  `json:"id"`
+	Visibility string `json:"visibility"`
+}
+
+func (q *Queries) UpdateProblemVisibility(ctx context.Context, arg UpdateProblemVisibilityParams) error {
+	_, err := q.db.Exec(ctx, updateProblemVisibility, arg.ID, arg.Visibility)
 	return err
 }
