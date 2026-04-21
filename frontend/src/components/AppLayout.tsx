@@ -33,6 +33,7 @@ export function AppLayout() {
             <nav className="flex items-center gap-1">
               <NavLink
                 to="/problems"
+                end
                 className={({ isActive }) =>
                   `px-3 py-1.5 rounded-md text-sm transition-colors ${
                     isActive
@@ -42,6 +43,18 @@ export function AppLayout() {
                 }
               >
                 Задачи
+              </NavLink>
+              <NavLink
+                to="/problems/mine"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                  }`
+                }
+              >
+                Мои задачи
               </NavLink>
               <NavLink
                 to="/games"

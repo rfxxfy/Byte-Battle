@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getProblem, type Problem } from '@/api/problems'
-import { createGame } from '@/api/games'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { difficultyLabel, difficultyClass } from '@/lib/difficulty'
 import { Button } from '@/components/ui/button'
 import { ProblemDescription } from '@/components/ProblemDescription'
+import { CreateGameModal } from '@/components/CreateGameModal'
 
 export function ProblemPage() {
   const { id } = useParams<{ id: string }>()
@@ -14,32 +14,17 @@ export function ProblemPage() {
   const [problem, setProblem] = useState<Problem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
     getProblem(id)
-      .then((res) => setProblem(res.problem))
-      .catch((err) =>
+      .then(res => setProblem(res.problem))
+      .catch(err =>
         setError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err)),
       )
       .finally(() => setLoading(false))
   }, [id])
-
-  const handleCreateGame = async () => {
-    if (!problem) return
-    setCreating(true)
-    setCreateError('')
-    try {
-      const res = await createGame([problem.id])
-      navigate(`/games/${res.game.id}`)
-    } catch (err) {
-      setCreateError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
-    } finally {
-      setCreating(false)
-    }
-  }
 
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
   if (error) return <p className="text-sm text-destructive">{error}</p>
@@ -56,12 +41,9 @@ export function ProblemPage() {
 
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold">{problem.title}</h1>
-        <div className="flex flex-col items-end gap-1">
-          <Button onClick={handleCreateGame} disabled={creating} className="shrink-0">
-            {creating ? 'Создаём...' : 'Создать игру →'}
-          </Button>
-          {createError && <p className="text-xs text-destructive">{createError}</p>}
-        </div>
+        <Button onClick={() => setModalOpen(true)} className="shrink-0">
+          Создать игру →
+        </Button>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -86,6 +68,17 @@ export function ProblemPage() {
       <div className="rounded-lg border border-border/60 bg-card/50 p-6">
         <ProblemDescription content={problem.description} />
       </div>
+
+      <CreateGameModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={(gameId, isSolo, inviteToken) => {
+          setModalOpen(false)
+          if (isSolo) navigate(`/games/${gameId}/lobby`)
+          else navigate(`/games/join/${inviteToken}`)
+        }}
+        initialSelected={[{ id: problem.id, title: problem.title, difficulty: problem.difficulty }]}
+      />
     </div>
   )
 }

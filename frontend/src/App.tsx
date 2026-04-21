@@ -5,6 +5,7 @@ import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { ProblemsPage } from './pages/ProblemsPage'
 import { ProblemPage } from './pages/ProblemPage'
+import { MyProblemsPage } from './pages/MyProblemsPage'
 import { GamesPage } from './pages/GamesPage'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -40,6 +41,7 @@ export default function App() {
             }
           >
             <Route path="/problems" element={<ProblemsPage />} />
+            <Route path="/problems/mine" element={<MyProblemsPage />} />
             <Route path="/problems/:id" element={<ProblemPage />} />
             <Route path="/games" element={<GamesPage />} />
             <Route path="/games/:id" element={<GamePage />} />
