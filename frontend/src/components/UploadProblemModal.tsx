@@ -1,14 +1,52 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadProblem, uploadProblemVersion, type UploadResult } from '@/api/problems'
+import { uploadProblem, uploadProblemVersion, type UploadResult, type UploadResponse } from '@/api/problems'
 import { ApiError } from '@/api/client'
 import { Button } from '@/components/ui/button'
+
+function isBatch(r: UploadResponse): r is { problems: UploadResult[] } {
+  return 'problems' in r
+}
+
+function ProblemResult({ title, version, slug }: { title: string; version: number; slug: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(slug)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline gap-2">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs text-muted-foreground">v{version}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs text-muted-foreground flex-1 truncate">{slug}</span>
+        <button
+          onClick={copy}
+          className={`text-xs shrink-0 transition-colors ${
+            copied ? 'text-green-400' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {copied ? '✓ скопировано' : 'копировать'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`
+  return `${(bytes / 1024 / 1024).toFixed(2)} МБ`
+}
 
 interface Props {
   mode: 'new' | 'version'
   slug?: string
   onClose: () => void
-  onUploaded: (result: UploadResult) => void
+  onUploaded: () => void
 }
 
 export function UploadProblemModal({ mode, slug, onClose, onUploaded }: Props) {
@@ -17,7 +55,7 @@ export function UploadProblemModal({ mode, slug, onClose, onUploaded }: Props) {
   const [visibility, setVisibility] = useState<'public' | 'unlisted' | 'private'>('public')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
-  const [result, setResult] = useState<UploadResult | null>(null)
+  const [result, setResult] = useState<UploadResponse | null>(null)
   const [dragging, setDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -43,7 +81,7 @@ export function UploadProblemModal({ mode, slug, onClose, onUploaded }: Props) {
           ? await uploadProblem(file, visibility)
           : await uploadProblemVersion(slug!, file)
       setResult(res)
-      onUploaded(res)
+      onUploaded()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err))
     } finally {
@@ -70,27 +108,31 @@ export function UploadProblemModal({ mode, slug, onClose, onUploaded }: Props) {
         </p>
 
         {result ? (
-          <div className="flex flex-col gap-4">
-            <div className="rounded-lg bg-green-500/10 border border-green-500/20 px-4 py-3">
-              <p className="text-sm font-medium text-green-400">Загружено успешно!</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {result.title} · версия {result.version}
-              </p>
-              <p className="text-xs font-mono text-muted-foreground/60 mt-0.5">{result.slug}</p>
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-4">
+              <p className="text-sm font-semibold text-green-400">✓ Загружено успешно!</p>
+              {isBatch(result) ? (
+                <div className="flex flex-col gap-3">
+                  {result.problems.map(p => (
+                    <ProblemResult key={p.slug} title={p.title} version={p.version} slug={p.slug} />
+                  ))}
+                </div>
+              ) : (
+                <ProblemResult title={result.title} version={result.version} slug={result.slug} />
+              )}
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={onClose}>
                 Закрыть
               </Button>
-              <Button
-                className="flex-1"
-                onClick={() => {
-                  onClose()
-                  navigate(`/problems/${result.slug}`)
-                }}
-              >
-                Открыть задачу →
-              </Button>
+              {!isBatch(result) && (
+                <Button
+                  className="flex-1"
+                  onClick={() => { onClose(); navigate(`/problems/${result.slug}`) }}
+                >
+                  Открыть задачу →
+                </Button>
+              )}
             </div>
           </div>
         ) : (
@@ -122,7 +164,7 @@ export function UploadProblemModal({ mode, slug, onClose, onUploaded }: Props) {
                 <div>
                   <p className="text-sm font-medium">{file.name}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {(file.size / 1024 / 1024).toFixed(2)} МБ · нажмите для замены
+                    {formatFileSize(file.size)} · нажмите для замены
                   </p>
                 </div>
               ) : (
@@ -154,6 +196,11 @@ export function UploadProblemModal({ mode, slug, onClose, onUploaded }: Props) {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground/70">
+                  {visibility === 'public' && 'Появляется в каталоге задач, доступна всем'}
+                  {visibility === 'unlisted' && 'Не в каталоге, открывается по прямой ссылке'}
+                  {visibility === 'private' && 'Доступна только вам'}
+                </p>
               </div>
             )}
 

@@ -4,6 +4,7 @@ import { listProblems, type Problem } from '@/api/problems'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { difficultyLabel, difficultyClass } from '@/lib/difficulty'
+import { Button } from '@/components/ui/button'
 
 export function ProblemsPage() {
   const navigate = useNavigate()
@@ -25,17 +26,22 @@ export function ProblemsPage() {
 
   return (
     <div className="flex flex-col gap-6 py-8">
-      <h1 className="text-2xl font-semibold">Задачи</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Задачи</h1>
+        <Button variant="outline" onClick={() => navigate('/problems/mine')}>
+          Мои задачи
+        </Button>
+      </div>
 
       <div className="rounded-lg border border-border/60 overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
           <thead>
-            <tr className="border-b border-border/60 bg-muted/30">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-48">ID</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Название</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-32">Сложность</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-36">Лимит времени</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-24">Тесты</th>
+            <tr className="border-b border-border/60 bg-muted/30 text-xs font-medium text-muted-foreground">
+              <th className="px-4 py-3 text-left">Название</th>
+              <th className="px-4 py-3 text-left w-48">Slug</th>
+              <th className="px-4 py-3 text-left w-28">Сложность</th>
+              <th className="px-4 py-3 text-left w-28">Лимит</th>
+              <th className="px-4 py-3 text-right w-24">Тесты</th>
             </tr>
           </thead>
           <tbody>
@@ -43,19 +49,17 @@ export function ProblemsPage() {
               <tr
                 key={p.id}
                 onClick={() => navigate(`/problems/${p.id}`)}
-                className="border-b border-border/40 last:border-0 hover:bg-muted/20 cursor-pointer transition-colors"
+                className="border-b border-border/40 last:border-0 even:bg-muted/20 hover:bg-muted/10 cursor-pointer transition-colors"
               >
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.id}</td>
-                <td className="px-4 py-3 font-medium">{p.title}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${difficultyClass[p.difficulty]}`}
-                  >
+                <td className="px-4 py-4 max-w-0"><div className="truncate font-medium">{p.title}</div></td>
+                <td className="px-4 py-4 max-w-0"><div className="truncate font-mono text-xs text-muted-foreground/50">{p.id}</div></td>
+                <td className="px-4 py-4">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${difficultyClass[p.difficulty]}`}>
                     {difficultyLabel[p.difficulty]}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{p.time_limit_ms} мс</td>
-                <td className="px-4 py-3 text-muted-foreground">{p.test_count ?? '—'}</td>
+                <td className="px-4 py-4 text-xs text-muted-foreground">{p.time_limit_ms} мс</td>
+                <td className="px-4 py-4 text-xs text-muted-foreground text-right">{p.test_count ?? '—'}</td>
               </tr>
             ))}
           </tbody>

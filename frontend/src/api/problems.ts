@@ -24,6 +24,8 @@ export interface UploadResult {
   version: number
 }
 
+export type UploadResponse = UploadResult | { problems: UploadResult[] }
+
 export const listProblems = (q = '', limit = 50, offset = 0) =>
   apiFetch<{ problems: Problem[]; total: number }>(
     `/problems?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
@@ -41,11 +43,11 @@ export const patchProblem = (id: string, visibility: string) =>
     body: JSON.stringify({ visibility }),
   })
 
-export const uploadProblem = (file: File, visibility: string): Promise<UploadResult> => {
+export const uploadProblem = (file: File, visibility: string): Promise<UploadResponse> => {
   const form = new FormData()
   form.append('file', file)
   form.append('visibility', visibility)
-  return apiFetch<UploadResult>('/problems', { method: 'POST', body: form })
+  return apiFetch<UploadResponse>('/problems', { method: 'POST', body: form })
 }
 
 export const uploadProblemVersion = (slug: string, file: File): Promise<UploadResult> => {

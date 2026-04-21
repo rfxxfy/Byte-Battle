@@ -184,7 +184,7 @@ export function CreateGameModal({ open, onClose, onCreated, initialSelected }: P
       onClick={onClose}
     >
       <div
-        className="bg-card border border-border/60 rounded-xl p-6 w-full max-w-sm shadow-2xl shadow-black/40 mx-4"
+        className="bg-card border border-border/60 rounded-xl p-6 w-full max-w-md shadow-2xl shadow-black/40 mx-4"
         onClick={e => e.stopPropagation()}
       >
         <h2 className="text-lg font-semibold mb-5">Новая игра</h2>
@@ -264,19 +264,27 @@ export function CreateGameModal({ open, onClose, onCreated, initialSelected }: P
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-sm mt-4 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={isSolo}
-            onChange={e => {
-              setIsSolo(e.target.checked)
-              setTimerOption(null)
-              setCustomMinutes('')
-            }}
-          />
-          <span>Одиночная игра</span>
-        </label>
+        <div className="flex flex-col gap-2 mt-4">
+          <label className="text-sm text-muted-foreground">Режим</label>
+          <div className="flex gap-2">
+            {([false, true] as const).map(solo => (
+              <button
+                key={String(solo)}
+                type="button"
+                onClick={() => { setIsSolo(solo); setTimerOption(null); setCustomMinutes('') }}
+                className={`flex-1 py-1.5 rounded-md text-xs border transition-colors ${
+                  isSolo === solo
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {solo ? 'Одиночная' : 'Мультиплеер'}
+              </button>
+            ))}
+          </div>
+        </div>
 
+        <div className="min-h-[7.5rem]">
         {isSolo ? (
           <div className="flex flex-col gap-2 mt-4">
             <label className="text-sm text-muted-foreground">Таймер</label>
@@ -295,17 +303,20 @@ export function CreateGameModal({ open, onClose, onCreated, initialSelected }: P
                   {formatTimer(m)}
                 </button>
               ))}
-              <button
-                type="button"
-                onClick={() => setTimerOption('custom')}
-                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={customMinutes}
+                onChange={e => { setCustomMinutes(e.target.value.replace(/\D/g, '')); setTimerOption('custom') }}
+                onFocus={() => setTimerOption('custom')}
+                placeholder="__ мин"
+                className={`w-20 px-3 py-1.5 rounded-md text-xs border transition-colors focus:outline-none ${
                   timerOption === 'custom'
                     ? 'border-primary bg-primary/10 text-foreground'
-                    : 'border-border text-muted-foreground hover:text-foreground'
+                    : 'border-border text-muted-foreground placeholder:text-muted-foreground/50'
                 }`}
-              >
-                Своё
-              </button>
+              />
               <button
                 type="button"
                 onClick={() => setTimerOption(null)}
@@ -318,34 +329,32 @@ export function CreateGameModal({ open, onClose, onCreated, initialSelected }: P
                 Без таймера
               </button>
             </div>
-            {timerOption === 'custom' && (
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="number"
-                  min={1}
-                  max={300}
-                  value={customMinutes}
-                  onChange={e => setCustomMinutes(e.target.value)}
-                  placeholder="1–300"
-                  className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <span className="text-xs text-muted-foreground">минут (1–300)</span>
-              </div>
-            )}
           </div>
         ) : (
-          <label className="flex items-center gap-2 text-sm mt-4 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={e => setIsPublic(e.target.checked)}
-            />
-            <span>Публичная игра</span>
-            {!isPublic && (
-              <span className="text-xs text-muted-foreground">(только по ссылке)</span>
-            )}
-          </label>
+          <div className="flex flex-col gap-2 mt-4">
+            <label className="text-sm text-muted-foreground">Доступ</label>
+            <div className="flex gap-2">
+              {([true, false] as const).map(pub => (
+                <button
+                  key={String(pub)}
+                  type="button"
+                  onClick={() => setIsPublic(pub)}
+                  className={`flex-1 py-1.5 rounded-md text-xs border transition-colors ${
+                    isPublic === pub
+                      ? 'border-primary bg-primary/10 text-foreground'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {pub ? 'Публичная' : 'Приватная'}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground/60">
+              {isPublic ? 'Видна в списке открытых игр' : 'Только по ссылке-приглашению'}
+            </p>
+          </div>
         )}
+        </div>
 
         <p className="text-xs text-muted-foreground/60 mt-4">
           После создания вы попадёте в лобби

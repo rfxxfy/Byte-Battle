@@ -118,13 +118,13 @@ export function GamesPage() {
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-border/60 bg-muted/30 text-xs font-medium text-muted-foreground">
-              <th className="px-4 py-3 text-left w-12">#</th>
+              <th className="px-4 py-3 text-right w-14">#</th>
               <th className="px-4 py-3 text-left w-24">Задачи</th>
               <th className="px-4 py-3 text-left w-36">Статус</th>
               <th className="px-4 py-3 text-left">
                 {activeTab === 'multiplayer' ? 'Участники' : 'Таймер'}
               </th>
-              <th className="px-4 py-3 text-left w-40">Дата</th>
+              <th className="px-4 py-3 text-right w-40">Дата</th>
             </tr>
           </thead>
           <tbody>
@@ -146,7 +146,7 @@ export function GamesPage() {
                   }}
                   className="border-b border-border/40 last:border-0 even:bg-muted/20 hover:bg-muted/10 cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40">{idx + 1}</td>
+                  <td className="px-4 py-4 text-xs font-mono text-muted-foreground/40 text-right">{idx + 1}</td>
                   <td className="px-4 py-4"><ProblemDots game={g} /></td>
                   <td className="px-4 py-4">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass[g.status]}`}>
@@ -181,7 +181,7 @@ export function GamesPage() {
                       {formatTimer(g.time_limit_minutes)}
                     </td>
                   )}
-                  <td className="px-4 py-4 text-left text-xs text-muted-foreground/60">
+                  <td className="px-4 py-4 text-right text-xs text-muted-foreground/60">
                     {formatDate(g.created_at)}
                   </td>
                 </tr>

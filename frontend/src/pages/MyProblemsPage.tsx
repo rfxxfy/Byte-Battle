@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listMyProblems, patchProblem, type MyProblem, type UploadResult } from '@/api/problems'
+import { listMyProblems, patchProblem, type MyProblem } from '@/api/problems'
 import { ApiError } from '@/api/client'
 import { errorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
@@ -12,10 +12,60 @@ const visibilityLabel: Record<MyProblem['visibility'], string> = {
   private: 'Приватная',
 }
 
-const visibilityClass: Record<MyProblem['visibility'], string> = {
-  public: 'text-green-400 bg-green-400/10',
-  unlisted: 'text-yellow-400 bg-yellow-400/10',
-  private: 'text-muted-foreground bg-muted/40',
+const visibilityColor: Record<MyProblem['visibility'], string> = {
+  public: 'text-green-400',
+  unlisted: 'text-yellow-400',
+  private: 'text-muted-foreground',
+}
+
+function VisibilityDropdown({
+  value,
+  onChange,
+}: {
+  value: MyProblem['visibility']
+  onChange: (v: MyProblem['visibility']) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative w-fit">
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
+        className={`flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70 ${visibilityColor[value]}`}
+      >
+        {visibilityLabel[value]}
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className="opacity-60">
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-20 bg-popover border border-border rounded-md shadow-lg overflow-hidden min-w-[7rem]">
+          {(Object.keys(visibilityLabel) as MyProblem['visibility'][]).map(v => (
+            <button
+              key={v}
+              type="button"
+              onClick={e => { e.stopPropagation(); onChange(v); setOpen(false) }}
+              className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-muted/50 ${
+                v === value ? visibilityColor[v] + ' font-medium' : 'text-muted-foreground'
+              }`}
+            >
+              {visibilityLabel[v]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function MyProblemsPage() {
@@ -26,8 +76,8 @@ export function MyProblemsPage() {
   const [patchError, setPatchError] = useState('')
   const [uploadModal, setUploadModal] = useState<{ mode: 'new' | 'version'; slug?: string } | null>(null)
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((initial = false) => {
+    if (initial) setLoading(true)
     listMyProblems()
       .then(res => setProblems(res.problems))
       .catch(err =>
@@ -36,22 +86,17 @@ export function MyProblemsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(true) }, [load])
 
-  const handleVisibilityChange = async (id: string, visibility: string) => {
+  const handleVisibilityChange = async (id: string, visibility: MyProblem['visibility']) => {
     setPatchError('')
+    setProblems(prev => prev.map(p => p.id === id ? { ...p, visibility } : p))
     try {
       await patchProblem(id, visibility)
-      setProblems(prev =>
-        prev.map(p => p.id === id ? { ...p, visibility: visibility as MyProblem['visibility'] } : p),
-      )
     } catch (err) {
+      load()
       setPatchError(err instanceof ApiError ? errorMessage(err.errorCode, err.message) : String(err))
     }
-  }
-
-  const handleUploaded = (_result: UploadResult) => {
-    load()
   }
 
   if (loading) return <p className="text-sm text-muted-foreground">Загрузка...</p>
@@ -78,55 +123,32 @@ export function MyProblemsPage() {
         </div>
       ) : (
         <div className="rounded-lg border border-border/60 overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="border-b border-border/60 bg-muted/30 text-xs font-medium text-muted-foreground">
                 <th className="px-4 py-3 text-left">Название</th>
-                <th className="px-4 py-3 text-left w-40">Доступ</th>
-                <th className="px-4 py-3 text-left w-20">Версия</th>
-                <th className="px-4 py-3 text-right w-40">Действия</th>
+                <th className="px-4 py-3 text-left w-48">Slug</th>
+                <th className="px-4 py-3 text-left w-28">Доступ</th>
+                <th className="px-4 py-3 text-right w-24">Версия</th>
               </tr>
             </thead>
             <tbody>
               {problems.map(p => (
                 <tr
                   key={p.id}
-                  className="border-b border-border/40 last:border-0 even:bg-muted/10"
+                  onClick={() => navigate(`/problems/${p.id}`)}
+                  className="border-b border-border/40 last:border-0 even:bg-muted/20 hover:bg-muted/10 cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => navigate(`/problems/${p.id}`)}
-                      className="font-medium hover:text-primary transition-colors text-left"
-                    >
-                      {p.title}
-                    </button>
-                    <div className="text-xs font-mono text-muted-foreground/50 mt-0.5">{p.id}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <select
+                  <td className="px-4 py-4 max-w-0"><div className="truncate font-medium">{p.title}</div></td>
+                  <td className="px-4 py-4 max-w-0"><div className="truncate font-mono text-xs text-muted-foreground/50">{p.id}</div></td>
+                  <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                    <VisibilityDropdown
                       value={p.visibility}
-                      onChange={e => handleVisibilityChange(p.id, e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-medium border-0 outline-none cursor-pointer ${visibilityClass[p.visibility]} bg-transparent`}
-                    >
-                      {Object.entries(visibilityLabel).map(([val, label]) => (
-                        <option key={val} value={val} className="bg-background text-foreground">
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={v => handleVisibilityChange(p.id, v)}
+                    />
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                  <td className="px-4 py-4 text-xs text-muted-foreground text-right">
                     {p.version != null ? `v${p.version}` : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setUploadModal({ mode: 'version', slug: p.id })}
-                    >
-                      Новая версия
-                    </Button>
                   </td>
                 </tr>
               ))}
@@ -140,7 +162,7 @@ export function MyProblemsPage() {
           mode={uploadModal.mode}
           slug={uploadModal.slug}
           onClose={() => setUploadModal(null)}
-          onUploaded={handleUploaded}
+          onUploaded={() => load()}
         />
       )}
     </div>
