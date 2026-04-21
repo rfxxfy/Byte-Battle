@@ -200,6 +200,14 @@ func (s *ProblemService) UploadNewVersion(ctx context.Context, validated *proble
 		return nil, apierr.New(apierr.ErrNotProblemOwner, "not the owner of this problem")
 	}
 
+	cnt, err := s.q.CountProblemVersions(ctx, catalog.ID)
+	if err != nil {
+		return nil, err
+	}
+	if cnt >= problems.MaxVersionsPerProblem {
+		return nil, apierr.New(apierr.ErrVersionLimitReached, "version limit reached")
+	}
+
 	return problems.UploadNewVersion(ctx, s.pool, s.store, validated, slug, ownerID)
 }
 
