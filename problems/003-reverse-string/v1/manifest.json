@@ -1,6 +1,5 @@
 {
-  "title": "Test Add",
-  "description": "Read two ints, print sum.",
+  "title": "Reverse String",
   "difficulty": "easy",
   "time_limit_ms": 1000,
   "memory_limit_mb": 256

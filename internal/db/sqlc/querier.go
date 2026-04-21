@@ -21,6 +21,8 @@ type Querier interface {
 	CountGameProblems(ctx context.Context, gameID int32) (int64, error)
 	CountGamesForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CreateGame(ctx context.Context, arg CreateGameParams) (Game, error)
+	CreateProblemCatalog(ctx context.Context, arg CreateProblemCatalogParams) (Problem, error)
+	CreateProblemVersion(ctx context.Context, arg CreateProblemVersionParams) (ProblemVersion, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserByEmail(ctx context.Context, arg CreateUserByEmailParams) (User, error)
@@ -33,6 +35,7 @@ type Querier interface {
 	GetGameByID(ctx context.Context, id int32) (Game, error)
 	GetGameByInviteToken(ctx context.Context, inviteToken uuid.UUID) (Game, error)
 	GetGameForUpdate(ctx context.Context, id int32) (Game, error)
+	GetGameProblemByIndex(ctx context.Context, arg GetGameProblemByIndexParams) (GetGameProblemByIndexRow, error)
 	GetGameProblemIDByIndex(ctx context.Context, arg GetGameProblemIDByIndexParams) (string, error)
 	GetGameProblemIDs(ctx context.Context, gameID int32) ([]string, error)
 	GetGameProblemIDsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetGameProblemIDsByGameIDsRow, error)
@@ -40,6 +43,8 @@ type Querier interface {
 	GetParticipantProblemIndex(ctx context.Context, arg GetParticipantProblemIndexParams) (int32, error)
 	GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error)
 	GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error)
+	GetProblemCatalogBySlug(ctx context.Context, slug string) (Problem, error)
+	GetProblemWithArtifactBySlug(ctx context.Context, slug string) (GetProblemWithArtifactBySlugRow, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
@@ -51,8 +56,11 @@ type Querier interface {
 	InsertSolution(ctx context.Context, arg InsertSolutionParams) error
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGamesForUser(ctx context.Context, arg ListGamesForUserParams) ([]Game, error)
+	ListPublishedPublicProblems(ctx context.Context) ([]Problem, error)
+	ListPublishedPublicProblemsWithArtifact(ctx context.Context) ([]ListPublishedPublicProblemsWithArtifactRow, error)
 	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
+	SetProblemCurrentVersion(ctx context.Context, arg SetProblemCurrentVersionParams) error
 	StartGame(ctx context.Context, id int32) (Game, error)
 	TimeoutGame(ctx context.Context, id int32) (Game, error)
 	UpdateGameWinner(ctx context.Context, arg UpdateGameWinnerParams) error

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -31,23 +32,24 @@ func NewRouter(pool *pgxpool.Pool, cfg config.Config) http.Handler {
 		log.Fatalf("failed to create executor: %v", err)
 	}
 
-	loader, err := problems.NewLoader(cfg.ProblemsDir)
-	if err != nil {
-		log.Fatalf("failed to load problems: %v", err)
+	store := problems.NewStore(cfg.ProblemsDir)
+
+	if err := problems.SeedBuiltins(context.Background(), pool, store); err != nil {
+		log.Fatalf("failed to seed built-in problems: %v", err)
 	}
 
-	return NewRouterWithExecutor(pool, dockerExecutor, loader, cfg)
+	return NewRouterWithExecutor(pool, dockerExecutor, store, cfg)
 }
 
-func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, loader *problems.Loader, cfg config.Config, rlCfg ...service.RateLimitConfig) http.Handler {
+func NewRouterWithExecutor(pool *pgxpool.Pool, exec executor.Executor, store *problems.Store, cfg config.Config, rlCfg ...service.RateLimitConfig) http.Handler {
 	q := sqlcdb.New(pool)
 
 	userService := service.NewUserService(q)
-	gameService := service.NewGameService(q, pool, loader)
-	problemService := service.NewProblemService(loader)
+	gameService := service.NewGameService(q, pool)
+	problemService := service.NewProblemService(store, q)
 	sessionService := service.NewSessionService(q, service.WithSessionDuration(cfg.Entrance.SessionTTL))
 	executionService := service.NewExecutionService(exec, rlCfg...)
-	submissionService := service.NewSubmissionService(executionService, gameService, loader, q)
+	submissionService := service.NewSubmissionService(executionService, gameService, store, q)
 
 	mailer := service.NewMailer(cfg.Entrance.ResendAPIKey, cfg.Entrance.FromEmail)
 	entranceService := service.NewEntranceService(q, sessionService, mailer, cfg.Entrance)

@@ -1,6 +1,6 @@
 -- name: InsertSolution :exec
-INSERT INTO solutions (user_id, problem_id, game_id, code, language, status)
-VALUES (@user_id, @problem_id, @game_id, @code, @language, 'passed')
+INSERT INTO solutions (user_id, problem_id, problem_version_id, game_id, code, language, status)
+VALUES (@user_id, @problem_id, @problem_version_id, @game_id, @code, @language, 'passed')
 ON CONFLICT (user_id, game_id, problem_id) DO NOTHING;
 
 -- name: GetGameSolutions :many

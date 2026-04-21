@@ -94,7 +94,7 @@ func TestGameWS_PlayerJoinedBroadcast(t *testing.T) {
 
 func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 	// failingExecutor returns wrong stdout, so no game_finished should be sent
-	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}, testLoader, config.Load()))
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, failingExecutor{}, testStore, config.Load()))
 	t.Cleanup(srv.Close)
 
 	srvURL := srv.URL
@@ -157,7 +157,7 @@ func TestGameWS_RejectedSubmitDoesNotFinishGame(t *testing.T) {
 
 func TestGameWS_FailedTestIndexIsCorrect(t *testing.T) {
 	// secondTestFailsExecutor passes test 0 but fails test 1, failed_test must be 1
-	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, &secondTestFailsExecutor{}, testLoader, config.Load()))
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, &secondTestFailsExecutor{}, testStore, config.Load()))
 	t.Cleanup(srv.Close)
 
 	srvURL := srv.URL
