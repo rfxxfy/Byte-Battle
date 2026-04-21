@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"bytebattle/internal/api"
@@ -100,8 +99,17 @@ func (s *HTTPServer) ListProblems(ctx context.Context, req api.ListProblemsReque
 	}
 
 	apiProblems := make([]api.Problem, len(problemsList))
-	for i := range problemsList {
-		apiProblems[i] = toAPIProblem(problemsList[i])
+	for i, pm := range problemsList {
+		cnt := pm.TestCaseCount
+		apiProblems[i] = api.Problem{
+			Id:            pm.Slug,
+			Title:         pm.Title,
+			Description:   "",
+			Difficulty:    api.ProblemDifficulty(pm.Difficulty),
+			TimeLimitMs:   pm.TimeLimitMs,
+			MemoryLimitMb: pm.MemoryLimitMb,
+			TestCount:     &cnt,
+		}
 	}
 
 	return api.ListProblems200JSONResponse{Problems: apiProblems, Total: total}, nil
@@ -630,7 +638,7 @@ func (s *HTTPServer) handleUploadProblem(w http.ResponseWriter, r *http.Request)
 
 	validated, uploadErr := problems.ValidateArchive(r.Context(), f, fh.Size, s.executionService.Executor())
 	if uploadErr != nil {
-		if uploadErr.Error() == "executor not ready" {
+		if errors.Is(uploadErr, problems.ErrExecutorNotReady) {
 			writeHTTPError(w, apierr.New(apierr.ErrExecutorNotReady, "executor not ready"))
 			return
 		}
@@ -668,7 +676,7 @@ func (s *HTTPServer) handleUploadProblem(w http.ResponseWriter, r *http.Request)
 	}
 
 	if len(validated) > 1 {
-		_ = os.Remove(filepath.Dir(validated[0].Dir))
+		_ = os.RemoveAll(filepath.Dir(validated[0].Dir))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -699,7 +707,7 @@ func (s *HTTPServer) handleUploadProblemVersion(w http.ResponseWriter, r *http.R
 
 	validated, uploadErr := problems.ValidateArchive(r.Context(), f, fh.Size, s.executionService.Executor())
 	if uploadErr != nil {
-		if uploadErr.Error() == "executor not ready" {
+		if errors.Is(uploadErr, problems.ErrExecutorNotReady) {
 			writeHTTPError(w, apierr.New(apierr.ErrExecutorNotReady, "executor not ready"))
 			return
 		}
@@ -734,19 +742,7 @@ func mapUploadError(err error) error {
 	if errors.As(err, &ae) {
 		return ae
 	}
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "problem limit reached"):
-		return apierr.New(apierr.ErrProblemLimitReached, msg)
-	case strings.Contains(msg, "version limit reached"):
-		return apierr.New(apierr.ErrVersionLimitReached, msg)
-	case strings.Contains(msg, "not the owner"):
-		return apierr.New(apierr.ErrNotProblemOwner, msg)
-	case strings.Contains(msg, "not found"):
-		return apierr.New(apierr.ErrProblemNotFound, msg)
-	default:
-		return apierr.New(apierr.ErrInternal, "upload failed")
-	}
+	return apierr.New(apierr.ErrInternal, "upload failed")
 }
 
 func (s *HTTPServer) broadcastError(gameID int32, userID uuid.UUID, msg string) {

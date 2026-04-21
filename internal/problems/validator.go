@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,8 @@ import (
 
 	"bytebattle/internal/executor"
 )
+
+var ErrExecutorNotReady = errors.New("executor not ready")
 
 const (
 	MaxArchiveBytes       = 50 * 1024 * 1024  // 50 MB
@@ -35,7 +38,7 @@ type ValidatedProblem struct {
 
 func ValidateArchive(ctx context.Context, r io.ReadSeeker, size int64, exec executor.Executor) ([]*ValidatedProblem, error) {
 	if !exec.IsReady() {
-		return nil, fmt.Errorf("executor not ready")
+		return nil, ErrExecutorNotReady
 	}
 
 	if size > MaxArchiveBytes {

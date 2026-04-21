@@ -134,6 +134,8 @@ func insertProblemTx(ctx context.Context, pool *pgxpool.Pool, args insertProblem
 		CheckerType:       "diff",
 		ReferenceLanguage: args.refLang,
 		CreatedByUserID:   uuid.NullUUID{Valid: false},
+		TestCaseCount:     int32(len(args.problem.TestCases)),
+		Difficulty:        args.problem.Manifest.Difficulty,
 	})
 	if err != nil {
 		return fmt.Errorf("create problem version: %w", err)

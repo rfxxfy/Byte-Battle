@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
@@ -27,7 +26,7 @@ func NewProblemService(store *problems.Store, q sqlcdb.Querier, pool *pgxpool.Po
 	return &ProblemService{store: store, q: q, pool: pool, exec: exec}
 }
 
-func (s *ProblemService) ListProblems(ctx context.Context, q string, limit, offset int) ([]*problems.Problem, int64, error) {
+func (s *ProblemService) ListProblems(ctx context.Context, q string, limit, offset int) ([]*problems.ProblemMeta, int64, error) {
 	total, err := s.q.CountPublicProblems(ctx, q)
 	if err != nil {
 		return nil, 0, err
@@ -42,14 +41,16 @@ func (s *ProblemService) ListProblems(ctx context.Context, q string, limit, offs
 		return nil, 0, err
 	}
 
-	result := make([]*problems.Problem, 0, len(rows))
+	result := make([]*problems.ProblemMeta, 0, len(rows))
 	for i := range rows {
-		p, err := s.store.GetByPath(rows[i].ArtifactPath)
-		if err != nil {
-			log.Printf("warn: problem %q in DB but files missing (artifact=%s): %v", rows[i].Slug, rows[i].ArtifactPath, err)
-			continue
-		}
-		result = append(result, p)
+		result = append(result, &problems.ProblemMeta{
+			Slug:          rows[i].Slug,
+			Title:         rows[i].Title,
+			Difficulty:    rows[i].Difficulty,
+			TimeLimitMs:   int(rows[i].LimitsTimeMs),
+			MemoryLimitMb: int(rows[i].LimitsMemoryKb) / 1024,
+			TestCaseCount: int(rows[i].TestCaseCount),
+		})
 	}
 	return result, total, nil
 }

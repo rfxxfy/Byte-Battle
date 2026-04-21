@@ -32,10 +32,12 @@ INSERT INTO problem_versions (
     limits_memory_kb,
     checker_type,
     reference_language,
-    created_by_user_id
+    created_by_user_id,
+    test_case_count,
+    difficulty
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, problem_id, version, artifact_path, artifact_sha256, limits_time_ms, limits_memory_kb, checker_type, reference_language, created_by_user_id, created_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, problem_id, version, artifact_path, artifact_sha256, limits_time_ms, limits_memory_kb, checker_type, reference_language, created_by_user_id, created_at, test_case_count, difficulty
 `
 
 type CreateProblemVersionParams struct {
@@ -48,6 +50,8 @@ type CreateProblemVersionParams struct {
 	CheckerType       string        `json:"checker_type"`
 	ReferenceLanguage string        `json:"reference_language"`
 	CreatedByUserID   uuid.NullUUID `json:"created_by_user_id"`
+	TestCaseCount     int32         `json:"test_case_count"`
+	Difficulty        string        `json:"difficulty"`
 }
 
 func (q *Queries) CreateProblemVersion(ctx context.Context, arg CreateProblemVersionParams) (ProblemVersion, error) {
@@ -61,6 +65,8 @@ func (q *Queries) CreateProblemVersion(ctx context.Context, arg CreateProblemVer
 		arg.CheckerType,
 		arg.ReferenceLanguage,
 		arg.CreatedByUserID,
+		arg.TestCaseCount,
+		arg.Difficulty,
 	)
 	var i ProblemVersion
 	err := row.Scan(
@@ -75,6 +81,8 @@ func (q *Queries) CreateProblemVersion(ctx context.Context, arg CreateProblemVer
 		&i.ReferenceLanguage,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
+		&i.TestCaseCount,
+		&i.Difficulty,
 	)
 	return i, err
 }

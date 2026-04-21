@@ -36,7 +36,8 @@ WHERE p.slug = $1
 LIMIT 1;
 
 -- name: ListPublicProblemsSearch :many
-SELECT p.id, p.slug, p.title, p.visibility, p.current_version_id, p.owner_user_id, pv.artifact_path
+SELECT p.id, p.slug, p.title,
+       pv.difficulty, pv.limits_time_ms, pv.limits_memory_kb, pv.test_case_count
 FROM problems p
 JOIN problem_versions pv ON pv.id = p.current_version_id
 WHERE p.status = 'published' AND p.visibility = 'public'

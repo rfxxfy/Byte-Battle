@@ -199,7 +199,8 @@ func (q *Queries) ListMyProblems(ctx context.Context, arg ListMyProblemsParams) 
 }
 
 const listPublicProblemsSearch = `-- name: ListPublicProblemsSearch :many
-SELECT p.id, p.slug, p.title, p.visibility, p.current_version_id, p.owner_user_id, pv.artifact_path
+SELECT p.id, p.slug, p.title,
+       pv.difficulty, pv.limits_time_ms, pv.limits_memory_kb, pv.test_case_count
 FROM problems p
 JOIN problem_versions pv ON pv.id = p.current_version_id
 WHERE p.status = 'published' AND p.visibility = 'public'
@@ -215,13 +216,13 @@ type ListPublicProblemsSearchParams struct {
 }
 
 type ListPublicProblemsSearchRow struct {
-	ID               int64         `json:"id"`
-	Slug             string        `json:"slug"`
-	Title            string        `json:"title"`
-	Visibility       string        `json:"visibility"`
-	CurrentVersionID pgtype.Int8   `json:"current_version_id"`
-	OwnerUserID      uuid.NullUUID `json:"owner_user_id"`
-	ArtifactPath     string        `json:"artifact_path"`
+	ID             int64  `json:"id"`
+	Slug           string `json:"slug"`
+	Title          string `json:"title"`
+	Difficulty     string `json:"difficulty"`
+	LimitsTimeMs   int32  `json:"limits_time_ms"`
+	LimitsMemoryKb int32  `json:"limits_memory_kb"`
+	TestCaseCount  int32  `json:"test_case_count"`
 }
 
 func (q *Queries) ListPublicProblemsSearch(ctx context.Context, arg ListPublicProblemsSearchParams) ([]ListPublicProblemsSearchRow, error) {
@@ -237,10 +238,10 @@ func (q *Queries) ListPublicProblemsSearch(ctx context.Context, arg ListPublicPr
 			&i.ID,
 			&i.Slug,
 			&i.Title,
-			&i.Visibility,
-			&i.CurrentVersionID,
-			&i.OwnerUserID,
-			&i.ArtifactPath,
+			&i.Difficulty,
+			&i.LimitsTimeMs,
+			&i.LimitsMemoryKb,
+			&i.TestCaseCount,
 		); err != nil {
 			return nil, err
 		}

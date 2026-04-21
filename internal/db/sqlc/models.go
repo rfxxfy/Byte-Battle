@@ -62,6 +62,8 @@ type ProblemVersion struct {
 	ReferenceLanguage string             `json:"reference_language"`
 	CreatedByUserID   uuid.NullUUID      `json:"created_by_user_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	TestCaseCount     int32              `json:"test_case_count"`
+	Difficulty        string             `json:"difficulty"`
 }
 
 type Session struct {

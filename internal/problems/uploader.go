@@ -13,6 +13,7 @@ import (
 	"strings"
 	"unicode"
 
+	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
 
 	"github.com/google/uuid"
@@ -33,14 +34,6 @@ func UploadProblem(ctx context.Context, pool *pgxpool.Pool, store *Store, valida
 	}
 
 	q := sqlcdb.New(pool)
-
-	cnt, err := q.CountUserProblems(ctx, uuid.NullUUID{UUID: ownerID, Valid: true})
-	if err != nil {
-		return nil, fmt.Errorf("count user problems: %w", err)
-	}
-	if cnt >= MaxProblemsPerUser {
-		return nil, fmt.Errorf("problem limit reached: max %d problems per user", MaxProblemsPerUser)
-	}
 
 	slug, err := generateSlug(ctx, q, validated.Manifest.Title)
 	if err != nil {
@@ -83,6 +76,8 @@ func UploadProblem(ctx context.Context, pool *pgxpool.Pool, store *Store, valida
 		CheckerType:       "diff",
 		ReferenceLanguage: validated.ReferenceLang,
 		CreatedByUserID:   uuid.NullUUID{UUID: ownerID, Valid: true},
+		TestCaseCount:     int32(len(validated.TestCases)),
+		Difficulty:        validated.Manifest.Difficulty,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create problem version: %w", err)
@@ -120,22 +115,10 @@ func uploadNewVersion(ctx context.Context, pool *pgxpool.Pool, store *Store, val
 
 	catalog, err := q.GetProblemCatalogBySlug(ctx, slug)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("problem %q not found", slug)
+		return nil, apierr.New(apierr.ErrProblemNotFound, "problem not found")
 	}
 	if err != nil {
 		return nil, err
-	}
-
-	if !catalog.OwnerUserID.Valid || catalog.OwnerUserID.UUID != ownerID {
-		return nil, fmt.Errorf("not the owner of problem %q", slug)
-	}
-
-	versionCnt, err := q.CountProblemVersions(ctx, catalog.ID)
-	if err != nil {
-		return nil, fmt.Errorf("count versions: %w", err)
-	}
-	if versionCnt >= MaxVersionsPerProblem {
-		return nil, fmt.Errorf("version limit reached: max %d versions per problem", MaxVersionsPerProblem)
 	}
 
 	sha, err := dirSHA256(validated.Dir)
@@ -172,6 +155,8 @@ func uploadNewVersion(ctx context.Context, pool *pgxpool.Pool, store *Store, val
 		CheckerType:       "diff",
 		ReferenceLanguage: validated.ReferenceLang,
 		CreatedByUserID:   uuid.NullUUID{UUID: ownerID, Valid: true},
+		TestCaseCount:     int32(len(validated.TestCases)),
+		Difficulty:        validated.Manifest.Difficulty,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create problem version: %w", err)
