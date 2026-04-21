@@ -43,7 +43,7 @@ export function AppLayout() {
               >
                 Задачи
               </NavLink>
-<NavLink
+              <NavLink
                 to="/games"
                 className={({ isActive }) =>
                   `px-3 py-1.5 rounded-md text-sm transition-colors ${
