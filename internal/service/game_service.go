@@ -2,15 +2,11 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"path/filepath"
 
 	"bytebattle/internal/apierr"
 	sqlcdb "bytebattle/internal/db/sqlc"
-	"bytebattle/internal/problems"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -34,28 +30,24 @@ const (
 var errGameAlreadyFinished = errors.New("game already finished")
 
 type GameService struct {
-	q        *sqlcdb.Queries
-	pool     *pgxpool.Pool
-	problems *problems.Loader
+	q    *sqlcdb.Queries
+	pool *pgxpool.Pool
 }
 
-func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool, loader *problems.Loader) *GameService {
-	return &GameService{q: q, pool: pool, problems: loader}
+func NewGameService(q *sqlcdb.Queries, pool *pgxpool.Pool) *GameService {
+	return &GameService{q: q, pool: pool}
 }
 
-func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemIDs []string, isPublic, isSolo bool, timeLimitMinutes *int16) (sqlcdb.Game, error) {
-	if len(problemIDs) == 0 {
+func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, problemSlugs []string, isPublic, isSolo bool, timeLimitMinutes *int16) (sqlcdb.Game, error) {
+	if len(problemSlugs) == 0 {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "at least one problem is required")
 	}
-	if len(problemIDs) > maxGameProblems {
+	if len(problemSlugs) > maxGameProblems {
 		return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "too many problems in game")
 	}
-	for _, problemID := range problemIDs {
-		if problemID == "" {
-			return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "problem_id cannot be empty")
-		}
-		if _, err := s.problems.Get(problemID); err != nil {
-			return sqlcdb.Game{}, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+	for _, slug := range problemSlugs {
+		if slug == "" {
+			return sqlcdb.Game{}, apierr.New(apierr.ErrValidation, "problem slug cannot be empty")
 		}
 	}
 
@@ -81,19 +73,16 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 		return sqlcdb.Game{}, err
 	}
 
-	for idx, problemID := range problemIDs {
-		problemVersionID, err := s.ensureProblemVersion(ctx, qtx, creatorID, problemID)
+	for idx, slug := range problemSlugs {
+		versionID, err := s.resolveProblemVersion(ctx, qtx, creatorID, slug)
 		if err != nil {
 			return sqlcdb.Game{}, err
 		}
 		if err := qtx.AddGameProblem(ctx, sqlcdb.AddGameProblemParams{
-			GameID:       game.ID,
-			ProblemIndex: int32(idx),
-			ProblemID:    problemID,
-			ProblemVersionID: pgtype.Int8{
-				Int64: problemVersionID,
-				Valid: true,
-			},
+			GameID:           game.ID,
+			ProblemIndex:     int32(idx),
+			ProblemID:        slug,
+			ProblemVersionID: versionID,
 		}); err != nil {
 			return sqlcdb.Game{}, err
 		}
@@ -113,64 +102,26 @@ func (s *GameService) CreateGame(ctx context.Context, creatorID uuid.UUID, probl
 	return game, nil
 }
 
-func (s *GameService) ensureProblemVersion(ctx context.Context, qtx *sqlcdb.Queries, creatorID uuid.UUID, problemID string) (int64, error) {
-	problem, err := s.problems.Get(problemID)
-	if err != nil {
-		return 0, apierr.New(apierr.ErrProblemNotFound, "problem not found")
-	}
-
-	catalog, err := qtx.GetProblemCatalogBySlug(ctx, problemID)
+func (s *GameService) resolveProblemVersion(ctx context.Context, qtx *sqlcdb.Queries, requesterID uuid.UUID, slug string) (int64, error) {
+	catalog, err := qtx.GetProblemCatalogBySlug(ctx, slug)
 	if errors.Is(err, pgx.ErrNoRows) {
-		catalog, err = qtx.CreateProblemCatalog(ctx, sqlcdb.CreateProblemCatalogParams{
-			Slug:        problemID,
-			OwnerUserID: uuid.NullUUID{UUID: creatorID, Valid: true},
-			Visibility:  "public",
-			Status:      "published",
-			Title:       problem.Meta.Title,
-		})
-		if err != nil {
-			return 0, err
-		}
-	} else if err != nil {
-		return 0, err
-	}
-
-	if catalog.Visibility == "private" && (!catalog.OwnerUserID.Valid || catalog.OwnerUserID.UUID != creatorID) {
 		return 0, apierr.New(apierr.ErrProblemNotFound, "problem not found")
 	}
-	if catalog.Status != "published" && (!catalog.OwnerUserID.Valid || catalog.OwnerUserID.UUID != creatorID) {
-		return 0, apierr.New(apierr.ErrProblemNotFound, "problem not found")
-	}
-
-	if catalog.CurrentVersionID.Valid {
-		return catalog.CurrentVersionID.Int64, nil
-	}
-
-	contentFingerprint := sha256.Sum256([]byte(problem.ID + ":" + problem.Meta.Title + ":" + problem.Meta.Description))
-	artifactSHA := hex.EncodeToString(contentFingerprint[:])
-	version, err := qtx.CreateProblemVersion(ctx, sqlcdb.CreateProblemVersionParams{
-		ProblemID:       catalog.ID,
-		Version:         1,
-		ArtifactPath:    filepath.ToSlash(filepath.Join("problems", problem.ID)),
-		ArtifactSha256:  artifactSHA,
-		StatementSha256: pgtype.Text{String: artifactSHA, Valid: true},
-		LimitsTimeMs:    int32(problem.Meta.TimeLimitMs),
-		LimitsMemoryKb:  int32(problem.Meta.MemoryLimitMb * 1024),
-		CheckerType:     "diff",
-		CreatedByUserID: uuid.NullUUID{UUID: creatorID, Valid: true},
-	})
 	if err != nil {
 		return 0, err
 	}
 
-	if err := qtx.SetProblemCurrentVersion(ctx, sqlcdb.SetProblemCurrentVersionParams{
-		ID:               catalog.ID,
-		CurrentVersionID: pgtype.Int8{Int64: version.ID, Valid: true},
-	}); err != nil {
-		return 0, err
+	if catalog.Visibility == "private" {
+		if !catalog.OwnerUserID.Valid || catalog.OwnerUserID.UUID != requesterID {
+			return 0, apierr.New(apierr.ErrProblemNotFound, "problem not found")
+		}
 	}
 
-	return version.ID, nil
+	if !catalog.CurrentVersionID.Valid {
+		return 0, apierr.New(apierr.ErrProblemNotFound, "problem has no published version")
+	}
+
+	return catalog.CurrentVersionID.Int64, nil
 }
 
 func (s *GameService) JoinGame(ctx context.Context, gameID int, userID uuid.UUID) (sqlcdb.Game, error) {

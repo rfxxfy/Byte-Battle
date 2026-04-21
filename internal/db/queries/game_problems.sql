@@ -26,8 +26,8 @@ WHERE game_id = $1 AND problem_index = $2
 LIMIT 1;
 
 -- name: GetGameProblemByIndex :one
-SELECT problem_id, problem_version_id
-FROM game_problems
-WHERE game_id = $1 AND problem_index = $2
+SELECT gp.problem_id, gp.problem_version_id, pv.artifact_path
+FROM game_problems gp
+JOIN problem_versions pv ON pv.id = gp.problem_version_id
+WHERE gp.game_id = $1 AND gp.problem_index = $2
 LIMIT 1;
-

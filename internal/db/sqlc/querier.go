@@ -44,6 +44,7 @@ type Querier interface {
 	GetParticipants(ctx context.Context, gameID int32) ([]GetParticipantsRow, error)
 	GetParticipantsByGameIDs(ctx context.Context, dollar_1 []int32) ([]GetParticipantsByGameIDsRow, error)
 	GetProblemCatalogBySlug(ctx context.Context, slug string) (Problem, error)
+	GetProblemWithArtifactBySlug(ctx context.Context, slug string) (GetProblemWithArtifactBySlugRow, error)
 	GetSessionByID(ctx context.Context, id int32) (Session, error)
 	GetSessionByToken(ctx context.Context, token string) (Session, error)
 	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]Session, error)
@@ -56,6 +57,7 @@ type Querier interface {
 	IsGameParticipant(ctx context.Context, arg IsGameParticipantParams) (bool, error)
 	ListGamesForUser(ctx context.Context, arg ListGamesForUserParams) ([]Game, error)
 	ListPublishedPublicProblems(ctx context.Context) ([]Problem, error)
+	ListPublishedPublicProblemsWithArtifact(ctx context.Context) ([]ListPublishedPublicProblemsWithArtifactRow, error)
 	RemoveGameParticipant(ctx context.Context, arg RemoveGameParticipantParams) (int64, error)
 	SetEmailVerified(ctx context.Context, id uuid.UUID) error
 	SetProblemCurrentVersion(ctx context.Context, arg SetProblemCurrentVersionParams) error

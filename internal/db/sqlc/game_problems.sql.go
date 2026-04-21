@@ -7,8 +7,6 @@ package sqlcdb
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addGameProblem = `-- name: AddGameProblem :exec
@@ -17,10 +15,10 @@ VALUES ($1, $2, $3, $4)
 `
 
 type AddGameProblemParams struct {
-	GameID           int32       `json:"game_id"`
-	ProblemIndex     int32       `json:"problem_index"`
-	ProblemID        string      `json:"problem_id"`
-	ProblemVersionID pgtype.Int8 `json:"problem_version_id"`
+	GameID           int32  `json:"game_id"`
+	ProblemIndex     int32  `json:"problem_index"`
+	ProblemID        string `json:"problem_id"`
+	ProblemVersionID int64  `json:"problem_version_id"`
 }
 
 func (q *Queries) AddGameProblem(ctx context.Context, arg AddGameProblemParams) error {
@@ -47,9 +45,10 @@ func (q *Queries) CountGameProblems(ctx context.Context, gameID int32) (int64, e
 }
 
 const getGameProblemByIndex = `-- name: GetGameProblemByIndex :one
-SELECT problem_id, problem_version_id
-FROM game_problems
-WHERE game_id = $1 AND problem_index = $2
+SELECT gp.problem_id, gp.problem_version_id, pv.artifact_path
+FROM game_problems gp
+JOIN problem_versions pv ON pv.id = gp.problem_version_id
+WHERE gp.game_id = $1 AND gp.problem_index = $2
 LIMIT 1
 `
 
@@ -59,14 +58,15 @@ type GetGameProblemByIndexParams struct {
 }
 
 type GetGameProblemByIndexRow struct {
-	ProblemID        string      `json:"problem_id"`
-	ProblemVersionID pgtype.Int8 `json:"problem_version_id"`
+	ProblemID        string `json:"problem_id"`
+	ProblemVersionID int64  `json:"problem_version_id"`
+	ArtifactPath     string `json:"artifact_path"`
 }
 
 func (q *Queries) GetGameProblemByIndex(ctx context.Context, arg GetGameProblemByIndexParams) (GetGameProblemByIndexRow, error) {
 	row := q.db.QueryRow(ctx, getGameProblemByIndex, arg.GameID, arg.ProblemIndex)
 	var i GetGameProblemByIndexRow
-	err := row.Scan(&i.ProblemID, &i.ProblemVersionID)
+	err := row.Scan(&i.ProblemID, &i.ProblemVersionID, &i.ArtifactPath)
 	return i, err
 }
 

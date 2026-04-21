@@ -5,7 +5,7 @@ CREATE TABLE problems (
     visibility TEXT NOT NULL DEFAULT 'public'
         CHECK (visibility IN ('public', 'unlisted', 'private')),
     status TEXT NOT NULL DEFAULT 'published'
-        CHECK (status IN ('draft', 'pending_review', 'published', 'rejected', 'archived')),
+        CHECK (status IN ('published', 'archived')),
     title TEXT NOT NULL,
     current_version_id BIGINT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -22,10 +22,10 @@ CREATE TABLE problem_versions (
     version INTEGER NOT NULL CHECK (version > 0),
     artifact_path TEXT NOT NULL,
     artifact_sha256 TEXT NOT NULL,
-    statement_sha256 TEXT,
     limits_time_ms INTEGER NOT NULL CHECK (limits_time_ms > 0),
     limits_memory_kb INTEGER NOT NULL CHECK (limits_memory_kb > 0),
     checker_type TEXT NOT NULL CHECK (checker_type IN ('diff', 'custom')),
+    reference_language TEXT NOT NULL CHECK (reference_language IN ('python', 'go', 'cpp', 'java')),
     created_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     UNIQUE (problem_id, version)
@@ -40,11 +40,11 @@ ALTER TABLE problems
     ON DELETE SET NULL;
 
 ALTER TABLE game_problems
-    ADD COLUMN problem_version_id BIGINT REFERENCES problem_versions(id) ON DELETE RESTRICT;
+    ADD COLUMN problem_version_id BIGINT NOT NULL REFERENCES problem_versions(id) ON DELETE RESTRICT;
 
 CREATE INDEX idx_game_problems_problem_version_id ON game_problems(problem_version_id);
 
 ALTER TABLE solutions
-    ADD COLUMN problem_version_id BIGINT REFERENCES problem_versions(id) ON DELETE SET NULL;
+    ADD COLUMN problem_version_id BIGINT NOT NULL REFERENCES problem_versions(id) ON DELETE RESTRICT;
 
 CREATE INDEX idx_solutions_problem_version_id ON solutions(problem_version_id);

@@ -77,8 +77,11 @@ func (s *HTTPServer) ListGames(ctx context.Context, req api.ListGamesRequestObje
 	return api.ListGames200JSONResponse{Games: apiGames, Total: total}, nil
 }
 
-func (s *HTTPServer) ListProblems(_ context.Context, _ api.ListProblemsRequestObject) (api.ListProblemsResponseObject, error) {
-	problemsList := s.problemService.ListProblems()
+func (s *HTTPServer) ListProblems(ctx context.Context, _ api.ListProblemsRequestObject) (api.ListProblemsResponseObject, error) {
+	problemsList, err := s.problemService.ListProblems(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	apiProblems := make([]api.Problem, len(problemsList))
 	for i := range problemsList {
@@ -88,8 +91,8 @@ func (s *HTTPServer) ListProblems(_ context.Context, _ api.ListProblemsRequestOb
 	return api.ListProblems200JSONResponse{Problems: apiProblems}, nil
 }
 
-func (s *HTTPServer) GetProblem(_ context.Context, req api.GetProblemRequestObject) (api.GetProblemResponseObject, error) {
-	p, err := s.problemService.GetProblem(req.ProblemId)
+func (s *HTTPServer) GetProblem(ctx context.Context, req api.GetProblemRequestObject) (api.GetProblemResponseObject, error) {
+	p, err := s.problemService.GetProblem(ctx, req.ProblemId)
 	if err != nil {
 		return nil, apierr.New(apierr.ErrProblemNotFound, "problem not found")
 	}
@@ -360,12 +363,12 @@ func isParticipantOf(userID uuid.UUID, participants []service.Participant) bool 
 func toAPIProblem(p *problems.Problem) api.Problem {
 	testCount := len(p.TestCases)
 	return api.Problem{
-		Id:            p.ID,
-		Title:         p.Meta.Title,
-		Description:   p.Meta.Description,
-		Difficulty:    api.ProblemDifficulty(p.Meta.Difficulty),
-		TimeLimitMs:   p.Meta.TimeLimitMs,
-		MemoryLimitMb: p.Meta.MemoryLimitMb,
+		Id:            p.Slug,
+		Title:         p.Manifest.Title,
+		Description:   p.Statement,
+		Difficulty:    api.ProblemDifficulty(p.Manifest.Difficulty),
+		TimeLimitMs:   p.Manifest.TimeLimitMs,
+		MemoryLimitMb: p.Manifest.MemoryLimitMb,
 		TestCount:     &testCount,
 	}
 }

@@ -20,3 +20,17 @@ SELECT *
 FROM problems
 WHERE status = 'published' AND visibility = 'public'
 ORDER BY created_at DESC;
+
+-- name: ListPublishedPublicProblemsWithArtifact :many
+SELECT p.id, p.slug, p.owner_user_id, p.visibility, p.status, p.title, p.current_version_id, p.created_at, p.updated_at, pv.artifact_path
+FROM problems p
+JOIN problem_versions pv ON pv.id = p.current_version_id
+WHERE p.status = 'published' AND p.visibility = 'public'
+ORDER BY p.created_at DESC;
+
+-- name: GetProblemWithArtifactBySlug :one
+SELECT p.id, p.slug, p.owner_user_id, p.visibility, p.status, p.title, p.current_version_id, p.created_at, p.updated_at, pv.artifact_path
+FROM problems p
+JOIN problem_versions pv ON pv.id = p.current_version_id
+WHERE p.slug = $1
+LIMIT 1;

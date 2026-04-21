@@ -74,7 +74,7 @@ ON CONFLICT (user_id, game_id, problem_id) DO NOTHING
 type InsertSolutionParams struct {
 	UserID           uuid.UUID   `json:"user_id"`
 	ProblemID        string      `json:"problem_id"`
-	ProblemVersionID pgtype.Int8 `json:"problem_version_id"`
+	ProblemVersionID int64       `json:"problem_version_id"`
 	GameID           pgtype.Int4 `json:"game_id"`
 	Code             string      `json:"code"`
 	Language         string      `json:"language"`

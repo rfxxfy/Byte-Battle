@@ -70,13 +70,13 @@ func (e *secondTestFailsExecutor) Run(_ context.Context, _ executor.ExecutionReq
 }
 
 var (
-	testSrv    *httptest.Server
-	testPool   *pgxpool.Pool
-	testLoader *problems.Loader
-	user1ID    uuid.UUID
-	user2ID    uuid.UUID
-	token1     string
-	token2     string
+	testSrv   *httptest.Server
+	testPool  *pgxpool.Pool
+	testStore *problems.Store
+	user1ID   uuid.UUID
+	user2ID   uuid.UUID
+	token1    string
+	token2    string
 )
 
 func TestMain(m *testing.M) {
@@ -148,17 +148,17 @@ func TestMain(m *testing.M) {
 	}
 	user2ID = u2.ID
 
-	loader, err := problems.NewLoader("testdata/problems")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "load test problems: %v\n", err)
+	store := problems.NewStore("testdata/problems")
+	if err := problems.SeedBuiltins(ctx, pool, store); err != nil {
+		fmt.Fprintf(os.Stderr, "seed test problems: %v\n", err)
 		pool.Close()
 		_ = pgCtr.Terminate(ctx)
 		os.Exit(1)
 	}
 
 	testPool = pool
-	testLoader = loader
-	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, correctExecutor{}, loader, config.Load()))
+	testStore = store
+	testSrv = httptest.NewServer(app.NewRouterWithExecutor(pool, correctExecutor{}, store, config.Load()))
 
 	var tokErr error
 	token1, tokErr = makeAuthToken("player1@test.com")
@@ -343,7 +343,7 @@ func newGameServer(t *testing.T, exec executor.Executor, rlCfg ...service.RateLi
 	if len(rlCfg) > 0 {
 		cfg = rlCfg[0]
 	}
-	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, exec, testLoader, config.Load(), cfg))
+	srv := httptest.NewServer(app.NewRouterWithExecutor(testPool, exec, testStore, config.Load(), cfg))
 	t.Cleanup(srv.Close)
 	return srv
 }

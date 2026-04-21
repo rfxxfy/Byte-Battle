@@ -27,15 +27,15 @@ type SubmissionResult struct {
 }
 
 type SubmissionService struct {
-	execSvc  *ExecutionService
-	gameSvc  *GameService
-	problems *problems.Loader
-	q        sqlcdb.Querier
+	execSvc *ExecutionService
+	gameSvc *GameService
+	store   *problems.Store
+	q       sqlcdb.Querier
 }
 
 type activeProblem struct {
 	problem   *problems.Problem
-	versionID pgtype.Int8
+	versionID int64
 }
 
 type executionOutcome struct {
@@ -45,8 +45,8 @@ type executionOutcome struct {
 	stderr     string
 }
 
-func NewSubmissionService(execSvc *ExecutionService, gameSvc *GameService, loader *problems.Loader, q sqlcdb.Querier) *SubmissionService {
-	return &SubmissionService{execSvc: execSvc, gameSvc: gameSvc, problems: loader, q: q}
+func NewSubmissionService(execSvc *ExecutionService, gameSvc *GameService, store *problems.Store, q sqlcdb.Querier) *SubmissionService {
+	return &SubmissionService{execSvc: execSvc, gameSvc: gameSvc, store: store, q: q}
 }
 
 func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.UUID, code string, language executor.Language) (SubmissionResult, error) {
@@ -76,13 +76,13 @@ func (s *SubmissionService) Submit(ctx context.Context, gameID int, userID uuid.
 
 	if err := s.q.InsertSolution(ctx, sqlcdb.InsertSolutionParams{
 		UserID:           userID,
-		ProblemID:        ap.problem.ID,
+		ProblemID:        ap.problem.Slug,
 		ProblemVersionID: ap.versionID,
 		GameID:           pgtype.Int4{Int32: int32(gameID), Valid: true},
 		Code:             code,
 		Language:         string(language),
 	}); err != nil {
-		log.Printf("warn: failed to save solution user=%s problem=%s game=%d: %v", userID, ap.problem.ID, gameID, err)
+		log.Printf("warn: failed to save solution user=%s problem=%s game=%d: %v", userID, ap.problem.Slug, gameID, err)
 	}
 
 	return s.completeAcceptedSubmission(ctx, gameID, userID)
@@ -107,7 +107,7 @@ func (s *SubmissionService) getCurrentProblemForSubmission(ctx context.Context, 
 		return nil, fmt.Errorf("get game problem by index: %w", err)
 	}
 
-	problem, err := s.problems.Get(gameProblem.ProblemID)
+	problem, err := s.store.GetByPath(gameProblem.ArtifactPath)
 	if err != nil {
 		return nil, fmt.Errorf("get problem: %w", err)
 	}

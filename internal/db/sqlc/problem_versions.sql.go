@@ -9,7 +9,6 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createProblemVersion = `-- name: CreateProblemVersion :one
@@ -18,26 +17,26 @@ INSERT INTO problem_versions (
     version,
     artifact_path,
     artifact_sha256,
-    statement_sha256,
     limits_time_ms,
     limits_memory_kb,
     checker_type,
+    reference_language,
     created_by_user_id
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, problem_id, version, artifact_path, artifact_sha256, statement_sha256, limits_time_ms, limits_memory_kb, checker_type, created_by_user_id, created_at
+RETURNING id, problem_id, version, artifact_path, artifact_sha256, limits_time_ms, limits_memory_kb, checker_type, reference_language, created_by_user_id, created_at
 `
 
 type CreateProblemVersionParams struct {
-	ProblemID       int64         `json:"problem_id"`
-	Version         int32         `json:"version"`
-	ArtifactPath    string        `json:"artifact_path"`
-	ArtifactSha256  string        `json:"artifact_sha256"`
-	StatementSha256 pgtype.Text   `json:"statement_sha256"`
-	LimitsTimeMs    int32         `json:"limits_time_ms"`
-	LimitsMemoryKb  int32         `json:"limits_memory_kb"`
-	CheckerType     string        `json:"checker_type"`
-	CreatedByUserID uuid.NullUUID `json:"created_by_user_id"`
+	ProblemID         int64         `json:"problem_id"`
+	Version           int32         `json:"version"`
+	ArtifactPath      string        `json:"artifact_path"`
+	ArtifactSha256    string        `json:"artifact_sha256"`
+	LimitsTimeMs      int32         `json:"limits_time_ms"`
+	LimitsMemoryKb    int32         `json:"limits_memory_kb"`
+	CheckerType       string        `json:"checker_type"`
+	ReferenceLanguage string        `json:"reference_language"`
+	CreatedByUserID   uuid.NullUUID `json:"created_by_user_id"`
 }
 
 func (q *Queries) CreateProblemVersion(ctx context.Context, arg CreateProblemVersionParams) (ProblemVersion, error) {
@@ -46,10 +45,10 @@ func (q *Queries) CreateProblemVersion(ctx context.Context, arg CreateProblemVer
 		arg.Version,
 		arg.ArtifactPath,
 		arg.ArtifactSha256,
-		arg.StatementSha256,
 		arg.LimitsTimeMs,
 		arg.LimitsMemoryKb,
 		arg.CheckerType,
+		arg.ReferenceLanguage,
 		arg.CreatedByUserID,
 	)
 	var i ProblemVersion
@@ -59,10 +58,10 @@ func (q *Queries) CreateProblemVersion(ctx context.Context, arg CreateProblemVer
 		&i.Version,
 		&i.ArtifactPath,
 		&i.ArtifactSha256,
-		&i.StatementSha256,
 		&i.LimitsTimeMs,
 		&i.LimitsMemoryKb,
 		&i.CheckerType,
+		&i.ReferenceLanguage,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 	)

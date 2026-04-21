@@ -73,6 +73,45 @@ func (q *Queries) GetProblemCatalogBySlug(ctx context.Context, slug string) (Pro
 	return i, err
 }
 
+const getProblemWithArtifactBySlug = `-- name: GetProblemWithArtifactBySlug :one
+SELECT p.id, p.slug, p.owner_user_id, p.visibility, p.status, p.title, p.current_version_id, p.created_at, p.updated_at, pv.artifact_path
+FROM problems p
+JOIN problem_versions pv ON pv.id = p.current_version_id
+WHERE p.slug = $1
+LIMIT 1
+`
+
+type GetProblemWithArtifactBySlugRow struct {
+	ID               int64              `json:"id"`
+	Slug             string             `json:"slug"`
+	OwnerUserID      uuid.NullUUID      `json:"owner_user_id"`
+	Visibility       string             `json:"visibility"`
+	Status           string             `json:"status"`
+	Title            string             `json:"title"`
+	CurrentVersionID pgtype.Int8        `json:"current_version_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ArtifactPath     string             `json:"artifact_path"`
+}
+
+func (q *Queries) GetProblemWithArtifactBySlug(ctx context.Context, slug string) (GetProblemWithArtifactBySlugRow, error) {
+	row := q.db.QueryRow(ctx, getProblemWithArtifactBySlug, slug)
+	var i GetProblemWithArtifactBySlugRow
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.OwnerUserID,
+		&i.Visibility,
+		&i.Status,
+		&i.Title,
+		&i.CurrentVersionID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArtifactPath,
+	)
+	return i, err
+}
+
 const listPublishedPublicProblems = `-- name: ListPublishedPublicProblems :many
 SELECT id, slug, owner_user_id, visibility, status, title, current_version_id, created_at, updated_at
 FROM problems
@@ -99,6 +138,58 @@ func (q *Queries) ListPublishedPublicProblems(ctx context.Context) ([]Problem, e
 			&i.CurrentVersionID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublishedPublicProblemsWithArtifact = `-- name: ListPublishedPublicProblemsWithArtifact :many
+SELECT p.id, p.slug, p.owner_user_id, p.visibility, p.status, p.title, p.current_version_id, p.created_at, p.updated_at, pv.artifact_path
+FROM problems p
+JOIN problem_versions pv ON pv.id = p.current_version_id
+WHERE p.status = 'published' AND p.visibility = 'public'
+ORDER BY p.created_at DESC
+`
+
+type ListPublishedPublicProblemsWithArtifactRow struct {
+	ID               int64              `json:"id"`
+	Slug             string             `json:"slug"`
+	OwnerUserID      uuid.NullUUID      `json:"owner_user_id"`
+	Visibility       string             `json:"visibility"`
+	Status           string             `json:"status"`
+	Title            string             `json:"title"`
+	CurrentVersionID pgtype.Int8        `json:"current_version_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ArtifactPath     string             `json:"artifact_path"`
+}
+
+func (q *Queries) ListPublishedPublicProblemsWithArtifact(ctx context.Context) ([]ListPublishedPublicProblemsWithArtifactRow, error) {
+	rows, err := q.db.Query(ctx, listPublishedPublicProblemsWithArtifact)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublishedPublicProblemsWithArtifactRow{}
+	for rows.Next() {
+		var i ListPublishedPublicProblemsWithArtifactRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.OwnerUserID,
+			&i.Visibility,
+			&i.Status,
+			&i.Title,
+			&i.CurrentVersionID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArtifactPath,
 		); err != nil {
 			return nil, err
 		}

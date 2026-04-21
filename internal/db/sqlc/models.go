@@ -32,10 +32,10 @@ type GameParticipant struct {
 }
 
 type GameProblem struct {
-	GameID           int32       `json:"game_id"`
-	ProblemIndex     int32       `json:"problem_index"`
-	ProblemID        string      `json:"problem_id"`
-	ProblemVersionID pgtype.Int8 `json:"problem_version_id"`
+	GameID           int32  `json:"game_id"`
+	ProblemIndex     int32  `json:"problem_index"`
+	ProblemID        string `json:"problem_id"`
+	ProblemVersionID int64  `json:"problem_version_id"`
 }
 
 type Problem struct {
@@ -51,17 +51,17 @@ type Problem struct {
 }
 
 type ProblemVersion struct {
-	ID              int64              `json:"id"`
-	ProblemID       int64              `json:"problem_id"`
-	Version         int32              `json:"version"`
-	ArtifactPath    string             `json:"artifact_path"`
-	ArtifactSha256  string             `json:"artifact_sha256"`
-	StatementSha256 pgtype.Text        `json:"statement_sha256"`
-	LimitsTimeMs    int32              `json:"limits_time_ms"`
-	LimitsMemoryKb  int32              `json:"limits_memory_kb"`
-	CheckerType     string             `json:"checker_type"`
-	CreatedByUserID uuid.NullUUID      `json:"created_by_user_id"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ID                int64              `json:"id"`
+	ProblemID         int64              `json:"problem_id"`
+	Version           int32              `json:"version"`
+	ArtifactPath      string             `json:"artifact_path"`
+	ArtifactSha256    string             `json:"artifact_sha256"`
+	LimitsTimeMs      int32              `json:"limits_time_ms"`
+	LimitsMemoryKb    int32              `json:"limits_memory_kb"`
+	CheckerType       string             `json:"checker_type"`
+	ReferenceLanguage string             `json:"reference_language"`
+	CreatedByUserID   uuid.NullUUID      `json:"created_by_user_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
 type Session struct {
@@ -85,7 +85,7 @@ type Solution struct {
 	MemoryUsed       pgtype.Int4        `json:"memory_used"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
-	ProblemVersionID pgtype.Int8        `json:"problem_version_id"`
+	ProblemVersionID int64              `json:"problem_version_id"`
 }
 
 type User struct {
