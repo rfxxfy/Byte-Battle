@@ -96,6 +96,7 @@ export function GamePage() {
   const [runOutput, setRunOutput] = useState<{ stdout: string; stderr: string } | null>(null)
 
   const [submitting, setSubmitting] = useState(false)
+  const [rateLimitSecs, setRateLimitSecs] = useState(0)
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null)
   const [winner, setWinner] = useState<GameFinished | null>(null)
   const [playerProgress, setPlayerProgress] = useState<Record<string, number>>({})
@@ -221,7 +222,7 @@ export function GamePage() {
 
       ws.onmessage = (e) => {
         try {
-          const msg = JSON.parse(e.data) as { type: string } & SubmissionResult & GameFinished & PlayerAdvanced & PlayerState
+          const msg = JSON.parse(e.data) as { type: string; message?: string } & SubmissionResult & GameFinished & PlayerAdvanced & PlayerState
           if (msg.type === 'submission_result') {
             setSubmissionResult(msg)
             setSubmitting(false)
@@ -264,6 +265,19 @@ export function GamePage() {
             }
             setGame((prev) => (prev ? { ...prev, status: 'finished' } : prev))
             setSubmitting(false)
+          } else if (msg.type === 'error') {
+            setSubmitting(false)
+            if (msg.message?.includes('rate limit')) {
+              setRateLimitSecs(10)
+              const interval = setInterval(() => {
+                setRateLimitSecs((s) => {
+                  if (s <= 1) { clearInterval(interval); return 0 }
+                  return s - 1
+                })
+              }, 1000)
+            } else {
+              setActionError(msg.message ?? 'Ошибка')
+            }
           }
         } catch { /* ignore malformed */ }
       }
@@ -471,9 +485,9 @@ export function GamePage() {
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={!isActive || submitting || timedOut || countdown !== null}
+                disabled={!isActive || submitting || timedOut || countdown !== null || rateLimitSecs > 0}
               >
-                {submitting ? 'Проверяем...' : 'Отправить решение'}
+                {submitting ? 'Проверяем...' : rateLimitSecs > 0 ? `Подождите ${rateLimitSecs}с` : 'Отправить решение'}
               </Button>
             </div>
           </div>
